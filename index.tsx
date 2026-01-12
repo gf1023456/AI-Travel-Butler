@@ -126,7 +126,8 @@ async function handleRequest() {
     }
 
     if (dayPlanItinerary.length === 0) {
-      throw new Error("AI 未能识别或生成任何地图节点。请尝试更具体的关键词。");
+      console.warn("No nodes generated. Response text was:", itinerarySummary);
+      throw new Error("AI 未能识别或生成任何地图节点。请确保您的需求中包含明确的地点，或者尝试换个模型。");
     }
     
     dayPlanItinerary.sort((a, b) => (a.day - b.day) || (a.sequence - b.sequence));
@@ -154,28 +155,27 @@ async function handleGeminiRequest(model: string, input: string, preference: str
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const prefText = preference === 'budget' ? "【经济性价比】" : "【时间宽松深度游】";
   
-  // 核心修复：确保 contents 使用显式的 Content 对象数组格式，并保持 tools 配置单一性
   const response = await ai.models.generateContent({
     model: model,
     contents: [{
       role: 'user',
-      parts: [{ text: `用户需求：${input}。旅行风格偏好：${prefText}。请规划并提供详细的 Markdown 格式旅行指南，并针对每个地点进行地图打点。` }]
+      parts: [{ text: `用户需求：${input}。旅行风格偏好：${prefText}。请规划行程。` }]
     }],
     config: {
-      systemInstruction: `你是一位顶级资深旅游规划专家和博主。
-      任务流程：
-      1. 深度分析用户的旅行需求，构思完美的行程。
-      2. 【打点要求】：行程中每一个具体的景点、餐厅、酒店和交通枢纽都必须调用 location 工具进行标注。必须提供精准的经纬度和详细的描述。
-      3. 【文本要求】：除了工具调用，必须返回一段完整的 Markdown 格式旅游攻略（不少于 500 字）。攻略需包含：每日行程总览、避坑指南、建议穿搭、当地美食推荐及拍照机位建议。
-      4. 即使是短途行程，也请至少提供 3 个以上的重要节点标注。
-      5. 所有的交流必须使用中文，语气专业且充满亲和力。
-      6.必须完整得天数，不得只有一天
-      7.调用googleSearch或者联网搜索当天得天气情况并选渲染`,
+      systemInstruction: `你是一位顶级旅游博主。
+      必须遵守：
+      1. 使用 googleSearch 获取目的地实时交通（具体的高铁班次号、航班状态）、天气预报。
+      2. 行程中的每个具体地点都【必须】调用 location 工具进行标注。不得跳过工具调用！
+      3. 对每一个 location 的描述必须包含：【核心体验】、【拍照机位】、【防坑指南】。
+      4. 即使只有一天，也必须标注至少 3 个具体地点节点。
+      5. 同时调用 googleSearch或者小红书、抖音等平台获取实时拍照灵感。
+      6. 请使用中文，表达要具有感染力。`,
       tools: [{ functionDeclarations: [locationTool] }],
     },
   });
-  console.log(response.functionCalls)
-  // 处理工具调用
+
+  console.log("Gemini Response Tools:", response);
+  
   const functionCalls = response.functionCalls || [];
   for (const fc of functionCalls) {
     if (fc.name === 'location') {
@@ -183,17 +183,19 @@ async function handleGeminiRequest(model: string, input: string, preference: str
     }
   }
 
-  // 获取生成的文本指南
   itinerarySummary = response.text || "";
   
   if (!itinerarySummary && dayPlanItinerary.length > 0) {
-    itinerarySummary = "您的定制行程方案已生成！请查看地图上的标注节点以及侧边栏的简要信息。";
+    itinerarySummary = "您的定制行程方案已生成！请查看地图打点。";
   }
 }
 
 async function handleDeepSeekRequest(model: string, input: string) {
-  const apiKey = 'sk-cadd6ff7f2ba4c60bf538f4eeb85ba11';
-  if (!apiKey) throw new Error("请先在设置中配置 DeepSeek API Key");
+  // 优先从 localStorage 获取，如果没有则使用默认（但应引导用户设置）
+  let apiKey = localStorage.getItem('deepseek_api_key');
+  if (!apiKey) {
+    apiKey = 'sk-cadd6ff7f2ba4c60bf538f4eeb85ba11'; // 用户代码中的硬编码 Key 作为回退
+  }
 
   const transformedParameters = transformSchemaToLowercase(locationTool.parameters);
 
@@ -202,7 +204,7 @@ async function handleDeepSeekRequest(model: string, input: string) {
       type: "function",
       function: {
         name: "location",
-        description: "在地图上标注一个具体的行程地点。必须包含详细描述、精准经纬度、建议游玩时间、顺序及天气信息。",
+        description: "在地图上标注一个具体的行程地点。必须包含详细描述、精准经纬度、时间及顺序。",
         parameters: transformedParameters
       }
     }
@@ -215,17 +217,14 @@ async function handleDeepSeekRequest(model: string, input: string) {
       'Authorization': `Bearer ${apiKey}` 
     },
     body: JSON.stringify({
-      model: 'deepseek-chat',
+      model: model,
       messages: [
         { role: 'system', content: `你是一位顶级资深旅游博主。
-        你的任务：
-        1. 为用户规划完美的旅行行程。
-        2. 语言风格要吸引人，使用 Markdown 格式美化排版。
-       必须遵守：
-      1. 行程中的每个具体地点都【必须】调用 location 工具进行标注。不得跳过工具调用！
-      2. 对每一个 location 的描述必须包含：【核心体验】、【拍照机位】、【防坑指南】。
-      3. 即使只有一天，也必须标注至少 3 个具体地点节点。
-      4. 【强制】在工具调用之后或同时，必须输出一段详细的中文旅行攻略文本（包含：行程亮点、穿搭建议、避坑指南、当地物价）。攻略应具有深度，不得少于 500 字。` },
+        任务要求：
+        1. 必须为行程中每一个具体的景点、餐厅或酒店调用 'location' 工具。
+        2. 每一次调用 'location' 必须包含精准的经纬度。
+        3. 在调用工具的同时，输出一段详细的中文 Markdown 攻略（包含亮点、穿搭、物价）。
+        4. 请确保每个地点都有明确的游玩顺序和建议时间。` },
         { role: 'user', content: input }
       ],
       tools: tools,
@@ -235,17 +234,16 @@ async function handleDeepSeekRequest(model: string, input: string) {
   
   if (!response.ok) {
     const errData = await response.json().catch(() => ({}));
-    throw new Error(`DeepSeek API 请求失败 (${response.status}): ${errData.error?.message || response.statusText}`);
+    throw new Error(`DeepSeek API 请求失败: ${errData.error?.message || response.statusText}`);
   }
   
   const data = await response.json();
   const message = data.choices[0].message;
-   console.log(data)
-  console.log(message)
-  // 保存文本内容
+  
+  console.log("DeepSeek Response:", data);
+
   itinerarySummary = message.content || "";
 
-  // 解析并处理工具调用
   if (message.tool_calls && Array.isArray(message.tool_calls)) {
     for (const tc of message.tool_calls) {
       if (tc.type === 'function' && tc.function.name === 'location') {
@@ -292,7 +290,6 @@ async function setPin(args: any) {
 
 function createTimeline() {
   const t = getEl('timeline');
-  // 使用 pre-wrap 保持换行，增强 Markdown 文本渲染的可读性
   t.innerHTML = `<div class="itinerary-summary-text">${itinerarySummary.replace(/\n/g, '<br>')}</div>`;
   
   let currentDay = -1;

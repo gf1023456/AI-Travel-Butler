@@ -19,16 +19,16 @@ export const locationTool: FunctionDeclaration = {
       sequence: { type: Type.NUMBER, description: '当天游玩的先后顺序' },
       transit_hint: { type: Type.STRING, description: '到达或离开该地点的交通建议' },
       category: { type: Type.STRING, description: '地点分类：SIGHT (景点), FOOD (餐饮), TRANSIT (交通), HOTEL (住宿)' },
-      weather: { type: Type.STRING, description: '预期的当地天气或气候特点描述' },
-      temperature: { type: Type.STRING, description: '建议游玩的体感温度范围' }
+      weather: { type: Type.STRING, description: '该地点的天气描述（如：晴朗，适合户外）' },
+      temperature: { type: Type.STRING, description: '建议游玩的体感温度（如：22°C）' }
     },
-    required: ['name', 'description', 'lat', 'lng', 'time', 'day', 'sequence', 'weather', 'temperature'],
+    required: ['name', 'description', 'lat', 'lng', 'time', 'day', 'sequence'],
   },
 };
 
 /**
  * 工具 2: 小红书内容检索工具 (xhs_search)
- * 暂未启用，保持定义
+ * 暂未启用
  */
 export const xhsSearchTool: FunctionDeclaration = {
   name: 'xhs_search',
