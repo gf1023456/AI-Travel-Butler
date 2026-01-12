@@ -1,7 +1,8 @@
+
 <!doctype html>
 <html>
   <head>
-    <title>交互式地图探索者</title>
+    <title>AI 深度旅游行程规划专家</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="stylesheet" href="/index.css" />
@@ -14,102 +15,89 @@
     </script>
   </head>
   <body>
-    <!-- Main container for the map and related UI elements -->
     <div id="map-container" class="map-container">
       <div id="map"></div>
 
-      <!-- Container for search elements positioned at the top -->
-      <div class="search-container">
-        <!-- Toggle switch for enabling/disabling Day Planner Mode -->
-        <div class="mode-toggle">
-          <label class="switch">
-            <input type="checkbox" id="planner-mode-toggle" />
-            <span class="slider round"></span>
-          </label>
-          <span class="mode-label">行程规划模式</span>
+      <button id="toggle-search-ui" class="floating-control-btn toggle-ui-btn" title="显示/隐藏搜索栏">
+        <i class="fas fa-eye-slash"></i>
+      </button>
+
+      <button id="reopen-timeline" class="floating-control-btn reopen-timeline-btn hidden" title="查看完整行程">
+        <i class="fas fa-route"></i>
+      </button>
+
+      <div class="search-container" id="search-container">
+        <div class="search-header-group">
+          <div class="mode-toggle">
+            <label class="switch">
+              <input type="checkbox" id="planner-mode-toggle" />
+              <span class="slider round"></span>
+            </label>
+            <span class="mode-label" id="mode-text">景点发现模式</span>
+          </div>
+
+          <div id="preference-toggle-group" class="preference-group hidden">
+            <select id="route-preference" class="preference-select">
+              <option value="optimal">⚡ 最优路径 (含高铁/飞机)</option>
+              <option value="budget">💰 性价比路径 (当地公交/特种兵)</option>
+            </select>
+          </div>
         </div>
 
-        <div class="search-bar">
-          <i class="fas fa-search search-icon" style="color: #999; margin-right: 10px; display: flex; align-items: center;"></i>
-          <textarea
-            id="prompt-input"
-            placeholder="探索地点、历史、活动，或询问任何位置..."
-          ></textarea>
-          <button id="generate" class="search-button">
-            <i class="fas fa-arrow-right"></i>
-          </button>
+        <div class="search-bar-stack">
+          <div class="search-bar">
+            <i class="fas fa-search-location" style="color: #ff5722; margin-right: 12px; font-size: 1.2rem;"></i>
+            <textarea id="prompt-input" placeholder="输入目的地或行程想法..."></textarea>
+            <button id="generate" class="search-button"><i class="fas fa-paper-plane"></i></button>
+          </div>
         </div>
 
-        <div class="error" id="error-message"></div>
+        <div class="error hidden" id="error-message"></div>
       </div>
 
-      <!-- Carousel for displaying location cards at the bottom -->
-      <div class="card-carousel">
-        <div class="card-container" id="card-container">
-          <!-- Location cards will be dynamically inserted here -->
-        </div>
-        <div class="carousel-indicators" id="carousel-indicators">
-          <!-- Indicator dots will be added dynamically -->
-        </div>
+      <div class="card-carousel hidden">
+        <div class="card-container" id="card-container"></div>
+        <div class="carousel-indicators" id="carousel-indicators"></div>
       </div>
 
-      <!-- Button to reset the map and clear current results -->
-      <button id="reset" class="reset-button">
-        <i class="fas fa-undo"></i>
+      <button id="reset" class="reset-button" title="重置地图 (R)">
+        <i class="fas fa-redo-alt"></i>
       </button>
     </div>
 
-    <!-- Sliding panel for displaying the day plan timeline -->
     <div class="timeline-container" id="timeline-container">
       <div class="timeline-header">
-        <h3>您的行程计划</h3>
-        <button id="close-timeline" class="close-button">
-          <i class="fas fa-times"></i>
-        </button>
+        <div class="header-left">
+          <h3 id="timeline-title">深度行程指南</h3>
+        </div>
+        <div class="header-actions">
+          <button id="export-btn" class="icon-btn" title="导出为 Markdown"><i class="fas fa-file-export"></i></button>
+          <button id="close-timeline" class="close-button"><i class="fas fa-times"></i></button>
+        </div>
       </div>
-      <div class="timeline" id="timeline">
-        <!-- Timeline items will be inserted here -->
+      <div class="timeline" id="timeline"></div>
+      <div id="grounding-sources" class="grounding-sources hidden">
+        <h4>参考资料与来源</h4>
+        <ul id="source-list"></ul>
       </div>
     </div>
 
-    <div id="spinner" class="hidden spinner"></div>
+    <div id="spinner" class="hidden spinner">
+      <div class="loading-text">AI 正在联网检索实时信息...</div>
+    </div>
 
-    <!-- Google Maps JavaScript API script -->
     <script>
       ((g) => {
-        var h,
-          a,
-          k,
-          p = "The Google Maps JavaScript API",
-          c = "google",
-          l = "importLibrary",
-          q = "__ib__",
-          m = document,
-          b = window;
+        var h, a, k, p = "The Google Maps JavaScript API", c = "google", l = "importLibrary", q = "__ib__", m = document, b = window;
         b = b[c] || (b[c] = {});
-        var d = b.maps || (b.maps = {}),
-          r = new Set(),
-          e = new URLSearchParams(),
-          u = () =>
-            h ||
-            (h = new Promise(async (f, n) => {
-              await (a = m.createElement("script"));
-              e.set("libraries", [...r] + "");
-              for (k in g)
-                e.set(
-                  k.replace(/[A-Z]/g, (t) => "_" + t[0].toLowerCase()),
-                  g[k],
-                );
-              e.set("callback", c + ".maps." + q);
-              a.src = `https://maps.${c}apis.com/maps/api/js?` + e;
-              d[q] = f;
-              a.onerror = () => (h = n(Error(p + " could not load.")));
-              a.nonce = m.querySelector("script[nonce]")?.nonce || "";
-              m.head.append(a);
-            }));
-        d[l]
-          ? console.warn(p + " only loads once. Ignoring:", g)
-          : (d[l] = (f, ...n) => r.add(f) && u().then(() => d[l](f, ...n)));
+        var d = b.maps || (b.maps = {}), r = new Set(), e = new URLSearchParams(), u = () => h || (h = new Promise(async (f, n) => {
+          await (a = m.createElement("script")); e.set("libraries", [...r] + "");
+          for (k in g) e.set(k.replace(/[A-Z]/g, (t) => "_" + t[0].toLowerCase()), g[k]);
+          e.set("callback", c + ".maps." + q); a.src = `https://maps.${c}apis.com/maps/api/js?` + e;
+          d[q] = f; a.onerror = () => (h = n(Error(p + " could not load.")));
+          a.nonce = m.querySelector("script[nonce]")?.nonce || ""; m.head.append(a);
+        }));
+        d[l] ? console.warn(p + " only loads once. Ignoring:", g) : (d[l] = (f, ...n) => r.add(f) && u().then(() => d[l](f, ...n)));
       })({ key: "AIzaSyCNXwnZayI7hxvA3huOB9d82myo1L-7j9Y", v: "weekly" });
     </script>
   </body>
