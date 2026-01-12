@@ -1,0 +1,116 @@
+<!doctype html>
+<html>
+  <head>
+    <title>交互式地图探索者</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="/index.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "@google/genai": "https://esm.sh/@google/genai@^0.7.0"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <!-- Main container for the map and related UI elements -->
+    <div id="map-container" class="map-container">
+      <div id="map"></div>
+
+      <!-- Container for search elements positioned at the top -->
+      <div class="search-container">
+        <!-- Toggle switch for enabling/disabling Day Planner Mode -->
+        <div class="mode-toggle">
+          <label class="switch">
+            <input type="checkbox" id="planner-mode-toggle" />
+            <span class="slider round"></span>
+          </label>
+          <span class="mode-label">行程规划模式</span>
+        </div>
+
+        <div class="search-bar">
+          <i class="fas fa-search search-icon" style="color: #999; margin-right: 10px; display: flex; align-items: center;"></i>
+          <textarea
+            id="prompt-input"
+            placeholder="探索地点、历史、活动，或询问任何位置..."
+          ></textarea>
+          <button id="generate" class="search-button">
+            <i class="fas fa-arrow-right"></i>
+          </button>
+        </div>
+
+        <div class="error" id="error-message"></div>
+      </div>
+
+      <!-- Carousel for displaying location cards at the bottom -->
+      <div class="card-carousel">
+        <div class="card-container" id="card-container">
+          <!-- Location cards will be dynamically inserted here -->
+        </div>
+        <div class="carousel-indicators" id="carousel-indicators">
+          <!-- Indicator dots will be added dynamically -->
+        </div>
+      </div>
+
+      <!-- Button to reset the map and clear current results -->
+      <button id="reset" class="reset-button">
+        <i class="fas fa-undo"></i>
+      </button>
+    </div>
+
+    <!-- Sliding panel for displaying the day plan timeline -->
+    <div class="timeline-container" id="timeline-container">
+      <div class="timeline-header">
+        <h3>您的行程计划</h3>
+        <button id="close-timeline" class="close-button">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="timeline" id="timeline">
+        <!-- Timeline items will be inserted here -->
+      </div>
+    </div>
+
+    <div id="spinner" class="hidden spinner"></div>
+
+    <!-- Google Maps JavaScript API script -->
+    <script>
+      ((g) => {
+        var h,
+          a,
+          k,
+          p = "The Google Maps JavaScript API",
+          c = "google",
+          l = "importLibrary",
+          q = "__ib__",
+          m = document,
+          b = window;
+        b = b[c] || (b[c] = {});
+        var d = b.maps || (b.maps = {}),
+          r = new Set(),
+          e = new URLSearchParams(),
+          u = () =>
+            h ||
+            (h = new Promise(async (f, n) => {
+              await (a = m.createElement("script"));
+              e.set("libraries", [...r] + "");
+              for (k in g)
+                e.set(
+                  k.replace(/[A-Z]/g, (t) => "_" + t[0].toLowerCase()),
+                  g[k],
+                );
+              e.set("callback", c + ".maps." + q);
+              a.src = `https://maps.${c}apis.com/maps/api/js?` + e;
+              d[q] = f;
+              a.onerror = () => (h = n(Error(p + " could not load.")));
+              a.nonce = m.querySelector("script[nonce]")?.nonce || "";
+              m.head.append(a);
+            }));
+        d[l]
+          ? console.warn(p + " only loads once. Ignoring:", g)
+          : (d[l] = (f, ...n) => r.add(f) && u().then(() => d[l](f, ...n)));
+      })({ key: "AIzaSyCNXwnZayI7hxvA3huOB9d82myo1L-7j9Y", v: "weekly" });
+    </script>
+  </body>
+</html>
