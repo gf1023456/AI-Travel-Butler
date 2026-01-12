@@ -9,7 +9,8 @@
     <script type="importmap">
       {
         "imports": {
-          "@google/genai": "https://esm.sh/@google/genai@^0.7.0"
+          "@google/genai": "https://esm.sh/@google/genai@^0.7.0",
+          "@googlemaps/markerclusterer": "https://esm.sh/@googlemaps/markerclusterer@^2.5.3"
         }
       }
     </script>
@@ -28,18 +29,35 @@
 
       <div class="search-container" id="search-container">
         <div class="search-header-group">
-          <div class="mode-toggle">
-            <label class="switch">
-              <input type="checkbox" id="planner-mode-toggle" />
-              <span class="slider round"></span>
-            </label>
-            <span class="mode-label" id="mode-text">景点发现模式</span>
+          <div class="header-left-controls">
+            <div class="mode-toggle">
+              <label class="switch">
+                <input type="checkbox" id="planner-mode-toggle" />
+                <span class="slider round"></span>
+              </label>
+              <span class="mode-label" id="mode-text">景点发现模式</span>
+            </div>
+
+            <select id="model-selector" class="model-select" title="切换 AI 模型">
+              <optgroup label="Google Gemini">
+                <option value="gemini-3-pro-preview">🧠 Gemini 3 Pro (推荐)</option>
+                <option value="gemini-3-flash-preview">⚡ Gemini 3 Flash</option>
+              </optgroup>
+              <optgroup label="DeepSeek (需配置 Key)">
+                <option value="deepseek-chat">🐳 DeepSeek V3 (强力)</option>
+                <option value="deepseek-reasoner">🧠 DeepSeek R1 (深度思考)</option>
+              </optgroup>
+            </select>
+            
+            <button id="open-settings" class="icon-btn-small" title="配置 API Keys">
+              <i class="fas fa-cog"></i>
+            </button>
           </div>
 
           <div id="preference-toggle-group" class="preference-group hidden">
-            <select id="route-preference" class="preference-select">
-              <option value="optimal">⚡ 最优路径 (含高铁/飞机)</option>
-              <option value="budget">💰 性价比路径 (当地公交/特种兵)</option>
+            <select id="route-preference" class="model-select">
+              <option value="budget">💰 经济性价比模式</option>
+              <option value="flexible">🕊️ 时间宽松深度游</option>
             </select>
           </div>
         </div>
@@ -55,14 +73,32 @@
         <div class="error hidden" id="error-message"></div>
       </div>
 
-      <div class="card-carousel hidden">
+      <div id="card-carousel" class="card-carousel hidden">
         <div class="card-container" id="card-container"></div>
         <div class="carousel-indicators" id="carousel-indicators"></div>
       </div>
 
-      <button id="reset" class="reset-button" title="重置地图 (R)">
+      <button id="reset" class="floating-control-btn reset-button" title="重置地图 (R)">
         <i class="fas fa-redo-alt"></i>
       </button>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal-overlay hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3><i class="fas fa-key"></i> 模型配置</h3>
+          <button id="close-settings" class="close-modal-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p class="settings-hint">Google Gemini 模型已预置 API Key。如需使用 DeepSeek，请在下方填入您的 API Key。</p>
+          <div class="input-group">
+            <label>DeepSeek API Key</label>
+            <input type="password" id="deepseek-key-input" placeholder="sk-...">
+          </div>
+          <button id="save-settings" class="primary-btn">保存配置</button>
+        </div>
+      </div>
     </div>
 
     <div class="timeline-container" id="timeline-container">
@@ -83,7 +119,8 @@
     </div>
 
     <div id="spinner" class="hidden spinner">
-      <div class="loading-text">AI 正在联网检索实时信息...</div>
+      <div class="loading-text">AI 正在根据您的偏好，联网检索并规划完整行程...</div>
+      <div id="spinner-model-info" class="loading-model-name"></div>
     </div>
 
     <script>

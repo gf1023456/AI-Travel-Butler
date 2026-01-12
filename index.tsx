@@ -3,7 +3,9 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-import { FunctionDeclaration, GoogleGenAI, Type, GenerateContentResponse } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
+import { MarkerClusterer } from "@googlemaps/markerclusterer";
+import { locationTool } from './mcp-tools';
 
 declare const google: any;
 
@@ -12,6 +14,7 @@ let map: any;
 let markers: any[] = [];
 let popUps: any[] = [];
 let bounds: any;
+let markerCluster: any;
 let activeCardIndex = 0;
 let isPlannerMode = false;
 let isUiHidden = false;
@@ -22,37 +25,62 @@ let polyline: any = null;
 const getEl = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 /**
- * Initialize Map
+ * 转换 Schema 类型为小写以兼容 OpenAI/DeepSeek 接口
  */
+function transformSchemaToLowercase(schema: any): any {
+  if (!schema || typeof schema !== 'object') return schema;
+  const newSchema = Array.isArray(schema) ? [...schema] : { ...schema };
+  
+  if (newSchema.type && typeof newSchema.type === 'string') {
+    newSchema.type = newSchema.type.toLowerCase();
+  }
+  
+  if (newSchema.properties) {
+    for (const key in newSchema.properties) {
+      newSchema.properties[key] = transformSchemaToLowercase(newSchema.properties[key]);
+    }
+  }
+  
+  if (newSchema.items) {
+    newSchema.items = transformSchemaToLowercase(newSchema.items);
+  }
+  
+  return newSchema;
+}
+
 async function initApp() {
   try {
-    const { Map } = await google.maps.importLibrary('maps');
-    const { LatLngBounds } = await google.maps.importLibrary('core');
+    const { Map } = await google.maps.importLibrary('maps') as any;
+    const { LatLngBounds } = await google.maps.importLibrary('core') as any;
     
+    const mapEl = getEl('map');
+    if (!mapEl) return;
+
     bounds = new LatLngBounds();
-    map = new Map(getEl('map'), {
-      center: { lat: 39.9042, lng: 116.4074 },
+    map = new Map(mapEl, {
+      center: { lat: 39.9042, lng: 116.4074 }, 
       zoom: 12,
       disableDefaultUI: true,
-      gestureHandling: 'greedy',
-      styles: [
-        { "featureType": "all", "elementType": "labels.text.fill", "stylers": [{ "color": "#ffffff" }] },
-        { "featureType": "all", "elementType": "labels.text.stroke", "stylers": [{ "color": "#000000" }, { "lightness": 13 }] },
-        { "featureType": "administrative", "elementType": "geometry.fill", "stylers": [{ "color": "#000000" }, { "lightness": 20 }] },
-        { "featureType": "landscape", "elementType": "geometry", "stylers": [{ "color": "#000000" }, { "lightness": 20 }] },
-        { "featureType": "poi", "elementType": "geometry", "stylers": [{ "color": "#000000" }, { "lightness": 21 }] },
-        { "featureType": "road.highway", "elementType": "geometry.fill", "stylers": [{ "color": "#000000" }, { "lightness": 17 }] },
-        { "featureType": "water", "elementType": "geometry", "stylers": [{ "color": "#0d0d0d" }, { "lightness": 17 }] }
-      ]
+      gestureHandling: 'greedy', 
+      mapId: 'DEMO_MAP_ID',
     });
+
+    try {
+      markerCluster = new MarkerClusterer({ map, markers: [] });
+    } catch (e) {}
 
     setupPopupClass();
     bindEvents();
-    setupKeyboardShortcuts();
+    
+    const savedKey = localStorage.getItem('deepseek_api_key');
+    if (savedKey) {
+      (getEl('deepseek-key-input') as HTMLInputElement).value = savedKey;
+    }
     
     getEl('spinner').classList.add('hidden');
   } catch (err) {
-    console.error("Map Load Failed", err);
+    console.error("Map Initialization Failed", err);
+    setStatus("地图初始化失败，请检查网络", "error");
   }
 }
 
@@ -68,9 +96,6 @@ function setupPopupClass() {
       bubble.classList.add('popup-bubble');
       bubble.appendChild(content);
       this.containerDiv.appendChild(bubble);
-      const anchor = document.createElement('div');
-      anchor.classList.add('popup-anchor');
-      this.containerDiv.appendChild(anchor);
       google.maps.OverlayView.preventMapHitsAndGesturesFrom(this.containerDiv);
     }
     onAdd() { (this as any).getPanes().floatPane.appendChild(this.containerDiv); }
@@ -82,350 +107,298 @@ function setupPopupClass() {
   };
 }
 
-const locationFunctionDeclaration: FunctionDeclaration = {
-  name: 'location',
-  parameters: {
-    type: Type.OBJECT,
-    description: '标注地点信息。必须严格根据用户需求产出完整的多天行程。',
-    properties: {
-      name: { type: Type.STRING, description: '地点名称' },
-      description: { type: Type.STRING, description: '详细博主级建议：必看、避雷、网红机位、必点菜。' },
-      lat: { type: Type.STRING },
-      lng: { type: Type.STRING },
-      time: { type: Type.STRING, description: '时间段，如 14:00 - 17:00' },
-      day: { type: Type.NUMBER, description: '所属天数。如果用户要3天，你必须产出 Day 1, 2, 3 的节点。' },
-      sequence: { type: Type.NUMBER, description: '当天顺序编号。' },
-      transit_hint: { type: Type.STRING, description: '具体交通方式（高铁班次、打车、地铁线）。' },
-      type: { type: Type.STRING, description: 'SIGHT, FOOD, TRANSIT, HOTEL' },
-      weather: { type: Type.STRING, description: '通过联网检索得到的该地点当前的实时天气状况（如：晴、多云、小雨）。' },
-      temperature: { type: Type.STRING, description: '该地点当天的实时温度范围或当前气温（如：25°C / 18°C）。' }
-    },
-    required: ['name', 'description', 'lat', 'lng', 'time', 'day', 'sequence', 'weather', 'temperature'],
-  },
-};
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 async function handleRequest() {
   const userInput = (getEl('prompt-input') as HTMLTextAreaElement).value.trim();
-  if (!userInput) {
-    setStatus("请输入您的想法或目的地！", "error");
-    return;
-  }
+  const selectedModel = (getEl('model-selector') as HTMLSelectElement).value;
+  const routePref = (getEl('route-preference') as HTMLSelectElement).value;
+  
+  if (!userInput) return;
 
   restart();
   getEl('spinner').classList.remove('hidden');
-  
-  const statusMsg = isPlannerMode 
-    ? "🗺️ 正在通过 Google Search 检索实时天气、高铁和各大平台真实反馈，为您规划完整多天方案..." 
-    : "🌟 正在为您搜寻全网实时热门宝藏地点与网红机位...";
-  setStatus(statusMsg, "loading");
+  setStatus(`AI 正在规划您的行程...`, "loading");
 
   try {
-    let systemInstruction = `你是一个顶级深度定制旅游博主。
-    1. **必须联网**：使用 googleSearch 检索目的地当前真实的实时天气、气温、交通（高铁具体班次/航班）和景点开放状态。
-    2. **完整规划**：必须识别并严格执行用户要求的天数。如果用户要“3天”，你必须在一次回答中完整调用 location 函数产出 Day 1, Day 2 和 Day 3 的全部节点，严禁遗漏任何一天。
-    3. **细节至上**：描述中必须包含【必打卡点】、【避雷攻略】、【省力路线】。
-    4. **实时天气**：通过搜索获取准确的天气和温度，并填入 location 函数的对应字段。
-    5. 在 text 响应部分提供一段行程亮点总述。`;
+    if (selectedModel.startsWith('deepseek')) {
+      await handleDeepSeekRequest(selectedModel, userInput);
+    } else {
+      await handleGeminiRequest(selectedModel, userInput, routePref);
+    }
 
-    let promptPrefix = `用户需求：${userInput}。
+    if (dayPlanItinerary.length === 0) {
+      throw new Error("AI 未能识别或生成任何地图节点。请尝试更具体的关键词。");
+    }
     
-    你必须：
-    - 如果用户提到具体天数（如 3天），必须完整返回这 3 天的行程节点，每一天至少包含 3-5 个节点。
-    - 联网查询目的地的【当前实时天气】和【实时气温】，体现在每个节点的 weather 和 temperature 字段中。
-    - 针对交通，联网搜索最优的具体高铁班次（如：G652次）或航班建议。
-    - 参考小红书、大众点评的最新高分评价。`;
-
-    if (!isPlannerMode) {
-      systemInstruction = "你是一个全网通的旅游挖掘博主，擅长提供最新、最真实、带实时天气的宝藏地推荐。";
-      promptPrefix = `请联网搜索推荐 6-10 个关于“${userInput}”的打卡点。每个点必须包含真实的【实时天气】和【气温】。`;
-    }
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
-      contents: promptPrefix,
-      config: {
-        thinkingConfig: { thinkingBudget: isPlannerMode ? 5500 : 2500 },
-        systemInstruction,
-        tools: [{ googleSearch: {} }, { functionDeclarations: [locationFunctionDeclaration] }],
-      },
-    });
-
-    const textPart = response.candidates?.[0]?.content?.parts.find(p => p.text);
-    if (textPart) itinerarySummary = textPart.text || "";
-
-    const calls = response.candidates?.[0]?.content?.parts.filter(p => p.functionCall) || [];
-    for (const part of calls) {
-      const fn = part.functionCall;
-      if (fn && fn.name === 'location') await setPin(fn.args);
-    }
-
-    const grounding = response.candidates?.[0]?.groundingMetadata;
-    if (grounding && grounding.groundingChunks) displaySources(grounding.groundingChunks);
-
-    if (dayPlanItinerary.length === 0) throw new Error("AI 未能获取到实时细节，请尝试输入更具体的内容（如：城市+天数）。");
-
-    dayPlanItinerary.sort((a, b) => {
-      const d1 = Number(a.day) || 1;
-      const d2 = Number(b.day) || 1;
-      if (d1 !== d2) return d1 - d2;
-      return (Number(a.sequence) || 0) - (Number(b.sequence) || 0);
-    });
-
-    if (isPlannerMode) {
-      drawRoute();
-      createTimeline();
-      showTimeline();
-    }
+    dayPlanItinerary.sort((a, b) => (a.day - b.day) || (a.sequence - b.sequence));
     
     createCards();
+    if (isPlannerMode) { 
+      drawRoute(); 
+      createTimeline(); 
+      showTimeline(); 
+    } else { 
+      hideTimeline(); 
+    }
+
     highlightCard(0, true);
     setStatus("", "hidden");
   } catch (e: any) {
+    console.error("HandleRequest Error:", e);
     setStatus("⚠️ " + e.message, "error");
-    console.error(e);
   } finally {
     getEl('spinner').classList.add('hidden');
   }
 }
 
-function displaySources(chunks: any[]) {
-  const list = getEl('source-list');
-  const container = getEl('grounding-sources');
-  list.innerHTML = '';
-  const uniqueUrls = new Set();
-  chunks.forEach(chunk => {
-    if (chunk.web?.uri && !uniqueUrls.has(chunk.web.uri)) {
-      uniqueUrls.add(chunk.web.uri);
-      const li = document.createElement('li');
-      li.innerHTML = `<a href="${chunk.web.uri}" target="_blank"><i class="fas fa-link"></i> ${chunk.web.title || chunk.web.uri}</a>`;
-      list.appendChild(li);
-    }
+async function handleGeminiRequest(model: string, input: string, preference: string) {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const prefText = preference === 'budget' ? "【经济性价比】" : "【时间宽松深度游】";
+  
+  // 核心修复：确保 contents 使用显式的 Content 对象数组格式，并保持 tools 配置单一性
+  const response = await ai.models.generateContent({
+    model: model,
+    contents: [{
+      role: 'user',
+      parts: [{ text: `用户需求：${input}。旅行风格偏好：${prefText}。请规划并提供详细的 Markdown 格式旅行指南，并针对每个地点进行地图打点。` }]
+    }],
+    config: {
+      systemInstruction: `你是一位顶级资深旅游规划专家和博主。
+      任务流程：
+      1. 深度分析用户的旅行需求，构思完美的行程。
+      2. 【打点要求】：行程中每一个具体的景点、餐厅、酒店和交通枢纽都必须调用 location 工具进行标注。必须提供精准的经纬度和详细的描述。
+      3. 【文本要求】：除了工具调用，必须返回一段完整的 Markdown 格式旅游攻略（不少于 500 字）。攻略需包含：每日行程总览、避坑指南、建议穿搭、当地美食推荐及拍照机位建议。
+      4. 即使是短途行程，也请至少提供 3 个以上的重要节点标注。
+      5. 所有的交流必须使用中文，语气专业且充满亲和力。
+      6.必须完整得天数，不得只有一天
+      7.调用googleSearch或者联网搜索当天得天气情况并选渲染`,
+      tools: [{ functionDeclarations: [locationTool] }],
+    },
   });
-  if (uniqueUrls.size > 0) container.classList.remove('hidden');
+  console.log(response.functionCalls)
+  // 处理工具调用
+  const functionCalls = response.functionCalls || [];
+  for (const fc of functionCalls) {
+    if (fc.name === 'location') {
+      await setPin(fc.args);
+    }
+  }
+
+  // 获取生成的文本指南
+  itinerarySummary = response.text || "";
+  
+  if (!itinerarySummary && dayPlanItinerary.length > 0) {
+    itinerarySummary = "您的定制行程方案已生成！请查看地图上的标注节点以及侧边栏的简要信息。";
+  }
+}
+
+async function handleDeepSeekRequest(model: string, input: string) {
+  const apiKey = 'sk-cadd6ff7f2ba4c60bf538f4eeb85ba11';
+  if (!apiKey) throw new Error("请先在设置中配置 DeepSeek API Key");
+
+  const transformedParameters = transformSchemaToLowercase(locationTool.parameters);
+
+  const tools = [
+    {
+      type: "function",
+      function: {
+        name: "location",
+        description: "在地图上标注一个具体的行程地点。必须包含详细描述、精准经纬度、建议游玩时间、顺序及天气信息。",
+        parameters: transformedParameters
+      }
+    }
+  ];
+  
+  const response = await fetch('https://api.deepseek.com/chat/completions', {
+    method: 'POST',
+    headers: { 
+      'Content-Type': 'application/json', 
+      'Authorization': `Bearer ${apiKey}` 
+    },
+    body: JSON.stringify({
+      model: 'deepseek-chat',
+      messages: [
+        { role: 'system', content: `你是一位顶级资深旅游博主。
+        你的任务：
+        1. 为用户规划完美的旅行行程。
+        2. 语言风格要吸引人，使用 Markdown 格式美化排版。
+       必须遵守：
+      1. 行程中的每个具体地点都【必须】调用 location 工具进行标注。不得跳过工具调用！
+      2. 对每一个 location 的描述必须包含：【核心体验】、【拍照机位】、【防坑指南】。
+      3. 即使只有一天，也必须标注至少 3 个具体地点节点。
+      4. 【强制】在工具调用之后或同时，必须输出一段详细的中文旅行攻略文本（包含：行程亮点、穿搭建议、避坑指南、当地物价）。攻略应具有深度，不得少于 500 字。` },
+        { role: 'user', content: input }
+      ],
+      tools: tools,
+      tool_choice: "auto"
+    })
+  });
+  
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(`DeepSeek API 请求失败 (${response.status}): ${errData.error?.message || response.statusText}`);
+  }
+  
+  const data = await response.json();
+  const message = data.choices[0].message;
+   console.log(data)
+  console.log(message)
+  // 保存文本内容
+  itinerarySummary = message.content || "";
+
+  // 解析并处理工具调用
+  if (message.tool_calls && Array.isArray(message.tool_calls)) {
+    for (const tc of message.tool_calls) {
+      if (tc.type === 'function' && tc.function.name === 'location') {
+        try {
+          const args = JSON.parse(tc.function.arguments);
+          await setPin(args);
+        } catch (e) {
+          console.error("解析工具参数失败", e);
+        }
+      }
+    }
+  }
+
+  if (!itinerarySummary && dayPlanItinerary.length > 0) {
+    itinerarySummary = "方案已生成，请查看地图上的标注。";
+  }
 }
 
 async function setPin(args: any) {
-  const pos = { lat: Number(args.lat), lng: Number(args.lng) };
-  bounds.extend(pos);
+  const { name, lat, lng } = args;
+  const pos = { lat: parseFloat(lat), lng: parseFloat(lng) };
+  if (isNaN(pos.lat) || isNaN(pos.lng)) return;
 
+  bounds.extend(pos);
   const marker = new google.maps.Marker({
-    map: map,
     position: pos,
-    title: args.name,
-    animation: google.maps.Animation.DROP,
+    title: name,
+    map: map,
     icon: {
       path: google.maps.SymbolPath.CIRCLE,
-      fillColor: args.type === 'TRANSIT' ? '#2196F3' : args.type === 'FOOD' ? '#FFC107' : '#ff5722',
-      fillOpacity: 1,
-      strokeWeight: 3,
-      strokeColor: '#fff',
-      scale: 11
+      fillColor: '#ff5722', fillOpacity: 1, strokeWeight: 2, strokeColor: '#fff', scale: 8
     }
   });
   
-  markers.push(marker);
-  map.fitBounds(bounds);
-
   const content = document.createElement('div');
-  content.innerHTML = `<div style="padding: 5px; min-width: 130px;"><strong>${args.name}</strong><br><small style="color:#666">Day ${args.day} | ${args.time}<br>🌡️ ${args.temperature} | ${args.weather}</small></div>`;
+  content.innerHTML = `<strong style="font-size:11px;">${name}</strong>`;
   const popup = new (window as any).Popup(new google.maps.LatLng(pos), content);
   
   const item = { ...args, position: new google.maps.LatLng(pos), popup, marker };
   dayPlanItinerary.push(item);
   popUps.push(item);
+  map.fitBounds(bounds);
+}
 
-  marker.addListener('click', () => {
-    highlightCard(dayPlanItinerary.indexOf(item), true);
+function createTimeline() {
+  const t = getEl('timeline');
+  // 使用 pre-wrap 保持换行，增强 Markdown 文本渲染的可读性
+  t.innerHTML = `<div class="itinerary-summary-text">${itinerarySummary.replace(/\n/g, '<br>')}</div>`;
+  
+  let currentDay = -1;
+  dayPlanItinerary.forEach((item, index) => {
+    if (item.day !== currentDay) {
+      currentDay = item.day;
+      const h = document.createElement('div');
+      h.className = 'day-header';
+      h.innerHTML = `D${currentDay}`;
+      t.appendChild(h);
+    }
+    const div = document.createElement('div');
+    div.className = `timeline-item`;
+    div.onclick = () => highlightCard(index, true);
+    div.innerHTML = `
+      <div class="timeline-time">${item.time}</div>
+      <div class="timeline-content">
+        <div class="timeline-title">${item.name}</div>
+        <div class="timeline-description">${item.description}</div>
+        ${item.transit_hint ? `<div class="transit-info"><i class="fas fa-bus"></i> ${item.transit_hint}</div>` : ''}
+      </div>`;
+    t.appendChild(div);
   });
+}
+
+function createCards() {
+  const container = getEl('card-container');
+  container.innerHTML = '';
+  getEl('card-carousel').classList.remove('hidden');
+  dayPlanItinerary.forEach((loc, index) => {
+    const card = document.createElement('div');
+    card.className = `location-card`;
+    card.innerHTML = `
+      <div class="card-day-mini">D${loc.day}</div>
+      <div class="card-info-mini">
+        <div class="card-title-mini">${loc.name}</div>
+        <div class="card-time-mini">${loc.time}</div>
+      </div>
+    `;
+    card.onclick = () => highlightCard(index, true);
+    container.appendChild(card);
+  });
+}
+
+function highlightCard(index: number, scroll: boolean = false) {
+  popUps.forEach(p => p.popup.setMap(null));
+  activeCardIndex = Math.max(0, Math.min(index, dayPlanItinerary.length - 1));
+  const item = dayPlanItinerary[activeCardIndex];
+  if (item) {
+    item.popup.setMap(map);
+    map.panTo(item.position);
+    if (scroll) {
+      const cards = document.querySelectorAll('.location-card');
+      cards[activeCardIndex]?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      cards.forEach(c => c.classList.remove('active'));
+      cards[activeCardIndex]?.classList.add('active');
+    }
+  }
 }
 
 function drawRoute() {
   if (polyline) polyline.setMap(null);
   polyline = new google.maps.Polyline({
     path: dayPlanItinerary.map(i => i.position),
-    geodesic: true,
-    strokeColor: '#ff5722',
-    strokeOpacity: 0.8,
-    strokeWeight: 5,
-    icons: [{
-      icon: { path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW, strokeColor: '#fff', scale: 2 },
-      offset: '100%',
-      repeat: '120px'
-    }],
-    map: map
+    strokeColor: '#ff5722', strokeOpacity: 0.6, strokeWeight: 2, map: map
   });
-}
-
-function createCards() {
-  const container = getEl('card-container');
-  const indicators = getEl('carousel-indicators');
-  container.innerHTML = ''; indicators.innerHTML = '';
-  document.querySelector('.card-carousel')!.classList.remove('hidden');
-  
-  dayPlanItinerary.forEach((loc, index) => {
-    const card = document.createElement('div');
-    card.className = `location-card type-${loc.type || 'SIGHT'}`;
-    card.innerHTML = `
-      <div class="card-badge">Day ${loc.day} - ${loc.sequence}</div>
-      <div class="card-weather"><i class="fas fa-cloud-sun"></i> ${loc.temperature}</div>
-      <div class="card-title">${loc.name}</div>
-      <div class="card-description">${loc.description}</div>
-    `;
-    card.onclick = () => highlightCard(index, true);
-    container.appendChild(card);
-
-    const dot = document.createElement('div');
-    dot.className = 'carousel-dot';
-    dot.onclick = () => highlightCard(index, true);
-    indicators.appendChild(dot);
-  });
-}
-
-function createTimeline() {
-  const t = getEl('timeline');
-  t.innerHTML = '';
-  
-  if (itinerarySummary) {
-    const summaryDiv = document.createElement('div');
-    summaryDiv.className = 'timeline-summary';
-    summaryDiv.innerHTML = `<i class="fas fa-info-circle"></i> <strong>行程总括与建议：</strong><br>${itinerarySummary.replace(/\n/g, '<br>')}`;
-    t.appendChild(summaryDiv);
-  }
-
-  let currentDay = -1;
-  dayPlanItinerary.forEach((item, index) => {
-    if (item.day !== currentDay) {
-      currentDay = item.day;
-      const dayHeader = document.createElement('div');
-      dayHeader.className = 'day-header';
-      dayHeader.innerHTML = `<i class="fas fa-calendar-day"></i> <span>第 ${currentDay} 天行程规划 (实时天气：${item.weather} ${item.temperature})</span>`;
-      t.appendChild(dayHeader);
-    }
-
-    const div = document.createElement('div');
-    div.className = `timeline-item type-${item.type || 'SIGHT'}`;
-    div.onclick = () => highlightCard(index, true);
-    div.innerHTML = `
-      <div class="timeline-time">${item.time} <span class="weather-pill">${item.temperature}</span></div>
-      <div class="timeline-content">
-        <div class="timeline-title">${item.name}</div>
-        <div class="timeline-description">${item.description}</div>
-      </div>
-    `;
-    t.appendChild(div);
-
-    if (index < dayPlanItinerary.length - 1 && item.transit_hint) {
-      if (dayPlanItinerary[index+1].day === item.day) {
-        const transitDiv = document.createElement('div');
-        transitDiv.className = 'transit-info';
-        transitDiv.innerHTML = `<i class="fas fa-shuttle-van"></i> <strong>交通细节：</strong>${item.transit_hint}`;
-        t.appendChild(transitDiv);
-      }
-    }
-  });
-}
-
-function exportItinerary() {
-  if (dayPlanItinerary.length === 0) return;
-  let md = `# AI 深度全域旅游手册\n\n`;
-  if (itinerarySummary) md += `## 行程前瞻\n${itinerarySummary}\n\n`;
-  let currentDay = -1;
-  dayPlanItinerary.forEach((item, i) => {
-    if (item.day !== currentDay) {
-      currentDay = item.day;
-      md += `\n# --- DAY ${currentDay} (实时天气: ${item.weather} ${item.temperature}) ---\n\n`;
-    }
-    md += `### ${item.sequence}. ${item.name} (${item.time})\n`;
-    md += `> **实时状况:** ${item.weather} / ${item.temperature}\n\n`;
-    md += `> **深度建议:**\n${item.description}\n\n`;
-    if (item.transit_hint) md += `**🚀 交通指南:** ${item.transit_hint}\n\n`;
-    md += `\n`;
-  });
-  md += `\n---\n### 数据来源与参考:\n`;
-  const sources = getEl('source-list').querySelectorAll('a');
-  sources.forEach(a => md += `- [${a.innerText}](${a.getAttribute('href')})\n`);
-  const blob = new Blob([md], { type: 'text/markdown' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `我的深度旅行手册_${new Date().toLocaleDateString()}.md`;
-  a.click();
-}
-
-function highlightCard(index: number, scroll: boolean = false) {
-  popUps.forEach(p => p.popup.setMap(null));
-  activeCardIndex = Math.max(0, Math.min(index, dayPlanItinerary.length - 1));
-  const cards = document.querySelectorAll('.location-card');
-  const dots = document.querySelectorAll('.carousel-dot');
-  cards.forEach((c, i) => c.classList.toggle('card-active', i === activeCardIndex));
-  dots.forEach((d, i) => d.classList.toggle('active', i === activeCardIndex));
-  const item = dayPlanItinerary[activeCardIndex];
-  if (item) {
-    item.popup.setMap(map);
-    map.panTo(item.position);
-    item.marker.setAnimation(google.maps.Animation.BOUNCE);
-    setTimeout(() => item.marker.setAnimation(null), 1200);
-  }
-  if (scroll && cards[activeCardIndex]) {
-    getEl('card-container').scrollTo({ 
-      left: (cards[activeCardIndex] as HTMLElement).offsetLeft - (getEl('card-container').offsetWidth / 2) + 120, 
-      behavior: 'smooth' 
-    });
-  }
-}
-
-function setStatus(msg: string, type: 'loading' | 'error' | 'hidden') {
-  const err = getEl('error-message');
-  if (type === 'hidden') {
-    err.classList.add('hidden');
-    return;
-  }
-  err.innerText = msg;
-  err.className = `error ${type}`;
-  err.classList.remove('hidden');
-}
-
-function showTimeline() {
-  getEl('timeline-container').classList.add('visible');
-  getEl('map-container').classList.add('shifted');
-  getEl('reopen-timeline').classList.add('hidden');
-}
-
-function hideTimeline() {
-  getEl('timeline-container').classList.remove('visible');
-  getEl('map-container').classList.remove('shifted');
-  if (dayPlanItinerary.length > 0 && isPlannerMode) getEl('reopen-timeline').classList.remove('hidden');
 }
 
 function restart() {
-  markers.forEach(m => m.setMap(null));
   popUps.forEach(p => p.popup.setMap(null));
   if (polyline) polyline.setMap(null);
-  markers = []; popUps = []; dayPlanItinerary = []; itinerarySummary = "";
+  dayPlanItinerary = [];
   getEl('card-container').innerHTML = '';
-  getEl('source-list').innerHTML = '';
+  getEl('card-carousel').classList.add('hidden');
+  getEl('timeline-container').classList.remove('visible');
   getEl('grounding-sources').classList.add('hidden');
-  document.querySelector('.card-carousel')!.classList.add('hidden');
-  setStatus("", "hidden");
-  hideTimeline();
   bounds = new google.maps.LatLngBounds();
+  setStatus("", "hidden");
+}
+
+function setStatus(msg: string, type: string) {
+  const err = getEl('error-message');
+  if (type === 'hidden') { err.classList.add('hidden'); return; }
+  err.innerText = msg; err.className = `error ${type}`; err.classList.remove('hidden');
 }
 
 function bindEvents() {
   getEl('planner-mode-toggle').onchange = (e) => {
     isPlannerMode = (e.target as HTMLInputElement).checked;
-    getEl('preference-toggle-group').classList.toggle('hidden', !isPlannerMode);
-    getEl('mode-text').innerText = isPlannerMode ? "行程规划模式 (支持多天+实时天气)" : "景点发现模式";
-    (getEl('prompt-input') as HTMLTextAreaElement).placeholder = isPlannerMode 
-      ? "输入行程：如“下周带孩子去北京玩3天，带实时天气和具体高铁班次建议”" 
-      : "输入兴趣点（如：杭州西湖看日落的网红位置）";
+    getEl('mode-text').innerText = isPlannerMode ? "行程规划模式" : "景点发现模式";
+    const prefGroup = getEl('preference-toggle-group');
+    if (isPlannerMode) prefGroup.classList.remove('hidden');
+    else prefGroup.classList.add('hidden');
     restart();
   };
   getEl('generate').onclick = handleRequest;
-  getEl('export-btn').onclick = exportItinerary;
   getEl('reset').onclick = restart;
+  getEl('export-btn').onclick = () => {
+    let md = `# 行程指南\n\n${itinerarySummary}\n\n`;
+    dayPlanItinerary.forEach(i => md += `## Day ${i.day}: ${i.name}\n- 时间: ${i.time}\n- 详情: ${i.description}\n\n`);
+    const blob = new Blob([md], { type: 'text/markdown' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `行程指南.md`;
+    a.click();
+  };
   getEl('close-timeline').onclick = hideTimeline;
   getEl('reopen-timeline').onclick = showTimeline;
   getEl('toggle-search-ui').onclick = () => {
@@ -433,18 +406,27 @@ function bindEvents() {
     getEl('search-container').classList.toggle('ui-hidden', isUiHidden);
     getEl('toggle-search-ui').innerHTML = isUiHidden ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
   };
-  getEl('prompt-input').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleRequest(); }
-  });
+  getEl('open-settings').onclick = () => getEl('settings-modal').classList.remove('hidden');
+  getEl('close-settings').onclick = () => getEl('settings-modal').classList.add('hidden');
+  getEl('save-settings').onclick = () => {
+    const val = (getEl('deepseek-key-input') as HTMLInputElement).value.trim();
+    localStorage.setItem('deepseek_api_key', val);
+    getEl('settings-modal').classList.add('hidden');
+  };
 }
 
-function setupKeyboardShortcuts() {
-  window.addEventListener('keydown', (e) => {
-    if (["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName || "")) return;
-    if (e.key === 'ArrowRight') highlightCard(activeCardIndex + 1, true);
-    if (e.key === 'ArrowLeft') highlightCard(activeCardIndex - 1, true);
-    if (e.key.toLowerCase() === 'r') restart();
-  });
+function hideTimeline() { 
+  getEl('timeline-container').classList.remove('visible'); 
+  if (dayPlanItinerary.length > 0) getEl('reopen-timeline').classList.remove('hidden'); 
 }
 
-initApp();
+function showTimeline() { 
+  getEl('timeline-container').classList.add('visible'); 
+  getEl('reopen-timeline').classList.add('hidden'); 
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp);
+} else {
+  initApp();
+}
