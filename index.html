@@ -29,9 +29,14 @@
             <i class="fas fa-route"></i>
             <span>AI Travel Pro</span>
           </div>
-          <button id="open-settings" class="icon-btn" title="配置中心">
-            <i class="fas fa-cog"></i>
-          </button>
+          <div class="header-actions" style="display:flex; gap:8px;">
+            <button id="open-history" class="icon-btn" title="历史行程">
+              <i class="fas fa-history"></i>
+            </button>
+            <button id="open-settings" class="icon-btn" title="配置中心">
+              <i class="fas fa-cog"></i>
+            </button>
+          </div>
         </div>
 
         <div class="sidebar-scroll">
@@ -45,6 +50,10 @@
               <optgroup label="DeepSeek">
                 <option value="deepseek-chat">🐳 DeepSeek V3</option>
                 <option value="deepseek-reasoner">🧠 DeepSeek R1</option>
+              </optgroup>
+              <optgroup label="智谱 AI (BigModel)">
+                <option value="glm-4-plus">💎 GLM-4-Plus (最强)</option>
+                <option value="glm-4-flash">⚡ GLM-4-Flash (极速)</option>
               </optgroup>
             </select>
           </section>
@@ -152,14 +161,35 @@
         </div>
         <div class="modal-body">
           <div class="input-group">
+            <label>Google Gemini API Key (可选)</label>
+            <p style="font-size:11px; color:#64748b; margin-bottom:4px;">如需覆盖默认 Key</p>
+            <input type="password" id="gemini-key-input" placeholder="AI_KEY...">
+          </div>
+          <div class="input-group">
             <label>DeepSeek API Key</label>
             <input type="password" id="deepseek-key-input" placeholder="sk-...">
+          </div>
+          <div class="input-group">
+            <label>智谱 AI API Key</label>
+            <input type="password" id="zhipu-key-input" placeholder="api-key...">
           </div>
           <div class="input-group">
             <label>天地图 API Key (tk)</label>
             <input type="text" id="tdt-key-input" placeholder="请输入 tk...">
           </div>
           <button id="save-settings" class="primary-btn-full">保存配置</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="history-modal" class="modal-overlay hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3><i class="fas fa-history"></i> 历史指南记录</h3>
+          <button id="close-history" class="close-modal-btn">&times;</button>
+        </div>
+        <div class="modal-body" style="padding: 15px; max-height: 70vh; overflow-y: auto;" id="history-list">
+          <!-- 历史列表将渲染在这里 -->
         </div>
       </div>
     </div>
