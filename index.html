@@ -2,141 +2,192 @@
 <!doctype html>
 <html>
   <head>
-    <title>AI 深度旅游行程规划专家</title>
+    <title>AI 深度旅游规划专家 - Pro</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
     <link rel="stylesheet" href="/index.css" />
     <script type="importmap">
       {
         "imports": {
           "@google/genai": "https://esm.sh/@google/genai@^0.7.0",
-          "@googlemaps/markerclusterer": "https://esm.sh/@googlemaps/markerclusterer@^2.5.3"
+          "leaflet": "https://esm.sh/leaflet@1.9.4",
+          "leaflet.markercluster": "https://esm.sh/leaflet.markercluster@1.5.3"
         }
       }
     </script>
   </head>
   <body>
-    <div id="map-container" class="map-container">
-      <div id="map"></div>
+    <div class="app-shell">
+      <!-- Left Sidebar -->
+      <aside class="sidebar-left" id="sidebar-left">
+        <div class="sidebar-header">
+          <div class="brand">
+            <i class="fas fa-route"></i>
+            <span>AI Travel Pro</span>
+          </div>
+          <button id="open-settings" class="icon-btn" title="配置中心">
+            <i class="fas fa-cog"></i>
+          </button>
+        </div>
 
-      <button id="toggle-search-ui" class="floating-control-btn toggle-ui-btn" title="显示/隐藏搜索栏">
-        <i class="fas fa-eye-slash"></i>
-      </button>
-
-      <button id="reopen-timeline" class="floating-control-btn reopen-timeline-btn hidden" title="查看完整行程">
-        <i class="fas fa-route"></i>
-      </button>
-
-      <div class="search-container" id="search-container">
-        <div class="search-header-group">
-          <div class="header-left-controls">
-            <div class="mode-toggle">
-              <label class="switch">
-                <input type="checkbox" id="planner-mode-toggle" />
-                <span class="slider round"></span>
-              </label>
-              <span class="mode-label" id="mode-text">景点发现模式</span>
-            </div>
-
-            <select id="model-selector" class="model-select" title="切换 AI 模型">
+        <div class="sidebar-scroll">
+          <section class="control-section">
+            <label class="section-label">智能模型</label>
+            <select id="model-selector" class="form-select">
               <optgroup label="Google Gemini">
                 <option value="gemini-3-pro-preview">🧠 Gemini 3 Pro (推荐)</option>
                 <option value="gemini-3-flash-preview">⚡ Gemini 3 Flash</option>
               </optgroup>
-              <optgroup label="DeepSeek (需配置 Key)">
-                <option value="deepseek-chat">🐳 DeepSeek V3 (强力)</option>
-                <option value="deepseek-reasoner">🧠 DeepSeek R1 (深度思考)</option>
+              <optgroup label="DeepSeek">
+                <option value="deepseek-chat">🐳 DeepSeek V3</option>
+                <option value="deepseek-reasoner">🧠 DeepSeek R1</option>
               </optgroup>
             </select>
-            
-            <button id="open-settings" class="icon-btn-small" title="配置 API Keys">
-              <i class="fas fa-cog"></i>
-            </button>
-          </div>
+          </section>
 
-          <div id="preference-toggle-group" class="preference-group hidden">
-            <select id="route-preference" class="model-select">
+          <section class="control-section">
+            <label class="section-label">工作模式</label>
+            <div class="mode-control-card">
+              <div class="mode-toggle-group">
+                <span class="mode-text" id="mode-text">景点发现模式</span>
+                <label class="switch">
+                  <input type="checkbox" id="planner-mode-toggle" />
+                  <span class="slider round"></span>
+                </label>
+              </div>
+            </div>
+          </section>
+
+          <section class="control-section hidden" id="preference-toggle-group">
+            <label class="section-label">路径偏好</label>
+            <select id="route-preference" class="form-select">
               <option value="budget">💰 经济性价比模式</option>
               <option value="flexible">🕊️ 时间宽松深度游</option>
             </select>
-          </div>
+          </section>
+
+          <section class="input-section">
+            <label class="section-label">您的旅行想法</label>
+            <div class="prompt-box">
+              <textarea id="prompt-input" placeholder="例如：我想去北京玩三天，带孩子，住在王府井附近..."></textarea>
+              <button id="generate" class="primary-action-btn">
+                <span>开始规划</span>
+                <i class="fas fa-magic"></i>
+              </button>
+            </div>
+          </section>
+
+          <div id="error-message" class="error-box hidden" style="margin-top: 15px; padding: 12px; background: #fee2e2; border-radius: 8px; color: #b91c1c; font-size: 13px;"></div>
         </div>
 
-        <div class="search-bar-stack">
-          <div class="search-bar">
-            <i class="fas fa-search-location" style="color: #ff5722; margin-right: 12px; font-size: 1.2rem;"></i>
-            <textarea id="prompt-input" placeholder="输入目的地或行程想法..."></textarea>
-            <button id="generate" class="search-button"><i class="fas fa-paper-plane"></i></button>
+        <div class="sidebar-footer">
+          <button id="reset" class="footer-btn">
+            <i class="fas fa-redo-alt"></i>
+            <span>重置地图</span>
+          </button>
+        </div>
+      </aside>
+
+      <!-- Main Map Area -->
+      <main class="main-canvas">
+        <div id="map"></div>
+
+        <div class="map-tool-stack">
+          <button id="toggle-timeline" class="map-tool-btn" title="查看行程清单">
+            <i class="fas fa-list-ul"></i>
+          </button>
+          <div class="map-type-menu-wrapper">
+            <button id="toggle-map-type" class="map-tool-btn" title="切换图层">
+              <i class="fas fa-layer-group"></i>
+            </button>
+            <div id="map-type-menu" class="map-type-menu hidden">
+              <div class="menu-label">天地图图层</div>
+              <button class="menu-item active" data-type="tdt_vec">天地图 矢量</button>
+              <button class="menu-item" data-type="tdt_img">天地图 影像</button>
+            </div>
           </div>
+          <button id="toggle-search-ui" class="map-tool-btn" title="全屏浏览">
+            <i class="fas fa-expand"></i>
+          </button>
         </div>
 
-        <div class="error hidden" id="error-message"></div>
-      </div>
+        <!-- Carousel -->
+        <div id="card-carousel" class="card-carousel hidden">
+          <div class="card-container" id="card-container"></div>
+        </div>
+      </main>
 
-      <div id="card-carousel" class="card-carousel hidden">
-        <div class="card-container" id="card-container"></div>
-        <div class="carousel-indicators" id="carousel-indicators"></div>
-      </div>
-
-      <button id="reset" class="floating-control-btn reset-button" title="重置地图 (R)">
-        <i class="fas fa-redo-alt"></i>
-      </button>
+      <!-- Right Panel: Timeline -->
+      <aside class="sidebar-right" id="timeline-container">
+        <div class="sidebar-header">
+          <h3 id="timeline-title">深度行程指南</h3>
+          <div class="header-actions">
+            <button id="share-btn" class="icon-btn-ghost" title="分享"><i class="fas fa-share-alt"></i></button>
+            <button id="close-timeline" class="icon-btn-ghost"><i class="fas fa-times"></i></button>
+          </div>
+        </div>
+        <div class="sidebar-scroll">
+          <div id="social-recs-section" class="social-recs-section hidden">
+            <div class="trending-header" style="margin-bottom: 15px; color: var(--primary); font-weight: 800;">
+              <i class="fas fa-fire"></i>
+              <span>社交平台热门趋势</span>
+            </div>
+            <div id="social-recs-list" class="social-recs-list"></div>
+          </div>
+          <div class="timeline" id="timeline-content"></div>
+        </div>
+      </aside>
     </div>
 
-    <!-- Settings Modal -->
+    <!-- Modals -->
     <div id="settings-modal" class="modal-overlay hidden">
       <div class="modal-content">
         <div class="modal-header">
-          <h3><i class="fas fa-key"></i> 模型配置</h3>
+          <h3><i class="fas fa-key"></i> 秘钥配置</h3>
           <button id="close-settings" class="close-modal-btn">&times;</button>
         </div>
         <div class="modal-body">
-          <p class="settings-hint">Google Gemini 模型已预置 API Key。如需使用 DeepSeek，请在下方填入您的 API Key。</p>
           <div class="input-group">
             <label>DeepSeek API Key</label>
             <input type="password" id="deepseek-key-input" placeholder="sk-...">
           </div>
-          <button id="save-settings" class="primary-btn">保存配置</button>
+          <div class="input-group">
+            <label>天地图 API Key (tk)</label>
+            <input type="text" id="tdt-key-input" placeholder="请输入 tk...">
+          </div>
+          <button id="save-settings" class="primary-btn-full">保存配置</button>
         </div>
       </div>
     </div>
 
-    <div class="timeline-container" id="timeline-container">
-      <div class="timeline-header">
-        <div class="header-left">
-          <h3 id="timeline-title">深度行程指南</h3>
+    <div id="share-modal" class="modal-overlay hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>行程海报生成</h3>
+          <button id="close-share" class="close-modal-btn">&times;</button>
         </div>
-        <div class="header-actions">
-          <button id="share-btn" class="icon-btn" title="分享行程链接"><i class="fas fa-share-alt"></i></button>
-          <button id="export-btn" class="icon-btn" title="导出为 Markdown"><i class="fas fa-file-export"></i></button>
-          <button id="close-timeline" class="close-button"><i class="fas fa-times"></i></button>
+        <div class="modal-body">
+          <div class="poster-preview-area" style="background: #f1f5f9; padding: 20px; border-radius: 12px; text-align: center;">
+            <div id="poster-placeholder">
+              <button id="generate-poster-btn" class="primary-btn-small">生成 AI 海报</button>
+            </div>
+            <div id="poster-result" class="hidden">
+              <canvas id="poster-canvas" width="800" style="max-width: 100%; border-radius: 8px;"></canvas>
+            </div>
+          </div>
         </div>
-      </div>
-      <div class="timeline" id="timeline"></div>
-      <div id="grounding-sources" class="grounding-sources hidden">
-        <h4>参考资料与来源</h4>
-        <ul id="source-list"></ul>
       </div>
     </div>
 
     <div id="spinner" class="hidden spinner">
-      <div class="loading-text">AI 正在根据您的偏好，联网检索并规划完整行程...</div>
-      <div id="spinner-model-info" class="loading-model-name"></div>
+      <div class="loading-animation"></div>
+      <div class="loading-text">正在深度规划您的完美行程...</div>
     </div>
 
-    <script>
-      ((g) => {
-        var h, a, k, p = "The Google Maps JavaScript API", c = "google", l = "importLibrary", q = "__ib__", m = document, b = window;
-        b = b[c] || (b[c] = {});
-        var d = b.maps || (b.maps = {}), r = new Set(), e = new URLSearchParams(), u = () => h || (h = new Promise(async (f, n) => {
-          await (a = m.createElement("script")); e.set("libraries", [...r] + "");
-          for (k in g) e.set(k.replace(/[A-Z]/g, (t) => "_" + t[0].toLowerCase()), g[k]);
-          e.set("callback", c + ".maps." + q); a.src = `https://maps.${c}apis.com/maps/api/js?` + e;
-          d[q] = f; a.onerror = () => (h = n(Error(p + " could not load.")));
-          a.nonce = m.querySelector("script[nonce]")?.nonce || ""; m.head.append(a);
-        }));
-        d[l] ? console.warn(p + " only loads once. Ignoring:", g) : (d[l] = (f, ...n) => r.add(f) && u().then(() => d[l](f, ...n)));
-      })({ key: "AIzaSyCNXwnZayI7hxvA3huOB9d82myo1L-7j9Y", v: "weekly" });
-    </script>
+    <script type="module" src="/index.tsx"></script>
   </body>
 </html>
