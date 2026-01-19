@@ -1,4 +1,3 @@
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -6,7 +5,6 @@
 import { GoogleGenAI } from '@google/genai';
 import L from 'leaflet';
 import { locationTool, socialRecommendationTool } from './mcp-tools';
-import { initAuth } from './auth';
 
 // Application state
 let map: L.Map;
@@ -17,6 +15,7 @@ let mapLayers: L.Layer[] = []; // Store markers and polylines to clear them easi
 let tdtLayer: L.TileLayer;
 let tdtAnnoLayer: L.TileLayer;
 let currentMapType: 'tdt_vec' | 'tdt_img' = 'tdt_vec'; // Track map type
+let activeSheet: string | null = null; // Track currently open sheet
 
 // Constants
 const TDT_DEFAULT_KEY = "97f9870fb795ba80ef201d6edae71d73";
@@ -45,11 +44,8 @@ function initApp() {
 
   switchTDT('tdt_vec', savedTdtKey);
   
-  // Initialize Authentication Module
-  initAuth();
-
   // Initialize UI Bindings
-  bindHUD();
+  bindNavigation();
   bindEvents();
   getEl('loading-overlay').classList.remove('active');
   
@@ -58,6 +54,11 @@ function initApp() {
   toastContainer.className = 'toast-container';
   toastContainer.id = 'toast-container';
   document.body.appendChild(toastContainer);
+
+  // Open Explore sheet by default on desktop
+  if (window.innerWidth > 768) {
+    toggleSheet('sheet-explore');
+  }
 }
 
 function switchTDT(type: string, tk: string) {
@@ -76,34 +77,91 @@ function switchTDT(type: string, tk: string) {
   }).addTo(map);
 }
 
-function bindHUD() {
-  getEl('hud-toggle-input').onclick = () => getEl('sidebar-left').classList.toggle('ui-hidden');
-  getEl('hud-toggle-itinerary').onclick = () => getEl('timeline-container').classList.toggle('visible');
-  getEl('hud-open-history').onclick = () => { renderHistoryList(); getEl('history-modal').classList.add('active'); };
-  getEl('hud-open-settings').onclick = () => getEl('settings-modal').classList.add('active');
-  getEl('user-profile').onclick = () => getEl('settings-modal').classList.add('active');
-  
-  // Restore Satellite/Vector toggle
-  getEl('hud-toggle-layers').onclick = () => {
+/**
+ * Handle Bottom Dock and Sheet Logic
+ */
+function bindNavigation() {
+  // 1. Explore Tab
+  getEl('nav-explore').onclick = () => {
+    setActiveTab('nav-explore');
+    toggleSheet('sheet-explore');
+  };
+  getEl('top-search-trigger').onclick = () => {
+    setActiveTab('nav-explore');
+    toggleSheet('sheet-explore');
+  };
+
+  // 2. Plan Tab
+  getEl('nav-plan').onclick = () => {
+    setActiveTab('nav-plan');
+    toggleSheet('sheet-plan');
+  };
+
+  // 3. Layers (Direct Action)
+  getEl('nav-layers').onclick = () => {
     currentMapType = currentMapType === 'tdt_vec' ? 'tdt_img' : 'tdt_vec';
     const key = localStorage.getItem('tdt_api_key') || TDT_DEFAULT_KEY;
     switchTDT(currentMapType, key);
     
-    // Optional: Visual feedback on button
-    const btn = getEl('hud-toggle-layers');
-    if (currentMapType === 'tdt_img') {
-      btn.style.background = '#333';
-      btn.style.color = '#fff';
-    } else {
-      btn.style.background = '';
-      btn.style.color = '';
-    }
+    // Toggle active state visual
+    const btn = getEl('nav-layers');
+    btn.classList.toggle('active');
+    const label = btn.querySelector('span');
+    if (label) label.innerText = currentMapType === 'tdt_img' ? '地图' : '卫星';
   };
+
+  // 4. History (Modal)
+  getEl('nav-history').onclick = () => {
+    renderHistoryList();
+    getEl('history-modal').classList.add('active');
+  };
+
+  // 5. Settings (Modal)
+  getEl('nav-settings').onclick = () => {
+    getEl('settings-modal').classList.add('active');
+  };
+  getEl('user-profile').onclick = () => {
+    getEl('settings-modal').classList.add('active');
+  };
+
+  // Close Sheet Handlers
+  document.querySelectorAll('.close-sheet-btn').forEach(btn => {
+    (btn as HTMLButtonElement).onclick = (e) => {
+      const targetId = (e.currentTarget as HTMLElement).dataset.target;
+      if (targetId) closeSheet(targetId);
+    };
+  });
+}
+
+function setActiveTab(id: string) {
+  document.querySelectorAll('.dock-item').forEach(el => el.classList.remove('active'));
+  getEl(id).classList.add('active');
+}
+
+function toggleSheet(id: string) {
+  const el = getEl(id);
+  const isOpen = el.classList.contains('active');
+  
+  // Close all other sheets first (Mutual exclusion)
+  document.querySelectorAll('.sheet-panel').forEach(sheet => {
+    if (sheet.id !== id) sheet.classList.remove('active');
+  });
+
+  if (isOpen) {
+    el.classList.remove('active');
+    activeSheet = null;
+  } else {
+    el.classList.add('active');
+    activeSheet = id;
+  }
+}
+
+function closeSheet(id: string) {
+  getEl(id).classList.remove('active');
+  activeSheet = null;
 }
 
 function bindEvents() {
-  getEl('close-console').onclick = () => getEl('sidebar-left').classList.add('ui-hidden');
-  getEl('close-itinerary').onclick = () => getEl('timeline-container').classList.remove('visible');
   getEl('close-settings').onclick = () => getEl('settings-modal').classList.remove('active');
   getEl('close-history').onclick = () => getEl('history-modal').classList.remove('active');
   
@@ -118,12 +176,12 @@ function bindEvents() {
        label.innerText = "📅 深度排期 (完整)";
        label.style.color = "var(--primary)";
        styleGroup.classList.remove('hidden');
-       btn.innerText = "生成深度排期";
+       btn.innerHTML = '<i class="fas fa-magic"></i> 生成深度排期';
      } else {
        label.innerText = "🔍 景点发现 (轻量)";
        label.style.color = "#64748b";
        styleGroup.classList.add('hidden');
-       btn.innerText = "开始探索";
+       btn.innerHTML = '<i class="fas fa-paper-plane"></i> 开始探索';
      }
   };
 
@@ -140,7 +198,7 @@ function bindEvents() {
     // Refresh map if key changed
     switchTDT(currentMapType, tdtKey || TDT_DEFAULT_KEY);
     getEl('settings-modal').classList.remove('active');
-    showToast("设置已保存");
+    showToast("配置已保存", 'success');
   };
   
   getEl('generate').onclick = handleRequest;
@@ -155,27 +213,23 @@ const GLOBAL_SYSTEM_PROMPT = `你是一位世界顶级的深度旅游规划专�
 【关键逻辑 - 出发地与目的地】：
 当用户输入 "从 A 到 B" (例如：从成都到重庆) 时，你必须严格遵守：
 1. **区分身份**：A 是出发地，B 是目的地。
-2. **行程分配**：
-   - 第一天(Day 1)：通常包含从 A 离开，乘坐交通工具前往 B。
-   - 后续天数(Day 2+)：必须 **100%** 在目的地 B 进行游玩。
-3. **严禁错误推荐**：严禁在到达 B 之后（例如 Day 2, Day 3），推荐 A 城市的景点。
-   - 错误示例：用户去重庆，Day 2 却推荐了成都的宽窄巷子。
-   - 正确示例：用户去重庆，Day 2 推荐洪崖洞、解放碑。
-
 【必须包含的三大部分】：
 1. 社交分析阶段 (工具: get_social_recommendations):
-   - 分析**目的地**最火的趋势（小红书/抖音），为用户提供打卡灵感。
-   
+   - 必须调用一次。分析当前最火的趋势，为用户提供灵感。
 2. 地图标注阶段 (工具: location):
    - 必须针对用户要求的【每一天】调用多次。
-   - 如果发生城市转移，必须生成一个 category="TRANSIT" 的节点，描述详细交通方案（高铁/飞机班次）。
-   - **务必准确填写 city 字段**，确保生成的地点属于正确的城市。
-
+   - 每一天的行程必须至少包含 3-4 个 location 打点（早、中、晚、交通）。
+   - 禁止在调用完社交推荐后就停止！必须紧接着进行地图打点。
 3. 文字总结阶段:
-   - 提供丰富的行程亮点说明。最后必须包含【行程花费预估】。
+   - 在所有工具调用完成后，提供简洁的行程亮点说明。
+【严苛禁令】：
+- 严禁二选一！必须【同时】给出社交平台趋势和每日具体的地图行程。
+- 严禁输出 <think> 标签内容。
+- 严禁任何废话开场白，直接开始调用工具链。。`;
 
-严禁输出 <think> 标签内容。直接调用工具。`;
-
+/**
+ * Main Request Handler that dispatches to the correct AI provider
+ */
 async function handleRequest() {
   const userInput = (getEl('prompt-input') as HTMLTextAreaElement).value.trim();
   const modelType = (getEl('model-selector') as HTMLSelectElement).value;
@@ -183,34 +237,91 @@ async function handleRequest() {
   const travelMode = (getEl('travel-mode-selector') as HTMLSelectElement).value;
   
   if (!userInput) {
-    showToast("请输入您的旅行想法");
+    showToast("请输入您的旅行想法", 'error');
     return;
   }
 
   // API Key Validation
   if (modelType.includes('deepseek')) {
     if (!localStorage.getItem('deepseek_api_key')) {
-      showToast('请先配置 DeepSeek API Key');
-      getEl('settings-modal').classList.add('active');
+      showToast('请先在设置中配置 DeepSeek API Key', 'error', 4000);
+      setTimeout(() => getEl('settings-modal').classList.add('active'), 1000);
       return;
     }
   } else if (modelType.includes('glm')) {
     if (!localStorage.getItem('zhipu_api_key')) {
-       showToast('请先配置智谱 GLM API Key');
-       getEl('settings-modal').classList.add('active');
+       showToast('请先在设置中配置智谱 GLM API Key', 'error', 4000);
+       setTimeout(() => getEl('settings-modal').classList.add('active'), 1000);
        return;
     }
   }
 
   restart();
+  closeSheet('sheet-explore');
   getEl('loading-overlay').classList.add('active');
   
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const modelName = modelType.startsWith('gemini') ? modelType : 'gemini-3-pro-preview';
+    let finalPrompt = constructUserPrompt(userInput, isPlannerMode, travelMode);
 
-    let finalPrompt = "";
+    if (modelType.startsWith('gemini')) {
+        // --- GOOGLE GEMINI (Use SDK) ---
+        await callGemini(modelType, finalPrompt);
+    } else if (modelType.includes('deepseek')) {
+        // --- DEEPSEEK ---
+        await handleDeepSeekRequest(modelType, userInput, finalPrompt);
+    } else if (modelType.includes('GLM') || modelType.includes('glm')) {
+        // --- ZHIPU GLM ---
+        await handleZhipuRequest(modelType, userInput, finalPrompt);
+    }
     
+    renderAll();
+    
+    // Automatically open the Plan sheet after generation
+    setTimeout(() => {
+        setActiveTab('nav-plan');
+        toggleSheet('sheet-plan');
+    }, 500);
+
+  } catch (e: any) {
+    console.error("AI Generation Error:", e);
+    
+    // Robust Error Handling with User Feedback
+    let errorMsg = "服务暂时不可用，请稍后重试";
+    let isAuthError = false;
+    
+    if (e.message) {
+        // Check for common API errors
+        if (e.message.includes('401') || e.message.includes('API key') || e.message.includes('Unauthenticated')) {
+            errorMsg = "鉴权失败：API Key 无效或未配置";
+            isAuthError = true;
+        } else if (e.message.includes('429') || e.message.includes('quota') || e.message.includes('Resource has been exhausted')) {
+            errorMsg = "请求过快：API 配额已耗尽或被限制";
+        } else if (e.message.includes('Failed to parse')) {
+            errorMsg = "数据解析错误：模型返回格式异常";
+        } else if (e.message.includes('fetch') || e.message.includes('network')) {
+            errorMsg = "网络连接失败，请检查您的网络设置";
+        } else {
+            // Truncate long error messages
+            errorMsg = `请求失败: ${e.message.length > 50 ? e.message.substring(0, 50) + '...' : e.message}`;
+        }
+    }
+    
+    showToast(errorMsg, 'error', 5000);
+    
+    // If it's an auth error, guide user to settings
+    if (isAuthError) {
+        setTimeout(() => {
+            getEl('settings-modal').classList.add('active');
+            showToast("请检查并更新您的 API Key", 'normal', 4000);
+        }, 1500);
+    }
+
+  } finally {
+    getEl('loading-overlay').classList.remove('active');
+  }
+}
+
+function constructUserPrompt(userInput: string, isPlannerMode: boolean, travelMode: string) {
     if (isPlannerMode) {
       // 深度排期模式
       let modeInstruction = "";
@@ -228,40 +339,184 @@ async function handleRequest() {
           modeInstruction = `【核心指令：摄影出片】\n1. 追逐光影：根据日出日落时间安排行程。\n2. 机位优先：重点标注热门机位。`;
           break;
       }
-      finalPrompt = `${modeInstruction}\n\n请为我生成一份详细的每日行程规划，严格区分出发地和目的地，不要混淆城市景点。需求：${userInput}`;
+      return `${modeInstruction}\n\n请为我生成一份详细的每日行程规划，严格区分出发地和目的地，不要混淆城市景点。需求：${userInput}`;
     } else {
       // 景点发现模式
-      finalPrompt = `【核心指令：景点发现模式】
+      return `【核心指令：景点发现模式】
 用户不需要完整的时间表，只需要你根据需求推荐一组值得去的地方。
 1. 请列出符合用户需求的 5-10 个地点（集中在用户想去的目的地）。
-2. 在地图上进行标注 (使用 location 工具)。
+2. 在地图上进行标注。
 3. 提供简短的文字介绍和推荐理由。
 用户需求：${userInput}`;
     }
+}
 
+// Transform Google GenAI schema to OpenAI JSON schema
+function transformSchema(schema: any): any {
+  if (!schema) return undefined;
+  const newSchema: any = JSON.parse(JSON.stringify(schema));
+  
+  if (newSchema.type) {
+    newSchema.type = newSchema.type.toLowerCase();
+  }
+  
+  if (newSchema.properties) {
+    const newProps: any = {};
+    for (const key in newSchema.properties) {
+      newProps[key] = transformSchema(newSchema.properties[key]);
+    }
+    newSchema.properties = newProps;
+  }
+  
+  if (newSchema.items) {
+    newSchema.items = transformSchema(newSchema.items);
+  }
+  
+  // Clean up fields that might strictly offend OpenAI validation if they exist
+  // but are undefined. (Mostly handled by JSON.stringify above)
+  
+  return newSchema;
+}
+
+function addValidItem(item: any) {
+  if (!item) return;
+  // Validations
+  if (!item.name || !item.lat || !item.lng) return;
+  
+  // Normalize data types
+  if (typeof item.day === 'string') item.day = parseInt(item.day) || 1;
+  if (typeof item.sequence === 'string') item.sequence = parseInt(item.sequence) || 1;
+  
+  dayPlanItinerary.push(item);
+}
+
+async function callGemini(modelName: string, prompt: string) {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: modelName,
-      contents: finalPrompt,
+      contents: prompt,
       config: {
-        systemInstruction: GLOBAL_SYSTEM_PROMPT,
+        systemInstruction: GLOBAL_SYSTEM_PROMPT + "严禁输出 <think> 标签内容。直接调用工具。",
         tools: [{ functionDeclarations: [locationTool, socialRecommendationTool] }],
       },
     });
     
     const fcs = response.functionCalls || [];
     fcs.forEach((fc: any) => {
-      if (fc.name === 'location') dayPlanItinerary.push(fc.args);
+      if (fc.name === 'location') addValidItem(fc.args);
       if (fc.name === 'get_social_recommendations') socialRecommendations = fc.args.recommendations || [];
     });
     itinerarySummary = response.text || "排期已生成";
-    renderAll();
-    getEl('timeline-container').classList.add('visible');
-  } catch (e: any) {
-    alert(`请求失败: ${e.message}`);
-  } finally {
-    getEl('loading-overlay').classList.remove('active');
+}
+
+async function handleDeepSeekRequest(model: string, input: string, pref: string) {
+  const apiKey = localStorage.getItem('deepseek_api_key');
+  if (!apiKey) throw new Error("请先在设置中配置 DeepSeek API Key");
+
+  const response = await fetch('https://api.deepseek.com/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+    body: JSON.stringify({ 
+      model: model, 
+      messages: [
+        { role: 'system', content: GLOBAL_SYSTEM_PROMPT },
+        { role: 'user', content: `【强制执行】需求：${input}。
+你需要同时执行以下两个子任务：
+任务A：调用 'get_social_recommendations'。
+任务B：为每一天调用多次 'location'。
+请立刻开始调用工具，不要回复文字说明。` }
+      ],
+      tools: [
+        { type: "function", function: { name: "get_social_recommendations", parameters: transformSchema(socialRecommendationTool.parameters) } },
+        { type: "function", function: { name: "location", parameters: transformSchema(locationTool.parameters) } }
+      ],
+      tool_choice: "auto",
+      max_tokens: 4000,
+      temperature: 0.1
+    })
+  });
+
+  if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`DeepSeek Error: ${response.status} ${errText}`);
+  }
+
+  const data = await response.json();
+  if (data.error) throw new Error(data.error.message);
+  
+  const message = data.choices?.[0]?.message;
+  if (!message) throw new Error("DeepSeek 返回数据为空");
+  
+  itinerarySummary = message.content || "规划数据同步中...";
+  
+  if (message.tool_calls) {
+    for (const tc of message.tool_calls) {
+      const args = JSON.parse(tc.function.arguments);
+      if (tc.function.name === 'location') addValidItem(args);
+      if (tc.function.name === 'get_social_recommendations') socialRecommendations = args.recommendations || [];
+    }
+  }
+
+  if (socialRecommendations.length > 0 && dayPlanItinerary.length === 0) {
+    itinerarySummary = "⚠️ 模型仅返回了趋势分析，未能完成地图打点。建议再次点击“开始规划”或换用 Gemini 3 Pro。";
   }
 }
+
+async function handleZhipuRequest(model: string, input: string, pref: string) {
+  const apiKey = localStorage.getItem('zhipu_api_key');
+  if (!apiKey) throw new Error("请先在设置中配置 智谱 AI API Key");
+
+  // Use model from arguments if available, otherwise default to user preference
+  const modelName = model || 'glm-4-flash';
+
+  const response = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
+    method: 'POST',
+    headers: { 
+      'Content-Type': 'application/json', 
+      'Authorization': `Bearer ${apiKey}` 
+    },
+    body: JSON.stringify({ 
+      model: modelName, 
+      messages: [
+        { role: 'system', content: GLOBAL_SYSTEM_PROMPT },
+        { role: 'user', content: `【强制执行】需求：${input}。
+你需要同时执行以下两个子任务：
+任务A：调用 'get_social_recommendations'。
+任务B：为每一天调用多次 'location'。
+请立刻开始调用工具，不要回复文字说明。` }
+      ],
+      tools: [
+        { type: "function", function: { name: "get_social_recommendations", parameters: transformSchema(socialRecommendationTool.parameters) } },
+        { type: "function", function: { name: "location", parameters: transformSchema(locationTool.parameters) } }
+      ],
+      tool_choice: "auto",
+      max_tokens: 4096,
+      temperature: 0.2
+    })
+  });
+
+  if (!response.ok) {
+     const errText = await response.text();
+     throw new Error(`Zhipu GLM Error: ${response.status} ${errText}`);
+  }
+
+  const data = await response.json();
+  if (data.error) throw new Error(data.error.message);
+  
+  const message = data.choices?.[0]?.message;
+  if (!message) throw new Error("Zhipu AI 返回数据为空");
+
+  itinerarySummary = message.content || "正在解析智谱 AI 规划结果...";
+  
+  if (message.tool_calls) {
+    for (const tc of message.tool_calls) {
+      const args = JSON.parse(tc.function.arguments);
+      if (tc.function.name === 'location') addValidItem(args);
+      if (tc.function.name === 'get_social_recommendations') socialRecommendations = args.recommendations || [];
+    }
+  }
+}
+
 
 function renderAll() {
   // Sort Items
@@ -272,15 +527,16 @@ function renderAll() {
 
   // 1. Render Summary
   const summaryDiv = document.createElement('div');
-  summaryDiv.className = 'itinerary-summary';
-  summaryDiv.innerHTML = itinerarySummary;
+  summaryDiv.className = 'timeline-card';
+  summaryDiv.style.borderLeft = 'none'; // Clean look
+  summaryDiv.innerHTML = `<h5 style="color:var(--text-title); font-size:15px; margin-bottom:10px;">🌟 行程综述</h5><p style="color:#3C3C43; font-size:14px; line-height:1.5;">${itinerarySummary}</p>`;
   container.appendChild(summaryDiv);
   
   // 2. Render Social Recommendations
   if (socialRecommendations.length > 0) {
     const socialDiv = document.createElement('div');
     socialDiv.className = 'social-radar';
-    let socialHtml = `<h4><i class="fas fa-fire"></i> 社交热度打卡</h4>`;
+    let socialHtml = `<h4 style="margin-bottom:12px; font-size:16px;">🔥 热门打卡</h4>`;
     socialRecommendations.forEach(r => {
       socialHtml += `<div class="social-item"><span>${r.platform}</span><b>${r.title}</b><p>${r.reason}</p></div>`;
     });
@@ -296,8 +552,14 @@ function renderAll() {
   const getColor = (day: number) => DAY_COLORS[(day - 1) % DAY_COLORS.length];
 
   dayPlanItinerary.forEach((item, index) => {
+    // Ensure lat/lng are usable
+    if (!item.lat || !item.lng) return;
+    
     const lat = parseFloat(item.lat);
     const lng = parseFloat(item.lng);
+    
+    if (isNaN(lat) || isNaN(lng)) return;
+
     const latlng = L.latLng(lat, lng);
     const dayColor = getColor(item.day);
 
@@ -317,23 +579,19 @@ function renderAll() {
     
     // City Badge Logic
     const cityBadge = item.city 
-        ? `<span style="background:#eee; color:#333; padding:1px 5px; border-radius:4px; font-size:10px; margin-left:5px;">${item.city}</span>` 
+        ? `<span style="background:#F2F2F7; color:#3C3C43; padding:2px 6px; border-radius:4px; font-size:10px; margin-left:5px;">${item.city}</span>` 
         : '';
 
     // Popup Content
     const popupContent = `
-      <div style="min-width:220px; font-family:sans-serif;">
-        <h3 style="margin:0 0 5px 0; color:${dayColor}; border-bottom:1px solid #eee; padding-bottom:5px;">
-           <span style="font-size:12px; background:${dayColor}; color:#fff; padding:2px 6px; border-radius:4px; margin-right:4px;">D${item.day}</span>
+      <div style="min-width:200px; font-family:-apple-system, sans-serif;">
+        <h3 style="margin:0 0 5px 0; color:${dayColor}; font-size:16px;">
            ${item.name}
         </h3>
-        <div style="font-size:12px; color:#666; margin-bottom:8px;">
-           <i class="far fa-clock"></i> ${item.time} ${cityBadge}
+        <div style="font-size:12px; color:#8E8E93; margin-bottom:8px;">
+           D${item.day} · ${item.time} ${cityBadge}
         </div>
         <p style="margin:0; font-size:13px; line-height:1.4; color:#333;">${item.description}</p>
-        <div style="margin-top:8px; font-size:12px; background:#f8fafc; padding:6px; border-radius:4px; color:#64748b;">
-            🚗 ${item.transit_hint || '暂无详细交通建议'}
-        </div>
       </div>
     `;
     marker.bindPopup(popupContent);
@@ -350,9 +608,9 @@ function renderAll() {
       : '';
       
     card.innerHTML = `
-      <h5 style="color:${dayColor}">D${item.day} <span style="color:#94a3b8; font-weight:normal; font-size:12px;">${item.time}</span> ${cityBadge} ${weatherHtml}</h5>
-      <div style="font-weight:bold; font-size:15px; margin-bottom:4px;">${item.name}</div>
-      <p>${item.description}</p>
+      <h5 style="color:${dayColor}">Day ${item.day} <span style="color:#8E8E93; font-weight:normal;">${item.time}</span> ${cityBadge} ${weatherHtml}</h5>
+      <div style="font-weight:700; font-size:16px; margin-bottom:4px; color:#000;">${item.name}</div>
+      <p style="color:#3C3C43; font-size:14px;">${item.description}</p>
     `;
     
     // Interaction: Click Card -> FlyTo Marker
@@ -360,7 +618,11 @@ function renderAll() {
       map.flyTo(latlng, 15, { duration: 1.5 });
       marker.openPopup();
       
-      // Highlight card visually
+      // Close sheet slightly on mobile to show map (Jobs UX detail)
+      if (window.innerWidth < 768) {
+         // Optionally collapse sheet or just do nothing, user can drag down
+      }
+      
       document.querySelectorAll('.timeline-card').forEach(c => c.classList.remove('active'));
       card.classList.add('active');
     };
@@ -375,9 +637,8 @@ function renderAll() {
     if (points.length > 1) {
       const polyline = L.polyline(points, {
         color: getColor(day),
-        weight: 4,
-        opacity: 0.7,
-        dashArray: '10, 10', // Dashed line to indicate path
+        weight: 5,
+        opacity: 0.8,
         lineCap: 'round'
       }).addTo(map);
       mapLayers.push(polyline);
@@ -397,15 +658,23 @@ function restart() {
   
   dayPlanItinerary = [];
   socialRecommendations = [];
-  getEl('timeline-content').innerHTML = '';
+  getEl('timeline-content').innerHTML = `<div class="empty-state"><i class="fas fa-route"></i><p>正在规划中...</p></div>`;
 }
 
 // Show Toast Notification
-function showToast(message: string) {
+function showToast(message: string, type: 'normal' | 'success' | 'error' = 'normal', duration = 3000) {
   const container = getEl('toast-container');
+  if (!container) return;
+  
   const toast = document.createElement('div');
-  toast.className = 'toast';
-  toast.innerText = message;
+  toast.className = `toast ${type}`;
+  
+  // Optional: Add icons based on type
+  let iconHtml = '';
+  if (type === 'success') iconHtml = '<i class="fas fa-check-circle"></i>';
+  if (type === 'error') iconHtml = '<i class="fas fa-exclamation-circle"></i>';
+  
+  toast.innerHTML = `${iconHtml}<span>${message}</span>`;
   container.appendChild(toast);
   
   // Trigger animation
@@ -413,13 +682,15 @@ function showToast(message: string) {
   
   setTimeout(() => {
     toast.classList.remove('show');
-    setTimeout(() => container.removeChild(toast), 300);
-  }, 3000);
+    setTimeout(() => {
+      if(container.contains(toast)) container.removeChild(toast);
+    }, 400); // Wait for transition to finish
+  }, duration);
 }
 
 function saveToHistory() {
   if (dayPlanItinerary.length === 0) {
-    showToast("当前无方案可保存");
+    showToast("当前无方案可保存", 'error');
     return;
   }
   const history = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
@@ -443,7 +714,7 @@ function saveToHistory() {
   history.unshift(newItem);
   if (history.length > 30) history.pop();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
-  showToast("方案保存成功！");
+  showToast("方案保存成功！", 'success');
 }
 
 function renderHistoryList() {
@@ -461,7 +732,7 @@ function renderHistoryList() {
       <div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:11px; opacity:0.5; padding-right: 20px;">
         <span>${item.timestamp}</span>
       </div>
-      <div style="font-weight:900; font-size:14px;">${item.prompt.substring(0, 50)}...</div>
+      <div style="font-weight:700; font-size:15px; color:#000;">${item.prompt.substring(0, 50)}...</div>
     `;
     
     // Delete Button
@@ -485,8 +756,12 @@ function renderHistoryList() {
       (getEl('prompt-input') as HTMLTextAreaElement).value = item.prompt;
       renderAll();
       getEl('history-modal').classList.remove('active');
-      getEl('timeline-container').classList.add('visible');
-      showToast("方案加载成功");
+      
+      // Auto open plan sheet
+      setActiveTab('nav-plan');
+      toggleSheet('sheet-plan');
+      
+      showToast("方案加载成功", 'success');
     };
     
     card.appendChild(delBtn);
@@ -500,7 +775,7 @@ function deleteHistoryItem(id: number) {
   history = history.filter((item: any) => item.id !== id);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
   renderHistoryList(); // Refresh list
-  showToast("删除成功");
+  showToast("删除成功", 'success');
 }
 
 /**
@@ -557,7 +832,7 @@ function generatePlainTextGuide(): string {
 
 function exportToFile() {
   if (dayPlanItinerary.length === 0) {
-    showToast("没有可导出的行程数据");
+    showToast("没有可导出的行程数据", 'error');
     return;
   }
 
@@ -575,16 +850,16 @@ function exportToFile() {
 
 function copyToClipboard() { 
   if (dayPlanItinerary.length === 0 && !itinerarySummary) {
-    showToast("没有内容可复制");
+    showToast("没有内容可复制", 'error');
     return;
   }
   
   const textContent = generatePlainTextGuide();
   
   navigator.clipboard.writeText(textContent).then(() => {
-    showToast("完整旅行指南已复制");
+    showToast("完整旅行指南已复制", 'success');
   }).catch(() => {
-    showToast("复制失败，请手动复制");
+    showToast("复制失败，请手动复制", 'error');
   });
 }
 

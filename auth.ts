@@ -46,18 +46,31 @@ export function initAuth() {
 
 /**
  * 检查当前登录状态并控制 UI
+ * 核心逻辑：有 Session -> 隐藏遮罩；无 Session -> 显示遮罩
  */
 export function checkAuthStatus() {
   const session = localStorage.getItem(AUTH_KEY);
   const overlay = getEl('login-overlay');
   const appShell = getEl('main-app');
+  
+  if (!overlay) return;
 
   if (session) {
-    overlay.classList.add('hidden');
-    appShell.classList.remove('blur-content');
+    // Logged In
+    overlay.classList.add('hidden'); 
+    overlay.style.display = 'none';
+    
+    overlay.classList.remove('fade-out');
+    if (appShell) appShell.classList.remove('blur-content');
   } else {
+    // Not Logged In
     overlay.classList.remove('hidden');
-    appShell.classList.add('blur-content');
+    // CRITICAL FIX: Force flex to ensure centering works. 
+    // Setting to '' might revert to 'block' if CSS hasn't loaded or specificity issues occur.
+    overlay.style.display = 'flex';
+    
+    overlay.classList.remove('fade-out');
+    if (appShell) appShell.classList.add('blur-content');
   }
 }
 
@@ -70,6 +83,7 @@ function bindAuthEvents() {
   const tabWechat = getEl('tab-wechat');
   const panelPhone = getEl('panel-phone');
   const panelWechat = getEl('panel-wechat');
+  const qrMask = getEl('qr-mask');
 
   if (tabPhone && tabWechat) {
     tabPhone.onclick = () => {
@@ -85,11 +99,23 @@ function bindAuthEvents() {
       panelWechat.classList.remove('hidden');
       panelPhone.classList.add('hidden');
       
+      // Reset QR state
+      if (qrMask) {
+         qrMask.classList.remove('hidden');
+         qrMask.innerHTML = '<i class="fas fa-spinner fa-spin" style="color:#007AFF"></i><span style="color:#333; margin-top:8px;">等待扫描...</span>';
+      }
+
       // 触发微信轮询模拟
-      const result: any = await api.checkWechatAuth();
-      const qrMask = getEl('qr-mask');
-      if (qrMask) qrMask.classList.remove('hidden');
-      setTimeout(() => loginSuccess(result), 1000);
+      try {
+        const result: any = await api.checkWechatAuth();
+        // Success state
+        if (qrMask) {
+           qrMask.innerHTML = '<i class="fas fa-check-circle" style="color:#34C759; font-size:40px;"></i><span style="color:#34C759; margin-top:8px;">登录成功</span>';
+        }
+        setTimeout(() => loginSuccess(result), 800);
+      } catch (e) {
+        if (qrMask) qrMask.classList.add('hidden');
+      }
     };
   }
 
@@ -117,7 +143,7 @@ function bindAuthEvents() {
   }
 
   // 手机号登录提交
-  const loginBtn = getEl('phone-login-btn');
+  const loginBtn = getEl<HTMLButtonElement>('phone-login-btn');
   if (loginBtn) {
     loginBtn.onclick = async () => {
       const phone = (getEl('phone-input') as HTMLInputElement).value;
@@ -130,13 +156,14 @@ function bindAuthEvents() {
       
       const originalText = loginBtn.innerText;
       loginBtn.innerText = "登录中...";
+      loginBtn.disabled = true;
       
       try {
         const result: any = await api.loginWithPhone(phone, code);
         loginSuccess(result);
       } catch (e) {
         alert("登录失败，请重试");
-      } finally {
+        loginBtn.disabled = false;
         loginBtn.innerText = originalText;
       }
     };
@@ -148,6 +175,7 @@ function bindAuthEvents() {
     logoutBtn.onclick = () => {
       if (confirm("确定要退出登录吗？")) {
         localStorage.removeItem(AUTH_KEY);
+        // Clean refresh
         window.location.reload();
       }
     };
@@ -158,10 +186,11 @@ function loginSuccess(session: any) {
   localStorage.setItem(AUTH_KEY, JSON.stringify(session));
   const overlay = getEl('login-overlay');
   
-  // 添加淡出动画
+  // 1. Add fade-out for visual transition
   overlay.classList.add('fade-out');
+  
+  // 2. Wait for transition, then force hidden state
   setTimeout(() => {
-    checkAuthStatus(); // 更新状态
-    overlay.classList.remove('fade-out'); // 重置动画类以便下次使用
+    checkAuthStatus(); // This will trigger style.display = 'none'
   }, 500);
 }

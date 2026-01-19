@@ -6,7 +6,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="/index.css" />
+    <link rel="stylesheet" href="./index.css" />
     <script type="importmap">
       {
         "imports": {
@@ -17,176 +17,168 @@
     </script>
   </head>
   <body>
-    <!-- 登录遮罩层 -->
-    <div id="login-overlay" class="auth-overlay">
-      <div class="auth-card">
-        <div class="auth-header">
-          <div class="brand"><i class="fas fa-compass"></i><span>Travel Pro</span></div>
-          <p>开启您的深度智游之旅</p>
-        </div>
-        
-        <div class="auth-tabs">
-          <button id="tab-phone" class="auth-tab active">手机登录</button>
-          <button id="tab-wechat" class="auth-tab">微信扫码</button>
-        </div>
+    <!-- Login Overlay Removed -->
 
-        <!-- 手机号登录面板 -->
-        <div id="panel-phone" class="auth-panel">
-          <div class="input-group">
-            <i class="fas fa-mobile-alt"></i>
-            <input type="tel" id="phone-input" placeholder="请输入手机号" maxlength="11">
-          </div>
-          <div class="input-group">
-            <i class="fas fa-shield-alt"></i>
-            <input type="text" id="code-input" placeholder="六位验证码">
-            <button id="get-code-btn" class="code-btn">获取验证码</button>
-          </div>
-          <button id="phone-login-btn" class="login-btn">立即登录</button>
-        </div>
-
-        <!-- 微信扫码面板 -->
-        <div id="panel-wechat" class="auth-panel hidden">
-          <div class="qr-container">
-            <div id="qr-code-box">
-              <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=AI-TRAVEL-PRO-LOGIN" alt="微信扫码">
-              <div id="qr-mask" class="hidden">
-                <i class="fas fa-check-circle"></i>
-                <span>扫码成功</span>
-              </div>
-            </div>
-            <p><i class="fab fa-weixin" style="color:#07C160;"></i> 请使用微信扫描二维码</p>
-          </div>
-        </div>
-
-        <div class="auth-footer">
-          登录即代表同意 <a href="#">服务协议</a> 与 <a href="#">隐私政策</a>
-        </div>
-      </div>
-    </div>
-
-    <div class="app-shell blur-content" id="main-app">
-      <!-- HUD 控制中心 -->
-      <div class="hud-controls">
-        <div id="user-profile" class="hud-btn user-avatar" title="个人中心">
-          <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="User">
-        </div>
-        <button id="hud-toggle-input" class="hud-btn active" title="开启灵感搜寻"><i class="fas fa-magic"></i></button>
-        <button id="hud-toggle-itinerary" class="hud-btn" title="查看排期方案"><i class="fas fa-calendar-alt"></i></button>
-        <button id="hud-toggle-layers" class="hud-btn" title="切换卫星/矢量地图"><i class="fas fa-layer-group"></i></button>
-        <button id="hud-open-history" class="hud-btn" title="历史方案库"><i class="fas fa-archive"></i></button>
-        <button id="hud-open-settings" class="hud-btn" title="API 设置"><i class="fas fa-sliders-h"></i></button>
+    <!-- Main App Shell -->
+    <div class="app-shell" id="main-app">
+      
+      <!-- Top Bar -->
+      <div class="top-bar glass-panel">
+         <div class="top-search-trigger" id="top-search-trigger">
+            <i class="fas fa-search"></i>
+            <span>输入旅行灵感...</span>
+         </div>
+         <div id="user-profile" class="user-avatar-mini">
+            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="User">
+         </div>
       </div>
 
-      <!-- 地图底座 -->
+      <!-- Map Base -->
       <main class="main-canvas">
         <div id="map"></div>
       </main>
 
-      <!-- 左侧主控制台 -->
-      <aside class="sidebar-left" id="sidebar-left">
-        <div class="sidebar-header">
-          <div class="brand"><i class="fas fa-compass"></i><span>Travel Pro</span></div>
-          <button id="close-console" style="background:none; border:none; color:var(--text-body); cursor:pointer; font-size:18px; padding:10px;"><i class="fas fa-times"></i></button>
+      <!-- Sheet: Explore (Input) -->
+      <div class="sheet-panel" id="sheet-explore">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+          <div class="brand"><i class="fas fa-magic"></i><span>灵感探索</span></div>
+          <button class="close-sheet-btn" data-target="sheet-explore"><i class="fas fa-times"></i></button>
         </div>
-        <div class="sidebar-scroll">
+        <div class="sheet-content">
           <div class="settings-group">
             <label>AI 决策引擎</label>
-            <select id="model-selector">
-              <option value="gemini-3-pro-preview">🧠 Gemini 3 Pro (推荐)</option>
-              <option value="gemini-3-flash-preview">⚡ Gemini 3 Flash</option>
-              <option value="deepseek-chat">🤖 DeepSeek V3</option>
-              <option value="glm-4">🇨🇳 智谱 GLM-4</option>
-            </select>
+            <div class="ios-select-wrapper">
+                <select id="model-selector">
+                <option value="gemini-3-pro-preview">🧠 Gemini 3 Pro (推荐)</option>
+                <option value="gemini-3-flash-preview">⚡ Gemini 3 Flash</option>
+                <option value="deepseek-chat">🤖 DeepSeek V3</option>
+                <option value="GLM-4.7">🇨🇳 智谱 GLM-GLM-4.7</option>
+                </select>
+                <i class="fas fa-chevron-down"></i>
+            </div>
           </div>
 
-          <!-- 模式切换开关 -->
-          <div class="settings-group" style="background: #f1f5f9; padding: 12px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center;">
-            <div>
-              <div style="font-weight: 800; font-size: 13px; color: var(--text-title); margin-bottom: 2px;">生成模式</div>
-              <div id="mode-label-text" style="font-size: 11px; color: #64748b;">🔍 景点发现 (轻量)</div>
+          <!-- Mode Toggle -->
+          <div class="settings-group card-group">
+            <div class="flex-row-center">
+                <div>
+                <div style="font-weight: 700; font-size: 15px; color: var(--text-title);">生成模式</div>
+                <div id="mode-label-text" style="font-size: 12px; color: #64748b; margin-top:2px;">🔍 景点发现 (轻量)</div>
+                </div>
+                <label class="switch">
+                <input type="checkbox" id="planner-mode-toggle">
+                <span class="slider"></span>
+                </label>
             </div>
-            <label class="switch">
-              <input type="checkbox" id="planner-mode-toggle">
-              <span class="slider"></span>
-            </label>
           </div>
           
-          <!-- 旅行风格选择器 (默认隐藏，切换到排期模式显示) -->
+          <!-- Style Selector -->
           <div class="settings-group hidden" id="style-selector-group">
             <label>核心旅行风格</label>
-            <select id="travel-mode-selector">
-              <option value="deep">🍵 深度文化慢游 (沉浸体验)</option>
-              <option value="special">🔥 特种兵极限打卡 (高强度)</option>
-              <option value="relax">🏖️ 躺平休闲度假 (吃喝为主)</option>
-              <option value="photo">📸 摄影出片之旅 (景观优先)</option>
-            </select>
+            <div class="ios-select-wrapper">
+                <select id="travel-mode-selector">
+                <option value="deep">🍵 深度文化慢游</option>
+                <option value="special">🔥 特种兵极限打卡</option>
+                <option value="relax">🏖️ 躺平休闲度假</option>
+                <option value="photo">📸 摄影出片之旅</option>
+                </select>
+                 <i class="fas fa-chevron-down"></i>
+            </div>
           </div>
 
           <div class="settings-group">
-            <label>您的旅行灵感</label>
             <div class="prompt-box-v3">
-              <textarea id="prompt-input" placeholder="输入想法，如：我想去成都玩3天，喜欢吃火锅看熊猫..."></textarea>
+              <textarea id="prompt-input" placeholder="我想去..."></textarea>
               <div class="action-bar">
-                <button id="generate" class="btn-generate">开始探索</button>
+                <button id="generate" class="btn-generate">
+                    <i class="fas fa-paper-plane"></i> 开始规划
+                </button>
               </div>
             </div>
           </div>
         </div>
-      </aside>
+      </div>
 
-      <!-- 右侧行程抽屉 -->
-      <aside class="sidebar-right" id="timeline-container">
-        <div class="sidebar-header">
-          <h3 style="font-weight:900; color:var(--text-title);">AI 深度方案</h3>
-          <div style="display:flex; gap:8px;">
-            <button id="save-itinerary-btn" class="hud-btn small-hud" title="保存方案"><i class="fas fa-save"></i></button>
-            <button id="export-file-btn" class="hud-btn small-hud" title="导出文件"><i class="fas fa-file-download"></i></button>
-            <button id="share-btn" class="hud-btn small-hud" title="复制指南"><i class="fas fa-copy"></i></button>
-            <button id="close-itinerary" class="hud-btn small-hud"><i class="fas fa-chevron-right"></i></button>
+      <!-- Sheet: Plan (Itinerary) -->
+      <div class="sheet-panel" id="sheet-plan">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+          <div class="brand"><i class="fas fa-map-marked-alt"></i><span>行程方案</span></div>
+          <div style="display:flex; gap:12px;">
+             <button id="save-itinerary-btn" class="icon-btn" title="保存"><i class="fas fa-save"></i></button>
+             <button id="share-btn" class="icon-btn" title="复制"><i class="fas fa-copy"></i></button>
+             <button id="export-file-btn" class="icon-btn" title="导出"><i class="fas fa-file-download"></i></button>
+             <button class="close-sheet-btn" data-target="sheet-plan"><i class="fas fa-times"></i></button>
           </div>
         </div>
-        <div class="sidebar-scroll" id="timeline-content"></div>
-      </aside>
-
-      <!-- 设置模态框 -->
-      <div id="settings-modal" class="modal-overlay">
-        <div class="modal-content">
-          <div style="display:flex; justify-content:space-between; margin-bottom:20px; align-items:center;">
-            <h3>API 接入配置</h3>
-            <button id="close-settings" style="background:none; border:none; cursor:pointer; font-size:24px;">&times;</button>
-          </div>
-          
-          <div class="settings-group">
-            <label>天地图 Key (地图底图)</label>
-            <input type="text" id="tdt-key-input" placeholder="天地图浏览器端 Key">
-          </div>
-
-          <div class="settings-group">
-             <label>DeepSeek API Key</label>
-             <input type="password" id="deepseek-key-input" placeholder="sk-...">
-          </div>
-
-          <div class="settings-group">
-             <label>智谱 GLM API Key</label>
-             <input type="password" id="zhipu-key-input" placeholder="输入 API Key">
-          </div>
-
-          <button id="save-settings" class="btn-generate" style="width:100%;">保存并同步配置</button>
-          
-          <div style="margin-top:20px; padding-top:20px; border-top:1px solid #eee;">
-             <button id="logout-btn" style="width:100%; background:#fff1f2; border:1px solid #fecdd3; padding:12px; border-radius:12px; color:#e11d48; font-weight:700; cursor:pointer;">退出当前账号</button>
-          </div>
+        <div class="sheet-content" id="timeline-content">
+            <div class="empty-state">
+                <i class="fas fa-route"></i>
+                <p>暂无行程，请先在“探索”中生成</p>
+            </div>
         </div>
       </div>
 
-      <!-- 历史记录模态框 -->
+      <!-- Bottom Dock -->
+      <nav class="bottom-dock glass-panel">
+        <button class="dock-item" id="nav-explore">
+            <i class="fas fa-compass"></i>
+            <span>探索</span>
+        </button>
+        <button class="dock-item" id="nav-plan">
+            <i class="fas fa-calendar-alt"></i>
+            <span>行程</span>
+        </button>
+        <button class="dock-item" id="nav-layers">
+            <i class="fas fa-layer-group"></i>
+            <span>卫星</span>
+        </button>
+        <button class="dock-item" id="nav-history">
+            <i class="fas fa-clock"></i>
+            <span>历史</span>
+        </button>
+        <button class="dock-item" id="nav-settings">
+            <i class="fas fa-cog"></i>
+            <span>设置</span>
+        </button>
+      </nav>
+
+      <!-- Settings Modal -->
+      <div id="settings-modal" class="modal-overlay">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3>设置</h3>
+            <button id="close-settings" class="close-modal-btn">&times;</button>
+          </div>
+          
+          <div class="settings-group">
+            <label>天地图 Key</label>
+            <input type="text" id="tdt-key-input" class="ios-input" placeholder="Key">
+          </div>
+
+          <div class="settings-group">
+             <label>DeepSeek Key</label>
+             <input type="password" id="deepseek-key-input" class="ios-input" placeholder="Key">
+          </div>
+
+          <div class="settings-group">
+             <label>Zhipu GLM Key</label>
+             <input type="password" id="zhipu-key-input" class="ios-input" placeholder="Key">
+          </div>
+
+          <button id="save-settings" class="btn-primary-ios">保存配置</button>
+        </div>
+      </div>
+
+      <!-- History Modal -->
       <div id="history-modal" class="modal-overlay">
         <div class="modal-content">
-          <div style="display:flex; justify-content:space-between; margin-bottom:20px;">
-            <h3>历史方案</h3>
-            <button id="close-history" style="background:none; border:none; cursor:pointer; font-size:24px;">&times;</button>
+          <div class="modal-header">
+            <h3>历史记录</h3>
+            <button id="close-history" class="close-modal-btn">&times;</button>
           </div>
-          <div id="history-list"></div>
+          <div id="history-list" class="scroll-list"></div>
         </div>
       </div>
 
@@ -194,16 +186,15 @@
       <div id="loading-overlay" class="loading-overlay">
         <div class="loading-content">
           <div class="loading-icon">
-            <i class="fas fa-compass fa-spin"></i>
+            <i class="fas fa-spinner fa-spin"></i>
           </div>
           <div class="loading-text">
-            <h3>AI 正在规划路线...</h3>
-            <p>正在计算交通耗时与景点热度</p>
+            <h3>Thinking...</h3>
           </div>
         </div>
       </div>
     </div>
 
-    <script type="module" src="/index.tsx"></script>
+    <script type="module" src="./index.tsx"></script>
   </body>
 </html>
