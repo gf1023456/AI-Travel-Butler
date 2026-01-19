@@ -214,6 +214,12 @@ html, body {
   box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
 }
 
+#prompt-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.2);
+  transform: translateY(-1px);
+}
+
 .ios-select-wrapper { position: relative; }
 .ios-select-wrapper i {
   position: absolute; right: 16px; top: 50%; transform: translateY(-50%);

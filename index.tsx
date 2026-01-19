@@ -19,6 +19,7 @@ let activeSheet: string | null = null; // Track currently open sheet
 
 // Constants
 const TDT_DEFAULT_KEY = "97f9870fb795ba80ef201d6edae71d73";
+const ZHIPU_DEFAULT_KEY = "b8aa2e50a2484cc1bd0fd45527217880.UJk1UbZRdZi6zgOx";
 const DAY_COLORS = ['#ff5722', '#2196f3', '#4caf50', '#9c27b0', '#ffeb3b', '#00bcd4', '#795548'];
 const STORAGE_KEY = 'travel_pro_history_v2';
 
@@ -40,7 +41,7 @@ function initApp() {
   const savedTdtKey = localStorage.getItem('tdt_api_key') || TDT_DEFAULT_KEY;
   (getEl('tdt-key-input') as HTMLInputElement).value = savedTdtKey;
   (getEl('deepseek-key-input') as HTMLInputElement).value = localStorage.getItem('deepseek_api_key') || '';
-  (getEl('zhipu-key-input') as HTMLInputElement).value = localStorage.getItem('zhipu_api_key') || '';
+  (getEl('zhipu-key-input') as HTMLInputElement).value = localStorage.getItem('zhipu_api_key') || ZHIPU_DEFAULT_KEY;
 
   switchTDT('tdt_vec', savedTdtKey);
   
@@ -249,7 +250,8 @@ async function handleRequest() {
       return;
     }
   } else if (modelType.includes('glm')) {
-    if (!localStorage.getItem('zhipu_api_key')) {
+    const hasKey = localStorage.getItem('zhipu_api_key') || ZHIPU_DEFAULT_KEY;
+    if (!hasKey) {
        showToast('请先在设置中配置智谱 GLM API Key', 'error', 4000);
        setTimeout(() => getEl('settings-modal').classList.add('active'), 1000);
        return;
@@ -463,7 +465,8 @@ async function handleDeepSeekRequest(model: string, input: string, pref: string)
 }
 
 async function handleZhipuRequest(model: string, input: string, pref: string) {
-  const apiKey = localStorage.getItem('zhipu_api_key');
+  // Use user provided key or default
+  const apiKey = localStorage.getItem('zhipu_api_key') || ZHIPU_DEFAULT_KEY;
   if (!apiKey) throw new Error("请先在设置中配置 智谱 AI API Key");
 
   // Use model from arguments if available, otherwise default to user preference
