@@ -11,6 +11,7 @@ export const locationTool: FunctionDeclaration = {
     description: '在地图上精准标注一个行程地点（景点、餐厅、酒店等），并提供实时天气和详细交通信息。',
     properties: {
       name: { type: Type.STRING, description: '地点名称，例如：故宫博物院' },
+      city: { type: Type.STRING, description: '该地点所属的城市名称，例如 "北京"。关键字段：用于区分出发地和目的地。' },
       description: { type: Type.STRING, description: '该地点的深度介绍，包含看点、避坑指南和建议游玩时长。' },
       lat: { type: Type.STRING, description: '该地点的精准纬度坐标（字符串格式，如 "39.9172"）' },
       lng: { type: Type.STRING, description: '该地点的精准经度坐标（字符串格式，如 "116.3907"）' },
@@ -23,7 +24,7 @@ export const locationTool: FunctionDeclaration = {
       weather_condition: { type: Type.STRING, description: '实时天气状况描述，例如 "晴朗"、"局部多云"、"阵雨"' },
       temperature: { type: Type.STRING, description: '该地点的当前或预计气温，例如 "22°C"' }
     },
-    required: ['name', 'description', 'lat', 'lng', 'time', 'day', 'sequence', 'weather_icon', 'weather_condition', 'temperature', 'transit_hint'],
+    required: ['name', 'city', 'description', 'lat', 'lng', 'time', 'day', 'sequence', 'weather_icon', 'weather_condition', 'temperature', 'transit_hint'],
   },
 };
 
