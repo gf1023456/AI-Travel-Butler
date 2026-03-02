@@ -31,4 +31,18 @@ A new backend orchestrator service has been added under `server/` as a first ste
 3. Start frontend in another terminal:
    `npm run dev`
 
-By default frontend will call `http://localhost:8787/api/plan` first, then fallback to direct provider calls if backend is unavailable.
+Frontend now routes planning requests to `http://localhost:8787/api/plan` only (provider calls are centralized on backend).
+
+
+### Backend env
+
+Set provider keys on server side (frontend no longer stores provider keys):
+
+- `GEMINI_API_KEY` (or `API_KEY`)
+- `DEEPSEEK_API_KEY`
+- `ZHIPU_API_KEY`
+
+Optional runtime controls:
+
+- `REQUEST_TIMEOUT_MS` (default `20000`)
+- `MAX_RETRIES` (default `2`)

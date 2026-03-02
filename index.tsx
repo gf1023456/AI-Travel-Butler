@@ -2,9 +2,7 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
-import { GoogleGenAI } from '@google/genai';
 import L from 'leaflet';
-import { locationTool, socialRecommendationTool } from './mcp-tools';
 
 // Application state
 let map: L.Map;
@@ -19,7 +17,6 @@ let activeSheet: string | null = null; // Track currently open sheet
 
 // Constants
 const TDT_DEFAULT_KEY = "97f9870fb795ba80ef201d6edae71d73";
-const ZHIPU_DEFAULT_KEY = "b8aa2e50a2484cc1bd0fd45527217880.UJk1UbZRdZi6zgOx";
 const DAY_COLORS = ['#ff5722', '#2196f3', '#4caf50', '#9c27b0', '#ffeb3b', '#00bcd4', '#795548'];
 const STORAGE_KEY = 'travel_pro_history_v2';
 const BACKEND_BASE_URL = (window as any).__TRAVEL_BACKEND_URL__ || 'http://localhost:8787';
@@ -41,8 +38,6 @@ function initApp() {
   // Load saved keys
   const savedTdtKey = localStorage.getItem('tdt_api_key') || TDT_DEFAULT_KEY;
   (getEl('tdt-key-input') as HTMLInputElement).value = savedTdtKey;
-  (getEl('deepseek-key-input') as HTMLInputElement).value = localStorage.getItem('deepseek_api_key') || '';
-  (getEl('zhipu-key-input') as HTMLInputElement).value = localStorage.getItem('zhipu_api_key') || ZHIPU_DEFAULT_KEY;
 
   switchTDT('tdt_vec', savedTdtKey);
   
@@ -163,6 +158,43 @@ function closeSheet(id: string) {
   activeSheet = null;
 }
 
+
+async function handleRequest() {
+  const userInput = (getEl('prompt-input') as HTMLTextAreaElement).value.trim();
+  const modelType = (getEl('model-selector') as HTMLSelectElement).value;
+  const isPlannerMode = (getEl('planner-mode-toggle') as HTMLInputElement).checked;
+  const travelMode = (getEl('travel-mode-selector') as HTMLSelectElement).value;
+
+  if (!userInput) {
+    showToast("请输入您的旅行想法", 'error');
+    return;
+  }
+
+  restart();
+  closeSheet('sheet-explore');
+  getEl('loading-overlay').classList.add('active');
+
+  try {
+    const usedBackend = await tryBackendPlan(userInput, modelType, isPlannerMode, travelMode);
+    if (!usedBackend) {
+      throw new Error('后端规划服务不可用，请检查 server 是否启动');
+    }
+
+    renderAll();
+
+    setTimeout(() => {
+      setActiveTab('nav-plan');
+      toggleSheet('sheet-plan');
+    }, 500);
+  } catch (e: any) {
+    console.error("AI Generation Error:", e);
+    const errorMsg = e?.message ? `请求失败: ${e.message}` : '服务暂时不可用，请稍后重试';
+    showToast(errorMsg, 'error', 5000);
+  } finally {
+    getEl('loading-overlay').classList.remove('active');
+  }
+}
+
 function bindEvents() {
   getEl('close-settings').onclick = () => getEl('settings-modal').classList.remove('active');
   getEl('close-history').onclick = () => getEl('history-modal').classList.remove('active');
@@ -190,12 +222,7 @@ function bindEvents() {
   // Save all keys
   getEl('save-settings').onclick = () => {
     const tdtKey = (getEl('tdt-key-input') as HTMLInputElement).value;
-    const deepseekKey = (getEl('deepseek-key-input') as HTMLInputElement).value;
-    const zhipuKey = (getEl('zhipu-key-input') as HTMLInputElement).value;
-
     if (tdtKey) localStorage.setItem('tdt_api_key', tdtKey);
-    localStorage.setItem('deepseek_api_key', deepseekKey);
-    localStorage.setItem('zhipu_api_key', zhipuKey);
     
     // Refresh map if key changed
     switchTDT(currentMapType, tdtKey || TDT_DEFAULT_KEY);
@@ -208,195 +235,6 @@ function bindEvents() {
   getEl('export-file-btn').onclick = exportToFile;
   getEl('share-btn').onclick = copyToClipboard;
 }
-
-const GLOBAL_SYSTEM_PROMPT = `你是一位世界顶级的深度旅游规划专家。
-你的任务是完成一个【三位一体】的规划报告。
-
-【关键逻辑 - 出发地与目的地】：
-当用户输入 "从 A 到 B" (例如：从成都到重庆) 时，你必须严格遵守：
-1. **区分身份**：A 是出发地，B 是目的地。
-【必须包含的三大部分】：
-1. 社交分析阶段 (工具: get_social_recommendations):
-   - 必须调用一次。分析当前最火的趋势，为用户提供灵感。
-2. 地图标注阶段 (工具: location):
-   - 必须针对用户要求的【每一天】调用多次。
-   - 每一天的行程必须至少包含 3-4 个 location 打点（早、中、晚、交通）。
-   - 禁止在调用完社交推荐后就停止！必须紧接着进行地图打点。
-3. 文字总结阶段:
-   - 在所有工具调用完成后，提供简洁的行程亮点说明。
-【严苛禁令】：
-- 严禁二选一！必须【同时】给出社交平台趋势和每日具体的地图行程。
-- 严禁输出 <think> 标签内容。
-- 严禁任何废话开场白，直接开始调用工具链。。`;
-
-/**
- * Main Request Handler that dispatches to the correct AI provider
- */
-async function handleRequest() {
-  const userInput = (getEl('prompt-input') as HTMLTextAreaElement).value.trim();
-  const modelType = (getEl('model-selector') as HTMLSelectElement).value;
-  const isPlannerMode = (getEl('planner-mode-toggle') as HTMLInputElement).checked;
-  const travelMode = (getEl('travel-mode-selector') as HTMLSelectElement).value;
-  
-  if (!userInput) {
-    showToast("请输入您的旅行想法", 'error');
-    return;
-  }
-
-  // API Key Validation
-  if (modelType.includes('deepseek')) {
-    if (!localStorage.getItem('deepseek_api_key')) {
-      showToast('请先在设置中配置 DeepSeek API Key', 'error', 4000);
-      setTimeout(() => getEl('settings-modal').classList.add('active'), 1000);
-      return;
-    }
-  } else if (modelType.includes('glm')) {
-    const hasKey = localStorage.getItem('zhipu_api_key') || ZHIPU_DEFAULT_KEY;
-    if (!hasKey) {
-       showToast('请先在设置中配置智谱 GLM API Key', 'error', 4000);
-       setTimeout(() => getEl('settings-modal').classList.add('active'), 1000);
-       return;
-    }
-  }
-
-  restart();
-  closeSheet('sheet-explore');
-  getEl('loading-overlay').classList.add('active');
-  
-  try {
-    let finalPrompt = constructUserPrompt(userInput, isPlannerMode, travelMode);
-
-    const usedBackend = await tryBackendPlan(userInput, modelType, isPlannerMode, travelMode);
-
-    if (!usedBackend) {
-      if (modelType.startsWith('gemini')) {
-          // --- GOOGLE GEMINI (Use SDK) ---
-          await callGemini(modelType, finalPrompt);
-      } else if (modelType.includes('deepseek')) {
-          // --- DEEPSEEK ---
-          await handleDeepSeekRequest(modelType, userInput, finalPrompt);
-      } else if (modelType.includes('GLM') || modelType.includes('glm')) {
-          // --- ZHIPU GLM ---
-          await handleZhipuRequest(modelType, userInput, finalPrompt);
-      }
-    }
-    
-    renderAll();
-    
-    // Automatically open the Plan sheet after generation
-    setTimeout(() => {
-        setActiveTab('nav-plan');
-        toggleSheet('sheet-plan');
-    }, 500);
-
-  } catch (e: any) {
-    console.error("AI Generation Error:", e);
-    
-    // Robust Error Handling with User Feedback
-    let errorMsg = "服务暂时不可用，请稍后重试";
-    let isAuthError = false;
-    
-    if (e.message) {
-        // Check for common API errors
-        if (e.message.includes('401') || e.message.includes('API key') || e.message.includes('Unauthenticated')) {
-            errorMsg = "鉴权失败：API Key 无效或未配置";
-            isAuthError = true;
-        } else if (e.message.includes('429') || e.message.includes('quota') || e.message.includes('Resource has been exhausted')) {
-            errorMsg = "请求过快：API 配额已耗尽或被限制";
-        } else if (e.message.includes('Failed to parse')) {
-            errorMsg = "数据解析错误：模型返回格式异常";
-        } else if (e.message.includes('fetch') || e.message.includes('network')) {
-            errorMsg = "网络连接失败，请检查您的网络设置";
-        } else {
-            // Truncate long error messages
-            errorMsg = `请求失败: ${e.message.length > 50 ? e.message.substring(0, 50) + '...' : e.message}`;
-        }
-    }
-    
-    showToast(errorMsg, 'error', 5000);
-    
-    // If it's an auth error, guide user to settings
-    if (isAuthError) {
-        setTimeout(() => {
-            getEl('settings-modal').classList.add('active');
-            showToast("请检查并更新您的 API Key", 'normal', 4000);
-        }, 1500);
-    }
-
-  } finally {
-    getEl('loading-overlay').classList.remove('active');
-  }
-}
-
-function constructUserPrompt(userInput: string, isPlannerMode: boolean, travelMode: string) {
-    if (isPlannerMode) {
-      // 深度排期模式
-      let modeInstruction = "";
-      switch (travelMode) {
-        case 'special':
-          modeInstruction = `【核心指令：特种兵模式】\n1. 时间利用率最大化：行程必须极度紧凑，每天安排至少5-7个点。\n2. 路线规划：必须是最优顺路方案，精确计算交通时间。\n3. 风格：高效率打卡。`;
-          break;
-        case 'deep':
-          modeInstruction = `【核心指令：深度文化慢游】\n1. 拒绝走马观花：每天景点不超过3个，注重深度体验。\n2. 留白：每个地点预留充分的游览时间。`;
-          break;
-        case 'relax':
-          modeInstruction = `【核心指令：休闲度假】\n1. 睡到自然醒，行程开始时间不早于10:30。\n2. 享受为主：重点推荐环境好的餐厅和酒店。`;
-          break;
-        case 'photo':
-          modeInstruction = `【核心指令：摄影出片】\n1. 追逐光影：根据日出日落时间安排行程。\n2. 机位优先：重点标注热门机位。`;
-          break;
-      }
-      return `${modeInstruction}\n\n请为我生成一份详细的每日行程规划，严格区分出发地和目的地，不要混淆城市景点。需求：${userInput}`;
-    } else {
-      // 景点发现模式
-      return `【核心指令：景点发现模式】
-用户不需要完整的时间表，只需要你根据需求推荐一组值得去的地方。
-1. 请列出符合用户需求的 5-10 个地点（集中在用户想去的目的地）。
-2. 在地图上进行标注。
-3. 提供简短的文字介绍和推荐理由。
-用户需求：${userInput}`;
-    }
-}
-
-// Transform Google GenAI schema to OpenAI JSON schema
-function transformSchema(schema: any): any {
-  if (!schema) return undefined;
-  const newSchema: any = JSON.parse(JSON.stringify(schema));
-  
-  if (newSchema.type) {
-    newSchema.type = newSchema.type.toLowerCase();
-  }
-  
-  if (newSchema.properties) {
-    const newProps: any = {};
-    for (const key in newSchema.properties) {
-      newProps[key] = transformSchema(newSchema.properties[key]);
-    }
-    newSchema.properties = newProps;
-  }
-  
-  if (newSchema.items) {
-    newSchema.items = transformSchema(newSchema.items);
-  }
-  
-  // Clean up fields that might strictly offend OpenAI validation if they exist
-  // but are undefined. (Mostly handled by JSON.stringify above)
-  
-  return newSchema;
-}
-
-function addValidItem(item: any) {
-  if (!item) return;
-  // Validations
-  if (!item.name || !item.lat || !item.lng) return;
-  
-  // Normalize data types
-  if (typeof item.day === 'string') item.day = parseInt(item.day) || 1;
-  if (typeof item.sequence === 'string') item.sequence = parseInt(item.sequence) || 1;
-  
-  dayPlanItinerary.push(item);
-}
-
 
 async function tryBackendPlan(userInput: string, modelType: string, isPlannerMode: boolean, travelMode: string): Promise<boolean> {
   try {
@@ -417,139 +255,10 @@ async function tryBackendPlan(userInput: string, modelType: string, isPlannerMod
     itinerarySummary = data.itinerarySummary || '排期已生成';
     return true;
   } catch (error) {
-    console.warn('Backend planner unavailable, fallback to frontend direct model call.', error);
+    console.warn('Backend planner unavailable.', error);
     return false;
   }
 }
-
-async function callGemini(modelName: string, prompt: string) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const response = await ai.models.generateContent({
-      model: modelName,
-      contents: prompt,
-      config: {
-        systemInstruction: GLOBAL_SYSTEM_PROMPT + "严禁输出 <think> 标签内容。直接调用工具。",
-        tools: [{ functionDeclarations: [locationTool, socialRecommendationTool] }],
-      },
-    });
-    
-    const fcs = response.functionCalls || [];
-    fcs.forEach((fc: any) => {
-      if (fc.name === 'location') addValidItem(fc.args);
-      if (fc.name === 'get_social_recommendations') socialRecommendations = fc.args.recommendations || [];
-    });
-    itinerarySummary = response.text || "排期已生成";
-}
-
-async function handleDeepSeekRequest(model: string, input: string, pref: string) {
-  const apiKey = localStorage.getItem('deepseek_api_key');
-  if (!apiKey) throw new Error("请先在设置中配置 DeepSeek API Key");
-
-  const response = await fetch('https://api.deepseek.com/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-    body: JSON.stringify({ 
-      model: model, 
-      messages: [
-        { role: 'system', content: GLOBAL_SYSTEM_PROMPT },
-        { role: 'user', content: `【强制执行】需求：${input}。
-你需要同时执行以下两个子任务：
-任务A：调用 'get_social_recommendations'。
-任务B：为每一天调用多次 'location'。
-请立刻开始调用工具，不要回复文字说明。` }
-      ],
-      tools: [
-        { type: "function", function: { name: "get_social_recommendations", parameters: transformSchema(socialRecommendationTool.parameters) } },
-        { type: "function", function: { name: "location", parameters: transformSchema(locationTool.parameters) } }
-      ],
-      tool_choice: "auto",
-      max_tokens: 4000,
-      temperature: 0.1
-    })
-  });
-
-  if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`DeepSeek Error: ${response.status} ${errText}`);
-  }
-
-  const data = await response.json();
-  if (data.error) throw new Error(data.error.message);
-  
-  const message = data.choices?.[0]?.message;
-  if (!message) throw new Error("DeepSeek 返回数据为空");
-  
-  itinerarySummary = message.content || "规划数据同步中...";
-  
-  if (message.tool_calls) {
-    for (const tc of message.tool_calls) {
-      const args = JSON.parse(tc.function.arguments);
-      if (tc.function.name === 'location') addValidItem(args);
-      if (tc.function.name === 'get_social_recommendations') socialRecommendations = args.recommendations || [];
-    }
-  }
-
-  if (socialRecommendations.length > 0 && dayPlanItinerary.length === 0) {
-    itinerarySummary = "⚠️ 模型仅返回了趋势分析，未能完成地图打点。建议再次点击“开始规划”或换用 Gemini 3 Pro。";
-  }
-}
-
-async function handleZhipuRequest(model: string, input: string, pref: string) {
-  // Use user provided key or default
-  const apiKey = localStorage.getItem('zhipu_api_key') || ZHIPU_DEFAULT_KEY;
-  if (!apiKey) throw new Error("请先在设置中配置 智谱 AI API Key");
-
-  // Use model from arguments if available, otherwise default to user preference
-  const modelName = model || 'glm-4-flash';
-
-  const response = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
-    method: 'POST',
-    headers: { 
-      'Content-Type': 'application/json', 
-      'Authorization': `Bearer ${apiKey}` 
-    },
-    body: JSON.stringify({ 
-      model: modelName, 
-      messages: [
-        { role: 'system', content: GLOBAL_SYSTEM_PROMPT },
-        { role: 'user', content: `【强制执行】需求：${input}。
-你需要同时执行以下两个子任务：
-任务A：调用 'get_social_recommendations'。
-任务B：为每一天调用多次 'location'。
-请立刻开始调用工具，不要回复文字说明。` }
-      ],
-      tools: [
-        { type: "function", function: { name: "get_social_recommendations", parameters: transformSchema(socialRecommendationTool.parameters) } },
-        { type: "function", function: { name: "location", parameters: transformSchema(locationTool.parameters) } }
-      ],
-      tool_choice: "auto",
-      max_tokens: 4096,
-      temperature: 0.2
-    })
-  });
-
-  if (!response.ok) {
-     const errText = await response.text();
-     throw new Error(`Zhipu GLM Error: ${response.status} ${errText}`);
-  }
-
-  const data = await response.json();
-  if (data.error) throw new Error(data.error.message);
-  
-  const message = data.choices?.[0]?.message;
-  if (!message) throw new Error("Zhipu AI 返回数据为空");
-
-  itinerarySummary = message.content || "正在解析智谱 AI 规划结果...";
-  
-  if (message.tool_calls) {
-    for (const tc of message.tool_calls) {
-      const args = JSON.parse(tc.function.arguments);
-      if (tc.function.name === 'location') addValidItem(args);
-      if (tc.function.name === 'get_social_recommendations') socialRecommendations = args.recommendations || [];
-    }
-  }
-}
-
 
 function renderAll() {
   // Sort Items
