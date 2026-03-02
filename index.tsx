@@ -22,6 +22,7 @@ const TDT_DEFAULT_KEY = "97f9870fb795ba80ef201d6edae71d73";
 const ZHIPU_DEFAULT_KEY = "b8aa2e50a2484cc1bd0fd45527217880.UJk1UbZRdZi6zgOx";
 const DAY_COLORS = ['#ff5722', '#2196f3', '#4caf50', '#9c27b0', '#ffeb3b', '#00bcd4', '#795548'];
 const STORAGE_KEY = 'travel_pro_history_v2';
+const BACKEND_BASE_URL = (window as any).__TRAVEL_BACKEND_URL__ || 'http://localhost:8787';
 
 const getEl = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -265,15 +266,19 @@ async function handleRequest() {
   try {
     let finalPrompt = constructUserPrompt(userInput, isPlannerMode, travelMode);
 
-    if (modelType.startsWith('gemini')) {
-        // --- GOOGLE GEMINI (Use SDK) ---
-        await callGemini(modelType, finalPrompt);
-    } else if (modelType.includes('deepseek')) {
-        // --- DEEPSEEK ---
-        await handleDeepSeekRequest(modelType, userInput, finalPrompt);
-    } else if (modelType.includes('GLM') || modelType.includes('glm')) {
-        // --- ZHIPU GLM ---
-        await handleZhipuRequest(modelType, userInput, finalPrompt);
+    const usedBackend = await tryBackendPlan(userInput, modelType, isPlannerMode, travelMode);
+
+    if (!usedBackend) {
+      if (modelType.startsWith('gemini')) {
+          // --- GOOGLE GEMINI (Use SDK) ---
+          await callGemini(modelType, finalPrompt);
+      } else if (modelType.includes('deepseek')) {
+          // --- DEEPSEEK ---
+          await handleDeepSeekRequest(modelType, userInput, finalPrompt);
+      } else if (modelType.includes('GLM') || modelType.includes('glm')) {
+          // --- ZHIPU GLM ---
+          await handleZhipuRequest(modelType, userInput, finalPrompt);
+      }
     }
     
     renderAll();
@@ -390,6 +395,31 @@ function addValidItem(item: any) {
   if (typeof item.sequence === 'string') item.sequence = parseInt(item.sequence) || 1;
   
   dayPlanItinerary.push(item);
+}
+
+
+async function tryBackendPlan(userInput: string, modelType: string, isPlannerMode: boolean, travelMode: string): Promise<boolean> {
+  try {
+    const response = await fetch(`${BACKEND_BASE_URL}/api/plan`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userInput, modelType, isPlannerMode, travelMode })
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`backend ${response.status}: ${text}`);
+    }
+
+    const data = await response.json();
+    dayPlanItinerary = Array.isArray(data.dayPlanItinerary) ? data.dayPlanItinerary : [];
+    socialRecommendations = Array.isArray(data.socialRecommendations) ? data.socialRecommendations : [];
+    itinerarySummary = data.itinerarySummary || '排期已生成';
+    return true;
+  } catch (error) {
+    console.warn('Backend planner unavailable, fallback to frontend direct model call.', error);
+    return false;
+  }
 }
 
 async function callGemini(modelName: string, prompt: string) {
