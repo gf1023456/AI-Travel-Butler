@@ -1,0 +1,30 @@
+{
+  "server": {
+    "port": 8787,
+    "requestTimeoutMs": 20000,
+    "maxRetries": 2
+  },
+  "rag": {
+    "topK": 3,
+    "knowledgeFile": "knowledge/processed/chunks.jsonl"
+  },
+  "rollout": {
+    "enableCanary": false,
+    "canaryPercent": 10,
+    "primaryProvider": "gemini",
+    "canaryProvider": "zhipu",
+    "autoRollbackOnFailure": true
+  },
+  "performance": {
+    "cacheTtlMs": 120000,
+    "costAlertThreshold": 2
+  },
+  "providers": {
+    "geminiApiKey": "",
+    "deepseekApiKey": "",
+    "zhipuApiKey": "",
+    "defaultGeminiModel": "gemini-2.5-flash",
+    "defaultDeepseekModel": "deepseek-chat",
+    "defaultZhipuModel": "glm-4-flash"
+  }
+}

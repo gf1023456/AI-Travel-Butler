@@ -15,9 +15,10 @@ View your app in AI Studio: https://ai.studio/apps/drive/1-73WjYkWmwZZLqaEGJ3mLv
 
 1. Install dependencies:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+2. Copy `server/config.example.json` to `server/config.json` and fill provider keys
+3. Run backend and frontend:
+   `npm run dev:server` (backend)
+   `npm run dev` (frontend)
 
 
 ## Backend service (Xi'an pilot)
@@ -34,18 +35,13 @@ A new backend orchestrator service has been added under `server/` as a first ste
 Frontend now routes planning requests to `http://localhost:8787/api/plan` only (provider calls are centralized on backend).
 
 
-### Backend env
+### Backend config file
 
-Set provider keys on server side (frontend no longer stores provider keys):
+Server reads configuration from `server/config.json` (frontend no longer stores provider keys).
 
-- `GEMINI_API_KEY` (or `API_KEY`)
-- `DEEPSEEK_API_KEY`
-- `ZHIPU_API_KEY`
-
-Optional runtime controls:
-
-- `REQUEST_TIMEOUT_MS` (default `20000`)
-- `MAX_RETRIES` (default `2`)
+- Copy `server/config.example.json` to `server/config.json`
+- Fill `providers.geminiApiKey` / `providers.deepseekApiKey` / `providers.zhipuApiKey`
+- Tune runtime values under `server`, `rag`, `rollout`, `performance` sections
 
 
 ### New backend endpoints
@@ -73,11 +69,12 @@ Optional runtime controls:
 
 ### Release + cost controls
 
-- `ENABLE_CANARY` (`1` to enable)
-- `CANARY_PERCENT` (default `10`)
-- `PRIMARY_PROVIDER` / `CANARY_PROVIDER`
-- `AUTO_ROLLBACK_ON_FAILURE` (default on)
-- `CACHE_TTL_MS` (default `120000`)
-- `COST_ALERT_THRESHOLD` (default `2` USD estimated)
+Configure in `server/config.json`:
+- `rollout.enableCanary`
+- `rollout.canaryPercent`
+- `rollout.primaryProvider` / `rollout.canaryProvider`
+- `rollout.autoRollbackOnFailure`
+- `performance.cacheTtlMs`
+- `performance.costAlertThreshold`
 
 You can also set `modelType` to `auto` in request payload to use backend rollout strategy.

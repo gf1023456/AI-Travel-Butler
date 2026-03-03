@@ -1,20 +1,77 @@
 import { createServer } from 'node:http';
 import crypto from 'node:crypto';
 import { readFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { GoogleGenAI } from '@google/genai';
 
-const PORT = Number(process.env.PORT || 8787);
-const REQUEST_TIMEOUT_MS = Number(process.env.REQUEST_TIMEOUT_MS || 20000);
-const MAX_RETRIES = Number(process.env.MAX_RETRIES || 2);
-const RAG_TOP_K = Number(process.env.RAG_TOP_K || 3);
-const KNOWLEDGE_FILE = process.env.KNOWLEDGE_FILE || 'knowledge/processed/chunks.jsonl';
-const ENABLE_CANARY = process.env.ENABLE_CANARY === '1';
-const CANARY_PERCENT = Number(process.env.CANARY_PERCENT || 10);
-const PRIMARY_PROVIDER = process.env.PRIMARY_PROVIDER || 'gemini';
-const CANARY_PROVIDER = process.env.CANARY_PROVIDER || 'zhipu';
-const AUTO_ROLLBACK_ON_FAILURE = process.env.AUTO_ROLLBACK_ON_FAILURE !== '0';
-const CACHE_TTL_MS = Number(process.env.CACHE_TTL_MS || 120000);
-const COST_ALERT_THRESHOLD = Number(process.env.COST_ALERT_THRESHOLD || 2);
+const CONFIG_FILE = process.argv[2] || 'server/config.json';
+
+const DEFAULT_CONFIG = {
+  server: {
+    port: 8787,
+    requestTimeoutMs: 20000,
+    maxRetries: 2
+  },
+  rag: {
+    topK: 3,
+    knowledgeFile: 'knowledge/processed/chunks.jsonl'
+  },
+  rollout: {
+    enableCanary: false,
+    canaryPercent: 10,
+    primaryProvider: 'gemini',
+    canaryProvider: 'zhipu',
+    autoRollbackOnFailure: true
+  },
+  performance: {
+    cacheTtlMs: 120000,
+    costAlertThreshold: 2
+  },
+  providers: {
+    geminiApiKey: '',
+    deepseekApiKey: '',
+    zhipuApiKey: '',
+    defaultGeminiModel: 'gemini-2.5-flash',
+    defaultDeepseekModel: 'deepseek-chat',
+    defaultZhipuModel: 'glm-4-flash'
+  }
+};
+
+function deepMerge(base, extra) {
+  if (!extra || typeof extra !== 'object') return base;
+  const out = { ...base };
+  for (const [k, v] of Object.entries(extra)) {
+    if (v && typeof v === 'object' && !Array.isArray(v) && out[k] && typeof out[k] === 'object') {
+      out[k] = deepMerge(out[k], v);
+    } else {
+      out[k] = v;
+    }
+  }
+  return out;
+}
+
+async function loadConfig() {
+  if (!existsSync(CONFIG_FILE)) {
+    throw new Error(`Config file not found: ${CONFIG_FILE}. Please copy server/config.example.json to server/config.json and fill provider keys.`);
+  }
+  const raw = await readFile(CONFIG_FILE, 'utf8');
+  const parsed = JSON.parse(raw);
+  return deepMerge(DEFAULT_CONFIG, parsed);
+}
+
+const CONFIG = await loadConfig();
+const PORT = Number(CONFIG.server.port || 8787);
+const REQUEST_TIMEOUT_MS = Number(CONFIG.server.requestTimeoutMs || 20000);
+const MAX_RETRIES = Number(CONFIG.server.maxRetries || 2);
+const RAG_TOP_K = Number(CONFIG.rag.topK || 3);
+const KNOWLEDGE_FILE = CONFIG.rag.knowledgeFile || 'knowledge/processed/chunks.jsonl';
+const ENABLE_CANARY = Boolean(CONFIG.rollout.enableCanary);
+const CANARY_PERCENT = Number(CONFIG.rollout.canaryPercent || 10);
+const PRIMARY_PROVIDER = CONFIG.rollout.primaryProvider || 'gemini';
+const CANARY_PROVIDER = CONFIG.rollout.canaryProvider || 'zhipu';
+const AUTO_ROLLBACK_ON_FAILURE = CONFIG.rollout.autoRollbackOnFailure !== false;
+const CACHE_TTL_MS = Number(CONFIG.performance.cacheTtlMs || 120000);
+const COST_ALERT_THRESHOLD = Number(CONFIG.performance.costAlertThreshold || 2);
 
 const GLOBAL_SYSTEM_PROMPT = `你是一位世界顶级的深度旅游规划专家。
 你的任务是完成一个【三位一体】的规划报告。
@@ -108,10 +165,10 @@ function chooseRolloutProvider(payload) {
   const canaryHit = ENABLE_CANARY && bucket < CANARY_PERCENT;
   const provider = canaryHit ? CANARY_PROVIDER : PRIMARY_PROVIDER;
   const modelType = provider === 'gemini'
-    ? (process.env.DEFAULT_GEMINI_MODEL || 'gemini-2.5-flash')
+    ? (CONFIG.providers.defaultGeminiModel || 'gemini-2.5-flash')
     : provider === 'deepseek'
-      ? (process.env.DEFAULT_DEEPSEEK_MODEL || 'deepseek-chat')
-      : (process.env.DEFAULT_ZHIPU_MODEL || 'glm-4-flash');
+      ? (CONFIG.providers.defaultDeepseekModel || 'deepseek-chat')
+      : (CONFIG.providers.defaultZhipuModel || 'glm-4-flash');
 
   return { provider, modelType, rollout: canaryHit ? 'canary' : 'primary' };
 }
@@ -391,9 +448,9 @@ function verifyPlan(items, mcpTrace) {
 }
 
 async function callGemini(modelType, prompt, mcpTrace, requestId) {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+  const apiKey = CONFIG.providers.geminiApiKey;
   if (!apiKey) {
-    const error = new Error('Missing GEMINI_API_KEY on server');
+    const error = new Error('Missing geminiApiKey in config');
     error.statusCode = 500;
     throw error;
   }
@@ -505,14 +562,14 @@ async function generatePlan(payload, requestId) {
     if (chosen.provider === 'gemini') {
       plan = await callGemini(chosen.modelType, prompt, mcpTrace, requestId);
     } else if (chosen.provider === 'deepseek') {
-      if (!process.env.DEEPSEEK_API_KEY) {
-        const error = new Error('Missing DEEPSEEK_API_KEY on server');
+      if (!CONFIG.providers.deepseekApiKey) {
+        const error = new Error('Missing deepseekApiKey in config');
         error.statusCode = 500;
         throw error;
       }
       plan = await callCompatible({
         endpoint: 'https://api.deepseek.com/chat/completions',
-        apiKey: process.env.DEEPSEEK_API_KEY,
+        apiKey: CONFIG.providers.deepseekApiKey,
         model: chosen.modelType,
         userInput: payload.userInput,
         provider: 'deepseek',
@@ -521,14 +578,14 @@ async function generatePlan(payload, requestId) {
         prompt
       });
     } else {
-      if (!process.env.ZHIPU_API_KEY) {
-        const error = new Error('Missing ZHIPU_API_KEY on server');
+      if (!CONFIG.providers.zhipuApiKey) {
+        const error = new Error('Missing zhipuApiKey in config');
         error.statusCode = 500;
         throw error;
       }
       plan = await callCompatible({
         endpoint: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
-        apiKey: process.env.ZHIPU_API_KEY,
+        apiKey: CONFIG.providers.zhipuApiKey,
         model: chosen.modelType,
         userInput: payload.userInput,
         provider: 'zhipu',
@@ -542,13 +599,13 @@ async function generatePlan(payload, requestId) {
       mcpTrace.push('rollout:rollback:triggered');
       pushAlert('warning', 'rollout_rollback', 'Canary provider failed, fallback to primary provider', { requestId });
       if (PRIMARY_PROVIDER === 'gemini') {
-        plan = await callGemini(process.env.DEFAULT_GEMINI_MODEL || 'gemini-2.5-flash', prompt, mcpTrace, requestId);
+        plan = await callGemini(CONFIG.providers.defaultGeminiModel || 'gemini-2.5-flash', prompt, mcpTrace, requestId);
       } else if (PRIMARY_PROVIDER === 'deepseek') {
-        if (!process.env.DEEPSEEK_API_KEY) throw error;
+        if (!CONFIG.providers.deepseekApiKey) throw error;
         plan = await callCompatible({
           endpoint: 'https://api.deepseek.com/chat/completions',
-          apiKey: process.env.DEEPSEEK_API_KEY,
-          model: process.env.DEFAULT_DEEPSEEK_MODEL || 'deepseek-chat',
+          apiKey: CONFIG.providers.deepseekApiKey,
+          model: CONFIG.providers.defaultDeepseekModel || 'deepseek-chat',
           userInput: payload.userInput,
           provider: 'deepseek',
           mcpTrace,
@@ -556,11 +613,11 @@ async function generatePlan(payload, requestId) {
           prompt
         });
       } else {
-        if (!process.env.ZHIPU_API_KEY) throw error;
+        if (!CONFIG.providers.zhipuApiKey) throw error;
         plan = await callCompatible({
           endpoint: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
-          apiKey: process.env.ZHIPU_API_KEY,
-          model: process.env.DEFAULT_ZHIPU_MODEL || 'glm-4-flash',
+          apiKey: CONFIG.providers.zhipuApiKey,
+          model: CONFIG.providers.defaultZhipuModel || 'glm-4-flash',
           userInput: payload.userInput,
           provider: 'zhipu',
           mcpTrace,
@@ -681,7 +738,7 @@ const server = createServer(async (req, res) => {
 
   if (req.method === 'GET' && req.url === '/api/release/status') {
     return json(res, 200, {
-      ENABLE_CANARY, CANARY_PERCENT, PRIMARY_PROVIDER, CANARY_PROVIDER, AUTO_ROLLBACK_ON_FAILURE, requestId
+      ENABLE_CANARY, CANARY_PERCENT, PRIMARY_PROVIDER, CANARY_PROVIDER, AUTO_ROLLBACK_ON_FAILURE, configFile: CONFIG_FILE, requestId
     }, requestId);
   }
 

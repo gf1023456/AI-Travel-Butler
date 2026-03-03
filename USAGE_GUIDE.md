@@ -16,29 +16,36 @@ npm install
 
 ---
 
-## 2. 配置环境变量（后端）
+## 2. 配置文件（后端）
 
-在启动后端前，至少配置一个可用 Provider Key。
+在启动后端前，请先准备 `server/config.json`。
 
-### 2.1 必填（至少一组）
-- Gemini: `GEMINI_API_KEY`（或 `API_KEY`）
-- DeepSeek: `DEEPSEEK_API_KEY`
-- Zhipu: `ZHIPU_API_KEY`
+### 2.1 初始化配置
+```bash
+cp server/config.example.json server/config.json
+```
 
-### 2.2 可选（运行时控制）
-- `REQUEST_TIMEOUT_MS`：请求超时（默认 `20000`）
-- `MAX_RETRIES`：重试次数（默认 `2`）
-- `RAG_TOP_K`：知识检索返回条数（默认 `3`）
-- `KNOWLEDGE_FILE`：知识库文件路径（默认 `knowledge/processed/chunks.jsonl`）
+### 2.2 必填（至少一组）
+编辑 `server/config.json`：
+- `providers.geminiApiKey`
+- `providers.deepseekApiKey`
+- `providers.zhipuApiKey`
 
-### 2.3 发布/成本控制（W11-W12）
-- `ENABLE_CANARY`：是否启用灰度（`1` 开启）
-- `CANARY_PERCENT`：灰度流量比例（默认 `10`）
-- `PRIMARY_PROVIDER`：主 Provider（默认 `gemini`）
-- `CANARY_PROVIDER`：灰度 Provider（默认 `zhipu`）
-- `AUTO_ROLLBACK_ON_FAILURE`：灰度失败自动回滚（默认开启）
-- `CACHE_TTL_MS`：响应缓存 TTL（默认 `120000`）
-- `COST_ALERT_THRESHOLD`：估算成本阈值（默认 `2` USD）
+### 2.3 可选（运行时控制）
+编辑 `server/config.json`：
+- `server.requestTimeoutMs`（默认 `20000`）
+- `server.maxRetries`（默认 `2`）
+- `rag.topK`（默认 `3`）
+- `rag.knowledgeFile`（默认 `knowledge/processed/chunks.jsonl`）
+
+### 2.4 发布/成本控制（W11-W12）
+编辑 `server/config.json`：
+- `rollout.enableCanary`
+- `rollout.canaryPercent`
+- `rollout.primaryProvider` / `rollout.canaryProvider`
+- `rollout.autoRollbackOnFailure`
+- `performance.cacheTtlMs`
+- `performance.costAlertThreshold`
 
 ---
 
@@ -146,8 +153,8 @@ curl -sS http://localhost:8787/api/execution-log/<execution_log_id>
 
 ## 6. 常见问题
 
-### Q1: 返回 `Missing GEMINI_API_KEY on server`
-说明后端缺少对应 Provider Key，请先设置环境变量后重启。
+### Q1: 返回 `Missing geminiApiKey in config`
+说明 `server/config.json` 中未填写对应 Provider Key，请更新配置文件并重启后端。
 
 ### Q2: `/api/plan` 400 报 `userInput is required`
 请求体缺少 `userInput` 或 JSON 格式错误。
