@@ -378,6 +378,57 @@ function mapToolCalls(toolCalls, mcpTrace, provider) {
 
 
 
+
+
+function getCityCenter(city) {
+  const map = {
+    '呼和浩特': { lat: 40.8426, lng: 111.7492 },
+    '西安': { lat: 34.3416, lng: 108.9398 },
+    '北京': { lat: 39.9042, lng: 116.4074 },
+    '上海': { lat: 31.2304, lng: 121.4737 }
+  };
+  return map[city] || { lat: 34.3416, lng: 108.9398 };
+}
+
+function inferCityFromRequest(userInput, recommendations) {
+  const text = String(userInput || '');
+  const known = ['呼和浩特', '西安', '北京', '上海'];
+  for (const city of known) {
+    if (text.includes(city)) return city;
+  }
+  const hint = recommendations?.[0]?.title || '';
+  for (const city of known) {
+    if (String(hint).includes(city)) return city;
+  }
+  return '西安';
+}
+
+function synthesizeLocationsFromSocial({ userInput, socialRecommendations, provider, mcpTrace }) {
+  if (!Array.isArray(socialRecommendations) || socialRecommendations.length === 0) return [];
+  const city = inferCityFromRequest(userInput, socialRecommendations);
+  const center = getCityCenter(city);
+  const picks = socialRecommendations.slice(0, 4);
+  const slots = ['09:30 - 11:00', '12:30 - 14:00', '15:30 - 17:00', '19:00 - 21:00'];
+
+  const items = picks.map((rec, idx) => normalizeLocation({
+    name: rec.title,
+    city,
+    description: rec.reason || `热门打卡：${rec.title}`,
+    lat: String((center.lat + (idx - 1.5) * 0.02).toFixed(6)),
+    lng: String((center.lng + (idx - 1.5) * 0.02).toFixed(6)),
+    time: slots[idx] || '10:00 - 12:00',
+    day: 1,
+    sequence: idx + 1,
+    transit_hint: idx === 0 ? '从酒店/出发地前往首站' : `从上一站前往 ${rec.title}`,
+    category: idx === 1 ? 'FOOD' : 'SIGHT',
+    source: `fallback:${provider}:social_to_location`,
+    confidence: 0.45
+  }, provider));
+
+  mcpTrace.push(`fallback:${provider}:synthesized_locations:${items.length}`);
+  return items.filter(Boolean);
+}
+
 function estimateWeatherByHour(timeRange) {
   const firstHour = Number(String(timeRange || '').match(/(\d{1,2})/)?.[1] || 12);
   if (firstHour <= 8) return { weather_icon: '🌤️', weather_condition: '清晨晴朗', temperature: '18°C' };
@@ -419,6 +470,11 @@ function enrichWithMcpSignals(items, mcpTrace) {
 
 function verifyPlan(items, mcpTrace) {
   const warnings = [];
+  if (!items || items.length === 0) {
+    warnings.push('未生成任何地图标注点，请重试或切换模型。');
+    mcpTrace.push('agent:verifier:warnings:1:no_locations');
+    return warnings;
+  }
   const byDay = new Map();
   for (const item of items) {
     if (!byDay.has(item.day)) byDay.set(item.day, []);
@@ -484,7 +540,13 @@ async function callGemini(modelType, prompt, mcpTrace, requestId) {
     }
   }
 
-  const { dayPlanItinerary, socialRecommendations } = mapToolCalls(response.functionCalls || [], mcpTrace, 'gemini');
+  const mapped = mapToolCalls(response.functionCalls || [], mcpTrace, 'gemini');
+  let dayPlanItinerary = mapped.dayPlanItinerary;
+  const socialRecommendations = mapped.socialRecommendations;
+
+  if (dayPlanItinerary.length === 0 && socialRecommendations.length > 0) {
+    dayPlanItinerary = synthesizeLocationsFromSocial({ userInput: prompt, socialRecommendations, provider: 'gemini', mcpTrace });
+  }
 
   return {
     provider: 'gemini',
@@ -527,7 +589,13 @@ async function callCompatible({ endpoint, apiKey, model, userInput, provider, mc
     throw error;
   }
 
-  const { dayPlanItinerary, socialRecommendations } = mapToolCalls(message.tool_calls || [], mcpTrace, provider);
+  const mapped = mapToolCalls(message.tool_calls || [], mcpTrace, provider);
+  let dayPlanItinerary = mapped.dayPlanItinerary;
+  const socialRecommendations = mapped.socialRecommendations;
+
+  if (dayPlanItinerary.length === 0 && socialRecommendations.length > 0) {
+    dayPlanItinerary = synthesizeLocationsFromSocial({ userInput, socialRecommendations, provider, mcpTrace });
+  }
 
   return {
     provider,

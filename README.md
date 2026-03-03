@@ -78,3 +78,8 @@ Configure in `server/config.json`:
 - `performance.costAlertThreshold`
 
 You can also set `modelType` to `auto` in request payload to use backend rollout strategy.
+
+
+### Map-point fallback behavior
+
+If a provider returns only social recommendations and no `location` tool calls, backend will synthesize minimal map points from social recommendations to keep map/export/history features usable. Trace key: `fallback:<provider>:social_to_location:*`.
