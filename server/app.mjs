@@ -470,7 +470,11 @@ function synthesizeLocationsFromSocial({ userInput, socialRecommendations, provi
   const city = inferCityFromRequest(userInput, socialRecommendations);
   const center = getCityCenter(city || '北京');
   const requestedDays = inferRequestedDays(userInput);
-  const picks = socialRecommendations.slice(0, Math.min(12, Math.max(4, requestedDays * 3)));
+  const targetCount = Math.min(12, Math.max(4, requestedDays * 3));
+  const picks = [];
+  for (let i = 0; i < targetCount; i += 1) {
+    picks.push(socialRecommendations[i % socialRecommendations.length]);
+  }
   const slots = ['09:30 - 11:00', '12:30 - 14:00', '15:30 - 17:00', '19:00 - 21:00'];
 
   const items = picks.map((rec, idx) => normalizeLocation({
@@ -536,13 +540,36 @@ function extractExpectedCityFromInput(userInput, socialRecommendations) {
   return inferCityFromRequest(userInput, socialRecommendations) || '';
 }
 
-function ensureMinimumItemsByRequestedDays(items, userInput, mcpTrace) {
+function ensureMinimumItemsByRequestedDays(items, userInput, socialRecommendations, provider, mcpTrace) {
   const requestedDays = inferRequestedDays(userInput);
-  if (requestedDays <= 1) return items;
-  const daySet = new Set((items || []).map((x) => Number(x.day || 1)));
-  if (daySet.size >= requestedDays) return items;
-  mcpTrace.push(`postprocess:days_mismatch:need:${requestedDays}:got:${daySet.size}`);
-  return items;
+  const minRequired = Math.max(3, requestedDays * 3);
+  const safeItems = Array.isArray(items) ? items : [];
+  const daySet = new Set(safeItems.map((x) => Number(x.day || 1)));
+
+  const dayCoverageOk = daySet.size >= requestedDays;
+  const countOk = safeItems.length >= minRequired;
+  if (dayCoverageOk && countOk) return safeItems;
+
+  if (!dayCoverageOk) mcpTrace.push(`postprocess:days_mismatch:need:${requestedDays}:got:${daySet.size}`);
+  if (!countOk) mcpTrace.push(`postprocess:count_mismatch:need:${minRequired}:got:${safeItems.length}`);
+
+  const synthesized = synthesizeLocationsFromSocial({ userInput, socialRecommendations, provider, mcpTrace });
+  if (!synthesized.length) return safeItems;
+
+  if (!safeItems.length) return synthesized;
+
+  const merged = [...safeItems];
+  const byKey = new Set(merged.map((x) => `${x.day}|${x.sequence}|${x.name}`));
+  for (const item of synthesized) {
+    const key = `${item.day}|${item.sequence}|${item.name}`;
+    if (byKey.has(key)) continue;
+    merged.push(item);
+    byKey.add(key);
+    if (merged.length >= minRequired) break;
+  }
+
+  mcpTrace.push(`postprocess:backfill_from_social:added:${merged.length - safeItems.length}`);
+  return merged;
 }
 
 function verifyPlan(items, mcpTrace) {
@@ -809,7 +836,7 @@ async function generatePlan(payload, requestId) {
 
   const expectedCity = extractExpectedCityFromInput(payload.userInput, plan.socialRecommendations || []);
   let alignedItinerary = harmonizeItineraryCity(plan.dayPlanItinerary || [], expectedCity, mcpTrace);
-  alignedItinerary = ensureMinimumItemsByRequestedDays(alignedItinerary, payload.userInput, mcpTrace);
+  alignedItinerary = ensureMinimumItemsByRequestedDays(alignedItinerary, payload.userInput, plan.socialRecommendations || [], plan.provider || chosen.provider, mcpTrace);
   const enrichedItinerary = enrichWithMcpSignals(alignedItinerary, mcpTrace);
   const verifierWarnings = verifyPlan(enrichedItinerary, mcpTrace);
 
