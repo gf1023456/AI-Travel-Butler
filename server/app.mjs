@@ -8,6 +8,13 @@ const REQUEST_TIMEOUT_MS = Number(process.env.REQUEST_TIMEOUT_MS || 20000);
 const MAX_RETRIES = Number(process.env.MAX_RETRIES || 2);
 const RAG_TOP_K = Number(process.env.RAG_TOP_K || 3);
 const KNOWLEDGE_FILE = process.env.KNOWLEDGE_FILE || 'knowledge/processed/chunks.jsonl';
+const ENABLE_CANARY = process.env.ENABLE_CANARY === '1';
+const CANARY_PERCENT = Number(process.env.CANARY_PERCENT || 10);
+const PRIMARY_PROVIDER = process.env.PRIMARY_PROVIDER || 'gemini';
+const CANARY_PROVIDER = process.env.CANARY_PROVIDER || 'zhipu';
+const AUTO_ROLLBACK_ON_FAILURE = process.env.AUTO_ROLLBACK_ON_FAILURE !== '0';
+const CACHE_TTL_MS = Number(process.env.CACHE_TTL_MS || 120000);
+const COST_ALERT_THRESHOLD = Number(process.env.COST_ALERT_THRESHOLD || 2);
 
 const GLOBAL_SYSTEM_PROMPT = `你是一位世界顶级的深度旅游规划专家。
 你的任务是完成一个【三位一体】的规划报告。
@@ -53,14 +60,67 @@ const socialRecommendationTool = {
 
 let knowledgeCache;
 const executionLogStore = new Map();
+const responseCache = new Map();
+const alerts = [];
 const metrics = {
   totalRequests: 0,
   planRequests: 0,
   refineRequests: 0,
   failedRequests: 0,
+  cacheHits: 0,
+  totalEstimatedCost: 0,
   providerCounts: { gemini: 0, deepseek: 0, zhipu: 0, unknown: 0 },
   lastError: null
 };
+
+
+
+function pushAlert(level, code, message, extra = {}) {
+  alerts.unshift({ level, code, message, at: new Date().toISOString(), ...extra });
+  if (alerts.length > 100) alerts.pop();
+}
+
+function cacheKeyOf(payload) {
+  return JSON.stringify({
+    userInput: payload.userInput,
+    modelType: payload.modelType,
+    isPlannerMode: payload.isPlannerMode,
+    travelMode: payload.travelMode
+  });
+}
+
+function stableBucket(text) {
+  const src = String(text || '');
+  let h = 0;
+  for (let i = 0; i < src.length; i += 1) h = (h * 31 + src.charCodeAt(i)) % 100;
+  return h;
+}
+
+function chooseRolloutProvider(payload) {
+  const requested = String(payload.modelType || '').toLowerCase();
+  if (requested && requested !== 'auto') {
+    if (requested.startsWith('gemini')) return { provider: 'gemini', modelType: payload.modelType, rollout: 'fixed' };
+    if (requested.includes('deepseek')) return { provider: 'deepseek', modelType: payload.modelType, rollout: 'fixed' };
+    if (requested.includes('glm')) return { provider: 'zhipu', modelType: payload.modelType, rollout: 'fixed' };
+  }
+
+  const bucket = stableBucket(payload.userInput);
+  const canaryHit = ENABLE_CANARY && bucket < CANARY_PERCENT;
+  const provider = canaryHit ? CANARY_PROVIDER : PRIMARY_PROVIDER;
+  const modelType = provider === 'gemini'
+    ? (process.env.DEFAULT_GEMINI_MODEL || 'gemini-2.5-flash')
+    : provider === 'deepseek'
+      ? (process.env.DEFAULT_DEEPSEEK_MODEL || 'deepseek-chat')
+      : (process.env.DEFAULT_ZHIPU_MODEL || 'glm-4-flash');
+
+  return { provider, modelType, rollout: canaryHit ? 'canary' : 'primary' };
+}
+
+function estimateCostUsd(result) {
+  const poi = Array.isArray(result.dayPlanItinerary) ? result.dayPlanItinerary.length : 0;
+  const evidence = Array.isArray(result.evidence) ? result.evidence.length : 0;
+  return Number((0.002 + poi * 0.0004 + evidence * 0.0002).toFixed(4));
+}
 
 async function loadKnowledgeChunks() {
   if (knowledgeCache) return knowledgeCache;
@@ -423,61 +483,122 @@ async function callCompatible({ endpoint, apiKey, model, userInput, provider, mc
 
 async function generatePlan(payload, requestId) {
   const mcpTrace = [`request:${requestId}:received`];
+  const cacheKey = cacheKeyOf(payload);
+  const cached = responseCache.get(cacheKey);
+  if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
+    metrics.cacheHits += 1;
+    const cloned = JSON.parse(JSON.stringify(cached.value));
+    cloned.mcpTrace = [...(cloned.mcpTrace || []), 'cache:hit'];
+    return cloned;
+  }
+
   const evidence = await retrieveEvidence(payload.userInput, RAG_TOP_K);
   mcpTrace.push(`rag:retrieved:${evidence.length}`);
   const ragContext = buildRagContext(evidence);
   const prompt = constructUserPrompt(payload.userInput, payload.isPlannerMode, payload.travelMode, ragContext);
 
   let plan;
+  const chosen = chooseRolloutProvider(payload);
+  mcpTrace.push(`rollout:${chosen.rollout}:provider:${chosen.provider}:model:${chosen.modelType}`);
 
-  if (payload.modelType?.startsWith('gemini')) {
-    plan = await callGemini(payload.modelType, prompt, mcpTrace, requestId);
-  } else if (payload.modelType?.includes('deepseek')) {
-    if (!process.env.DEEPSEEK_API_KEY) {
-      const error = new Error('Missing DEEPSEEK_API_KEY on server');
-      error.statusCode = 500;
+  try {
+    if (chosen.provider === 'gemini') {
+      plan = await callGemini(chosen.modelType, prompt, mcpTrace, requestId);
+    } else if (chosen.provider === 'deepseek') {
+      if (!process.env.DEEPSEEK_API_KEY) {
+        const error = new Error('Missing DEEPSEEK_API_KEY on server');
+        error.statusCode = 500;
+        throw error;
+      }
+      plan = await callCompatible({
+        endpoint: 'https://api.deepseek.com/chat/completions',
+        apiKey: process.env.DEEPSEEK_API_KEY,
+        model: chosen.modelType,
+        userInput: payload.userInput,
+        provider: 'deepseek',
+        mcpTrace,
+        requestId,
+        prompt
+      });
+    } else {
+      if (!process.env.ZHIPU_API_KEY) {
+        const error = new Error('Missing ZHIPU_API_KEY on server');
+        error.statusCode = 500;
+        throw error;
+      }
+      plan = await callCompatible({
+        endpoint: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
+        apiKey: process.env.ZHIPU_API_KEY,
+        model: chosen.modelType,
+        userInput: payload.userInput,
+        provider: 'zhipu',
+        mcpTrace,
+        requestId,
+        prompt
+      });
+    }
+  } catch (error) {
+    if (AUTO_ROLLBACK_ON_FAILURE && chosen.rollout === 'canary') {
+      mcpTrace.push('rollout:rollback:triggered');
+      pushAlert('warning', 'rollout_rollback', 'Canary provider failed, fallback to primary provider', { requestId });
+      if (PRIMARY_PROVIDER === 'gemini') {
+        plan = await callGemini(process.env.DEFAULT_GEMINI_MODEL || 'gemini-2.5-flash', prompt, mcpTrace, requestId);
+      } else if (PRIMARY_PROVIDER === 'deepseek') {
+        if (!process.env.DEEPSEEK_API_KEY) throw error;
+        plan = await callCompatible({
+          endpoint: 'https://api.deepseek.com/chat/completions',
+          apiKey: process.env.DEEPSEEK_API_KEY,
+          model: process.env.DEFAULT_DEEPSEEK_MODEL || 'deepseek-chat',
+          userInput: payload.userInput,
+          provider: 'deepseek',
+          mcpTrace,
+          requestId,
+          prompt
+        });
+      } else {
+        if (!process.env.ZHIPU_API_KEY) throw error;
+        plan = await callCompatible({
+          endpoint: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
+          apiKey: process.env.ZHIPU_API_KEY,
+          model: process.env.DEFAULT_ZHIPU_MODEL || 'glm-4-flash',
+          userInput: payload.userInput,
+          provider: 'zhipu',
+          mcpTrace,
+          requestId,
+          prompt
+        });
+      }
+    } else {
       throw error;
     }
-
-    plan = await callCompatible({
-      endpoint: 'https://api.deepseek.com/chat/completions',
-      apiKey: process.env.DEEPSEEK_API_KEY,
-      model: payload.modelType,
-      userInput: payload.userInput,
-      provider: 'deepseek',
-      mcpTrace,
-      requestId,
-      prompt
-    });
-  } else {
-    if (!process.env.ZHIPU_API_KEY) {
-      const error = new Error('Missing ZHIPU_API_KEY on server');
-      error.statusCode = 500;
-      throw error;
-    }
-
-    plan = await callCompatible({
-      endpoint: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
-      apiKey: process.env.ZHIPU_API_KEY,
-      model: payload.modelType || 'glm-4-flash',
-      userInput: payload.userInput,
-      provider: 'zhipu',
-      mcpTrace,
-      requestId,
-      prompt
-    });
   }
 
   const enrichedItinerary = enrichWithMcpSignals(plan.dayPlanItinerary || [], mcpTrace);
   const verifierWarnings = verifyPlan(enrichedItinerary, mcpTrace);
 
-  return {
+  const result = {
     ...plan,
     dayPlanItinerary: enrichedItinerary,
     verifierWarnings,
     evidence,
     execution_log_id: requestId
   };
+
+  const estCost = estimateCostUsd(result);
+  metrics.totalEstimatedCost += estCost;
+  if (metrics.totalEstimatedCost >= COST_ALERT_THRESHOLD) {
+    pushAlert('warning', 'cost_threshold', `Estimated cumulative cost exceeded threshold ${COST_ALERT_THRESHOLD} USD`, {
+      totalEstimatedCost: Number(metrics.totalEstimatedCost.toFixed(4))
+    });
+  }
+
+  responseCache.set(cacheKey, { at: Date.now(), value: result });
+  if (responseCache.size > 200) {
+    const oldest = responseCache.keys().next().value;
+    responseCache.delete(oldest);
+  }
+
+  return result;
 }
 
 function validatePayload(payload) {
@@ -534,6 +655,8 @@ function snapshotMetrics() {
   return {
     ...metrics,
     executionLogSize: executionLogStore.size,
+    cacheSize: responseCache.size,
+    alertCount: alerts.length,
     updatedAt: new Date().toISOString()
   };
 }
@@ -550,6 +673,16 @@ const server = createServer(async (req, res) => {
 
   if (req.method === 'GET' && req.url === '/api/metrics') {
     return json(res, 200, snapshotMetrics(), requestId);
+  }
+
+  if (req.method === 'GET' && req.url === '/api/alerts') {
+    return json(res, 200, { alerts, requestId }, requestId);
+  }
+
+  if (req.method === 'GET' && req.url === '/api/release/status') {
+    return json(res, 200, {
+      ENABLE_CANARY, CANARY_PERCENT, PRIMARY_PROVIDER, CANARY_PROVIDER, AUTO_ROLLBACK_ON_FAILURE, requestId
+    }, requestId);
   }
 
   if (req.method === 'GET' && req.url?.startsWith('/api/execution-log/')) {
@@ -595,7 +728,7 @@ const server = createServer(async (req, res) => {
         const data = await generatePlan(payload, requestId);
         data.mcpTrace.push(`request:${requestId}:completed:ms:${Date.now() - started}`);
 
-        const provider = getProviderFromModel(payload.modelType);
+        const provider = data.provider || getProviderFromModel(payload.modelType);
         metrics.providerCounts[provider] = (metrics.providerCounts[provider] || 0) + 1;
         recordExecutionLog({ requestId, route: req.url, payload, response: data, startedAt, failed: false });
 

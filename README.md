@@ -55,6 +55,8 @@ Optional runtime controls:
 - `GET /api/knowledge/search?q=...` : inspect local RAG retrieval results
 - `GET /api/metrics` : service-level counters and provider usage
 - `GET /api/execution-log/:id` : fetch a persisted execution log by `execution_log_id`
+- `GET /api/alerts` : list runtime alerts (rollback/cost threshold)
+- `GET /api/release/status` : inspect canary/rollback runtime config
 
 ### Local knowledge base (RAG MVP)
 
@@ -67,3 +69,15 @@ Optional runtime controls:
 `POST /api/plan` responses now include:
 - `verifierWarnings`: lightweight schedule checks (e.g. too few POIs / duplicate sequence)
 - MCP-enriched fields on POI items (`weather_*`, `transit_hint`, `source`, `confidence`) when provider output is incomplete.
+
+
+### Release + cost controls
+
+- `ENABLE_CANARY` (`1` to enable)
+- `CANARY_PERCENT` (default `10`)
+- `PRIMARY_PROVIDER` / `CANARY_PROVIDER`
+- `AUTO_ROLLBACK_ON_FAILURE` (default on)
+- `CACHE_TTL_MS` (default `120000`)
+- `COST_ALERT_THRESHOLD` (default `2` USD estimated)
+
+You can also set `modelType` to `auto` in request payload to use backend rollout strategy.
