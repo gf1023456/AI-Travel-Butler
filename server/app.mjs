@@ -52,6 +52,15 @@ const socialRecommendationTool = {
 };
 
 let knowledgeCache;
+const executionLogStore = new Map();
+const metrics = {
+  totalRequests: 0,
+  planRequests: 0,
+  refineRequests: 0,
+  failedRequests: 0,
+  providerCounts: { gemini: 0, deepseek: 0, zhipu: 0, unknown: 0 },
+  lastError: null
+};
 
 async function loadKnowledgeChunks() {
   if (knowledgeCache) return knowledgeCache;
@@ -488,13 +497,66 @@ function toRefinePayload(payload) {
   };
 }
 
+
+
+function getProviderFromModel(modelType) {
+  if (String(modelType || '').startsWith('gemini')) return 'gemini';
+  if (String(modelType || '').includes('deepseek')) return 'deepseek';
+  if (String(modelType || '').toLowerCase().includes('glm')) return 'zhipu';
+  return 'unknown';
+}
+
+function recordExecutionLog({ requestId, route, payload, response, startedAt, failed, errorMessage }) {
+  const entry = {
+    requestId,
+    route,
+    startedAt,
+    finishedAt: new Date().toISOString(),
+    durationMs: Date.now() - new Date(startedAt).getTime(),
+    modelType: payload?.modelType,
+    provider: getProviderFromModel(payload?.modelType),
+    userInputPreview: String(payload?.userInput || '').slice(0, 120),
+    mcpTraceCount: Array.isArray(response?.mcpTrace) ? response.mcpTrace.length : 0,
+    evidenceCount: Array.isArray(response?.evidence) ? response.evidence.length : 0,
+    itineraryCount: Array.isArray(response?.dayPlanItinerary) ? response.dayPlanItinerary.length : 0,
+    failed: Boolean(failed),
+    errorMessage: errorMessage || null
+  };
+
+  executionLogStore.set(requestId, entry);
+  if (executionLogStore.size > 200) {
+    const oldest = executionLogStore.keys().next().value;
+    executionLogStore.delete(oldest);
+  }
+}
+
+function snapshotMetrics() {
+  return {
+    ...metrics,
+    executionLogSize: executionLogStore.size,
+    updatedAt: new Date().toISOString()
+  };
+}
+
 const server = createServer(async (req, res) => {
   const requestId = crypto.randomUUID();
+  metrics.totalRequests += 1;
 
   if (req.method === 'OPTIONS') return json(res, 204, {}, requestId);
 
   if (req.method === 'GET' && req.url === '/healthz') {
     return json(res, 200, { ok: true, service: 'ai-travel-butler-server', city: 'xian' }, requestId);
+  }
+
+  if (req.method === 'GET' && req.url === '/api/metrics') {
+    return json(res, 200, snapshotMetrics(), requestId);
+  }
+
+  if (req.method === 'GET' && req.url?.startsWith('/api/execution-log/')) {
+    const id = req.url.split('/').pop();
+    const log = executionLogStore.get(id);
+    if (!log) return json(res, 404, { error: 'execution log not found', requestId }, requestId);
+    return json(res, 200, { log, requestId }, requestId);
   }
 
   if (req.method === 'GET' && req.url?.startsWith('/api/knowledge/search')) {
@@ -506,25 +568,43 @@ const server = createServer(async (req, res) => {
 
   if (req.method === 'POST' && (req.url === '/api/plan' || req.url === '/api/plan/refine')) {
     let body = '';
+    const startedAt = new Date().toISOString();
+    if (req.url === '/api/plan') metrics.planRequests += 1;
+    if (req.url === '/api/plan/refine') metrics.refineRequests += 1;
+
     req.on('data', (chunk) => {
       body += chunk;
       if (body.length > 1_000_000) req.destroy();
     });
 
     req.on('end', async () => {
+      let payload;
       try {
         const rawPayload = JSON.parse(body || '{}');
-        const payload = req.url === '/api/plan/refine' ? toRefinePayload(rawPayload) : rawPayload;
+        payload = req.url === '/api/plan/refine' ? toRefinePayload(rawPayload) : rawPayload;
 
         const validationError = validatePayload(payload);
-        if (validationError) return json(res, 400, { error: validationError, requestId }, requestId);
+        if (validationError) {
+          metrics.failedRequests += 1;
+          metrics.lastError = { message: validationError, at: new Date().toISOString(), route: req.url };
+          recordExecutionLog({ requestId, route: req.url, payload, startedAt, failed: true, errorMessage: validationError });
+          return json(res, 400, { error: validationError, requestId }, requestId);
+        }
 
         const started = Date.now();
         const data = await generatePlan(payload, requestId);
         data.mcpTrace.push(`request:${requestId}:completed:ms:${Date.now() - started}`);
+
+        const provider = getProviderFromModel(payload.modelType);
+        metrics.providerCounts[provider] = (metrics.providerCounts[provider] || 0) + 1;
+        recordExecutionLog({ requestId, route: req.url, payload, response: data, startedAt, failed: false });
+
         return json(res, 200, { ...data, requestId }, requestId);
       } catch (error) {
         const status = error?.statusCode || 500;
+        metrics.failedRequests += 1;
+        metrics.lastError = { message: error?.message || 'Planner error', at: new Date().toISOString(), route: req.url };
+        recordExecutionLog({ requestId, route: req.url, payload, startedAt, failed: true, errorMessage: error?.message || 'Planner error' });
         console.error(`[${requestId}] ${req.url} failed`, error?.message || error);
         return json(res, status, { error: error?.message || 'Planner error', requestId }, requestId);
       }

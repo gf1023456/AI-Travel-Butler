@@ -53,6 +53,8 @@ Optional runtime controls:
 - `POST /api/plan` : generate initial itinerary
 - `POST /api/plan/refine` : refine an existing plan with new instructions
 - `GET /api/knowledge/search?q=...` : inspect local RAG retrieval results
+- `GET /api/metrics` : service-level counters and provider usage
+- `GET /api/execution-log/:id` : fetch a persisted execution log by `execution_log_id`
 
 ### Local knowledge base (RAG MVP)
 
