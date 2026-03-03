@@ -75,10 +75,23 @@ const COST_ALERT_THRESHOLD = Number(CONFIG.performance.costAlertThreshold || 2);
 
 const GLOBAL_SYSTEM_PROMPT = `你是一位世界顶级的深度旅游规划专家。
 你的任务是完成一个【三位一体】的规划报告。
-1) 社交分析(get_social_recommendations)
-2) 地图标注(location)
-3) 文字总结。
-请优先利用提供的本地知识上下文（如存在）来提高准确性。`;
+
+【关键逻辑 - 出发地与目的地】
+当用户输入“从 A 到 B”时，A 是出发地，B 是目的地；地点推荐与打点必须落在目的地 B，不得混淆。
+
+【必须包含的三大部分】
+1) 社交分析 (工具: get_social_recommendations)
+   - 必须调用一次，给出趋势与理由。
+2) 地图标注 (工具: location)
+   - 必须针对用户要求的每一天调用多次。
+   - 每天至少 3-4 个 location（早/中/晚/交通）。
+   - 完成社交推荐后必须继续进行地图打点。
+3) 文字总结
+   - 在工具调用后输出简短亮点。
+
+【严苛禁令】
+- 严禁只做其一：社交趋势与地图行程必须同时给出。
+- 严禁输出 <think> 标签内容。`
 
 const locationTool = {
   name: 'location',
@@ -238,7 +251,7 @@ function buildRagContext(evidence) {
 }
 
 function constructUserPrompt(userInput, isPlannerMode, travelMode, ragContext) {
-  const hardConstraints = '硬性要求：必须输出与用户目标城市一致；必须覆盖用户要求的天数（如“三天/3天”则 day 至少包含 1,2,3）；每一天至少 3 个 location 点位；location.city 必须是目标城市，不得填写其他城市。';
+  const hardConstraints = '硬性要求：必须输出与用户目标城市一致；若输入包含“从A到B”，地点必须全部落在B；必须覆盖用户要求的天数（如“三天/3天”则 day 至少包含 1,2,3）；每一天至少 3 个 location 点位；location.city 必须是目标城市，不得填写其他城市。';
   if (isPlannerMode) {
     return `旅行风格：${travelMode}。请生成详细每日行程：${userInput}。${hardConstraints}${ragContext}`;
   }
@@ -402,6 +415,9 @@ function getCityCenter(city) {
 }
 
 function inferCityFromRequest(userInput, recommendations) {
+  const destination = extractDestinationFromInput(userInput);
+  if (destination) return destination;
+
   const text = String(userInput || '');
   const fromRecs = (recommendations || [])
     .map((x) => `${x.title || ''} ${x.reason || ''}`)
@@ -425,6 +441,16 @@ function inferRequestedDays(userInput) {
   if (/四[天日]/.test(text)) return 4;
   if (/五[天日]/.test(text)) return 5;
   return 1;
+}
+
+
+function extractDestinationFromInput(userInput) {
+  const text = String(userInput || '');
+  const routeMatch = text.match(/从\s*([一-龥A-Za-z]+)\s*(到|去|前往|->|→)\s*([一-龥A-Za-z]+)/);
+  if (routeMatch?.[3]) return routeMatch[3];
+  const toMatch = text.match(/到\s*([一-龥A-Za-z]+)/);
+  if (toMatch?.[1]) return toMatch[1];
+  return '';
 }
 
 function harmonizeItineraryCity(items, expectedCity, mcpTrace) {
@@ -620,13 +646,15 @@ async function callCompatible({ endpoint, apiKey, model, userInput, provider, mc
         model,
         messages: [
           { role: 'system', content: GLOBAL_SYSTEM_PROMPT },
-          { role: 'user', content: `需求：${userInput}。${prompt}。必须同时调用 get_social_recommendations 与 location。` }
+          { role: 'user', content: `【强制执行】需求：${userInput}。${prompt}。你需要同时执行两个子任务：任务A 调用 get_social_recommendations；任务B 为每一天多次调用 location。请立刻开始调用工具，不要回复文字说明。` }
         ],
         tools: [
           { type: 'function', function: { name: 'get_social_recommendations', parameters: socialRecommendationTool.parameters } },
           { type: 'function', function: { name: 'location', parameters: locationTool.parameters } }
         ],
-        tool_choice: 'auto'
+        tool_choice: 'auto',
+        max_tokens: 4096,
+        temperature: 0.1
       })
     },
     mcpTrace
@@ -657,7 +685,7 @@ async function callCompatible({ endpoint, apiKey, model, userInput, provider, mc
           model,
           messages: [
             { role: 'system', content: GLOBAL_SYSTEM_PROMPT },
-            { role: 'user', content: `仅补齐 location 工具调用。需求：${userInput}。要求：必须给出 day/sequence/time/transit_hint/lat/lng/city；city 必须与用户目标城市一致；若用户要求三天，day 至少覆盖 1,2,3。` }
+            { role: 'user', content: `仅补齐 location 工具调用。需求：${userInput}。要求：必须给出 day/sequence/time/transit_hint/lat/lng/city；若输入是“从A到B”，city 必须是 B；若用户要求三天，day 至少覆盖 1,2,3。` }
           ],
           tools: [
             { type: 'function', function: { name: 'location', parameters: locationTool.parameters } }
