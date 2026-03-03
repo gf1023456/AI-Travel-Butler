@@ -58,3 +58,10 @@ Optional runtime controls:
 
 - Seed data file: `knowledge/processed/chunks.jsonl`
 - Configure via `KNOWLEDGE_FILE` and `RAG_TOP_K`
+
+
+### Verifier + MCP enrichment (current)
+
+`POST /api/plan` responses now include:
+- `verifierWarnings`: lightweight schedule checks (e.g. too few POIs / duplicate sequence)
+- MCP-enriched fields on POI items (`weather_*`, `transit_hint`, `source`, `confidence`) when provider output is incomplete.

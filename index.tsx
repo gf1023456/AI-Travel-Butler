@@ -10,6 +10,7 @@ let dayPlanItinerary: any[] = [];
 let socialRecommendations: any[] = [];
 let itinerarySummary = "";
 let itineraryEvidence: any[] = [];
+let verifierWarnings: string[] = [];
 let mapLayers: L.Layer[] = []; // Store markers and polylines to clear them easily
 let tdtLayer: L.TileLayer;
 let tdtAnnoLayer: L.TileLayer;
@@ -255,6 +256,7 @@ async function tryBackendPlan(userInput: string, modelType: string, isPlannerMod
     socialRecommendations = Array.isArray(data.socialRecommendations) ? data.socialRecommendations : [];
     itinerarySummary = data.itinerarySummary || '排期已生成';
     itineraryEvidence = Array.isArray(data.evidence) ? data.evidence : [];
+    verifierWarnings = Array.isArray(data.verifierWarnings) ? data.verifierWarnings : [];
     return true;
   } catch (error) {
     console.warn('Backend planner unavailable.', error);
@@ -285,6 +287,16 @@ function renderAll() {
       .join('');
     evidenceDiv.innerHTML = `<h5 style="color:var(--text-title); font-size:14px; margin-bottom:8px;">📚 证据引用</h5>${evidenceHtml}`;
     container.appendChild(evidenceDiv);
+  }
+
+
+  if (verifierWarnings.length > 0) {
+    const warningDiv = document.createElement('div');
+    warningDiv.className = 'timeline-card';
+    warningDiv.innerHTML = `<h5 style="color:#ef6c00; font-size:14px; margin-bottom:8px;">⚠️ Verifier 检查</h5>${verifierWarnings
+      .map((w) => `<p style="font-size:12px;color:#8a5a00;margin:4px 0;">• ${w}</p>`)
+      .join('')}`;
+    container.appendChild(warningDiv);
   }
 
   // 2. Render Social Recommendations
@@ -414,6 +426,7 @@ function restart() {
   dayPlanItinerary = [];
   socialRecommendations = [];
   itineraryEvidence = [];
+  verifierWarnings = [];
   getEl('timeline-content').innerHTML = `<div class="empty-state"><i class="fas fa-route"></i><p>正在规划中...</p></div>`;
 }
 

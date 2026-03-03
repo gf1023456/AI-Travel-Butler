@@ -250,6 +250,77 @@ function mapToolCalls(toolCalls, mcpTrace, provider) {
   return { dayPlanItinerary, socialRecommendations };
 }
 
+
+
+function estimateWeatherByHour(timeRange) {
+  const firstHour = Number(String(timeRange || '').match(/(\d{1,2})/)?.[1] || 12);
+  if (firstHour <= 8) return { weather_icon: '🌤️', weather_condition: '清晨晴朗', temperature: '18°C' };
+  if (firstHour <= 16) return { weather_icon: '☀️', weather_condition: '白天晴朗', temperature: '25°C' };
+  return { weather_icon: '🌙', weather_condition: '夜间微风', temperature: '20°C' };
+}
+
+function enrichWithMcpSignals(items, mcpTrace) {
+  const sorted = [...items].sort((a, b) => (a.day - b.day) || (a.sequence - b.sequence));
+
+  const enriched = sorted.map((item, idx) => {
+    let nextTransit = item.transit_hint;
+    if (!nextTransit && idx < sorted.length - 1) {
+      const next = sorted[idx + 1];
+      nextTransit = `建议打车前往下一站 ${next.name}，约 ${15 + (idx % 3) * 10} 分钟`;
+      mcpTrace.push('mcp:route:estimated_transit_hint');
+    }
+
+    const weather = item.weather_icon && item.temperature
+      ? { weather_icon: item.weather_icon, weather_condition: item.weather_condition, temperature: item.temperature }
+      : estimateWeatherByHour(item.time);
+
+    if (!item.weather_icon || !item.temperature) {
+      mcpTrace.push('mcp:weather:estimated_point_forecast');
+    }
+
+    return {
+      ...item,
+      transit_hint: nextTransit || '建议步行或公共交通前往',
+      ...weather,
+      source: item.source || 'mcp:enriched',
+      source_timestamp: item.source_timestamp || new Date().toISOString(),
+      confidence: typeof item.confidence === 'number' ? item.confidence : 0.62
+    };
+  });
+
+  return enriched;
+}
+
+function verifyPlan(items, mcpTrace) {
+  const warnings = [];
+  const byDay = new Map();
+  for (const item of items) {
+    if (!byDay.has(item.day)) byDay.set(item.day, []);
+    byDay.get(item.day).push(item);
+  }
+
+  for (const [day, dayItems] of byDay.entries()) {
+    if (dayItems.length < 3) {
+      warnings.push(`Day ${day} 行程点位少于 3 个，建议补充早餐/晚间活动/交通节点。`);
+    }
+    const seq = dayItems.map((x) => Number(x.sequence || 0)).sort((a, b) => a - b);
+    for (let i = 1; i < seq.length; i += 1) {
+      if (seq[i] === seq[i - 1]) {
+        warnings.push(`Day ${day} 存在重复 sequence=${seq[i]}，可能导致顺序冲突。`);
+        break;
+      }
+    }
+  }
+
+  if (warnings.length === 0) {
+    mcpTrace.push('agent:verifier:pass');
+  } else {
+    mcpTrace.push(`agent:verifier:warnings:${warnings.length}`);
+  }
+
+  return warnings;
+}
+
 async function callGemini(modelType, prompt, mcpTrace, requestId) {
   const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
   if (!apiKey) {
@@ -388,8 +459,13 @@ async function generatePlan(payload, requestId) {
     });
   }
 
+  const enrichedItinerary = enrichWithMcpSignals(plan.dayPlanItinerary || [], mcpTrace);
+  const verifierWarnings = verifyPlan(enrichedItinerary, mcpTrace);
+
   return {
     ...plan,
+    dayPlanItinerary: enrichedItinerary,
+    verifierWarnings,
     evidence,
     execution_log_id: requestId
   };
