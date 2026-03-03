@@ -238,10 +238,11 @@ function buildRagContext(evidence) {
 }
 
 function constructUserPrompt(userInput, isPlannerMode, travelMode, ragContext) {
+  const hardConstraints = '硬性要求：必须输出与用户目标城市一致；必须覆盖用户要求的天数（如“三天/3天”则 day 至少包含 1,2,3）；每一天至少 3 个 location 点位；location.city 必须是目标城市，不得填写其他城市。';
   if (isPlannerMode) {
-    return `旅行风格：${travelMode}。请生成详细每日行程：${userInput}${ragContext}`;
+    return `旅行风格：${travelMode}。请生成详细每日行程：${userInput}。${hardConstraints}${ragContext}`;
   }
-  return `请推荐 5-10 个地点并标注地图：${userInput}${ragContext}`;
+  return `请推荐 5-10 个地点并标注地图：${userInput}。${hardConstraints}${ragContext}`;
 }
 
 function json(res, status, payload, requestId) {
@@ -259,7 +260,7 @@ function normalizeLocation(item = {}, provider) {
   if (!item.name || !item.lat || !item.lng) return null;
   return {
     name: String(item.name),
-    city: String(item.city || '西安'),
+    city: String(item.city || ''),
     description: String(item.description || ''),
     lat: String(item.lat),
     lng: String(item.lng),
@@ -382,50 +383,86 @@ function mapToolCalls(toolCalls, mcpTrace, provider) {
 
 function getCityCenter(city) {
   const map = {
+    '大理': { lat: 25.6075, lng: 100.2676 },
     '呼和浩特': { lat: 40.8426, lng: 111.7492 },
     '西安': { lat: 34.3416, lng: 108.9398 },
     '北京': { lat: 39.9042, lng: 116.4074 },
-    '上海': { lat: 31.2304, lng: 121.4737 }
+    '上海': { lat: 31.2304, lng: 121.4737 },
+    '成都': { lat: 30.5728, lng: 104.0668 },
+    '重庆': { lat: 29.563, lng: 106.5516 },
+    '广州': { lat: 23.1291, lng: 113.2644 },
+    '深圳': { lat: 22.5431, lng: 114.0579 },
+    '杭州': { lat: 30.2741, lng: 120.1551 },
+    '南京': { lat: 32.0603, lng: 118.7969 },
+    '苏州': { lat: 31.2989, lng: 120.5853 },
+    '昆明': { lat: 25.0389, lng: 102.7183 },
+    '丽江': { lat: 26.8721, lng: 100.2296 }
   };
-  return map[city] || { lat: 34.3416, lng: 108.9398 };
+  return map[city] || { lat: 39.9042, lng: 116.4074 };
 }
 
 function inferCityFromRequest(userInput, recommendations) {
   const text = String(userInput || '');
-  const known = ['呼和浩特', '西安', '北京', '上海'];
+  const fromRecs = (recommendations || [])
+    .map((x) => `${x.title || ''} ${x.reason || ''}`)
+    .join(' ');
+  const combined = `${text} ${fromRecs}`;
+
+  const known = ['大理', '呼和浩特', '西安', '北京', '上海', '成都', '重庆', '广州', '深圳', '杭州', '南京', '苏州', '昆明', '丽江'];
   for (const city of known) {
-    if (text.includes(city)) return city;
+    if (combined.includes(city)) return city;
   }
-  const hint = recommendations?.[0]?.title || '';
-  for (const city of known) {
-    if (String(hint).includes(city)) return city;
-  }
-  return '西安';
+  return '';
+}
+
+function inferRequestedDays(userInput) {
+  const text = String(userInput || '');
+  const direct = text.match(/(\d+)\s*[天日]/);
+  if (direct) return Math.min(10, Math.max(1, Number(direct[1])));
+  if (/一[天日]/.test(text)) return 1;
+  if (/两[天日]|二[天日]/.test(text)) return 2;
+  if (/三[天日]/.test(text)) return 3;
+  if (/四[天日]/.test(text)) return 4;
+  if (/五[天日]/.test(text)) return 5;
+  return 1;
+}
+
+function harmonizeItineraryCity(items, expectedCity, mcpTrace) {
+  if (!expectedCity) return items;
+  let replaced = 0;
+  const normalized = (items || []).map((item) => {
+    if (item.city === expectedCity) return item;
+    replaced += 1;
+    return { ...item, city: expectedCity };
+  });
+  if (replaced > 0) mcpTrace.push(`postprocess:city_aligned:${expectedCity}:count:${replaced}`);
+  return normalized;
 }
 
 function synthesizeLocationsFromSocial({ userInput, socialRecommendations, provider, mcpTrace }) {
   if (!Array.isArray(socialRecommendations) || socialRecommendations.length === 0) return [];
   const city = inferCityFromRequest(userInput, socialRecommendations);
-  const center = getCityCenter(city);
-  const picks = socialRecommendations.slice(0, 4);
+  const center = getCityCenter(city || '北京');
+  const requestedDays = inferRequestedDays(userInput);
+  const picks = socialRecommendations.slice(0, Math.min(12, Math.max(4, requestedDays * 3)));
   const slots = ['09:30 - 11:00', '12:30 - 14:00', '15:30 - 17:00', '19:00 - 21:00'];
 
   const items = picks.map((rec, idx) => normalizeLocation({
     name: rec.title,
-    city,
+    city: city || '目的地待确认',
     description: rec.reason || `热门打卡：${rec.title}`,
     lat: String((center.lat + (idx - 1.5) * 0.02).toFixed(6)),
     lng: String((center.lng + (idx - 1.5) * 0.02).toFixed(6)),
-    time: slots[idx] || '10:00 - 12:00',
-    day: 1,
-    sequence: idx + 1,
+    time: slots[idx % slots.length] || '10:00 - 12:00',
+    day: Math.min(requestedDays, Math.floor(idx / 3) + 1),
+    sequence: (idx % 3) + 1,
     transit_hint: idx === 0 ? '从酒店/出发地前往首站' : `从上一站前往 ${rec.title}`,
     category: idx === 1 ? 'FOOD' : 'SIGHT',
     source: `fallback:${provider}:social_to_location`,
     confidence: 0.45
   }, provider));
 
-  mcpTrace.push(`fallback:${provider}:synthesized_locations:${items.length}`);
+  mcpTrace.push(`fallback:${provider}:synthesized_locations:${items.length}:days:${requestedDays}`);
   return items.filter(Boolean);
 }
 
@@ -466,6 +503,20 @@ function enrichWithMcpSignals(items, mcpTrace) {
   });
 
   return enriched;
+}
+
+
+function extractExpectedCityFromInput(userInput, socialRecommendations) {
+  return inferCityFromRequest(userInput, socialRecommendations) || '';
+}
+
+function ensureMinimumItemsByRequestedDays(items, userInput, mcpTrace) {
+  const requestedDays = inferRequestedDays(userInput);
+  if (requestedDays <= 1) return items;
+  const daySet = new Set((items || []).map((x) => Number(x.day || 1)));
+  if (daySet.size >= requestedDays) return items;
+  mcpTrace.push(`postprocess:days_mismatch:need:${requestedDays}:got:${daySet.size}`);
+  return items;
 }
 
 function verifyPlan(items, mcpTrace) {
@@ -589,9 +640,39 @@ async function callCompatible({ endpoint, apiKey, model, userInput, provider, mc
     throw error;
   }
 
-  const mapped = mapToolCalls(message.tool_calls || [], mcpTrace, provider);
+  let mapped = mapToolCalls(message.tool_calls || [], mcpTrace, provider);
   let dayPlanItinerary = mapped.dayPlanItinerary;
-  const socialRecommendations = mapped.socialRecommendations;
+  let socialRecommendations = mapped.socialRecommendations;
+
+  if (dayPlanItinerary.length === 0) {
+    mcpTrace.push(`tool:${provider}:location:retry:forced`);
+    const forcedResponse = await requestWithRetry({
+      provider,
+      requestId,
+      url: endpoint,
+      options: {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'system', content: GLOBAL_SYSTEM_PROMPT },
+            { role: 'user', content: `仅补齐 location 工具调用。需求：${userInput}。要求：必须给出 day/sequence/time/transit_hint/lat/lng/city；city 必须与用户目标城市一致；若用户要求三天，day 至少覆盖 1,2,3。` }
+          ],
+          tools: [
+            { type: 'function', function: { name: 'location', parameters: locationTool.parameters } }
+          ],
+          tool_choice: { type: 'function', function: { name: 'location' } }
+        })
+      },
+      mcpTrace
+    });
+    const forcedData = await forcedResponse.json();
+    const forcedMessage = forcedData.choices?.[0]?.message || {};
+    const forcedMapped = mapToolCalls(forcedMessage.tool_calls || [], mcpTrace, provider);
+    dayPlanItinerary = forcedMapped.dayPlanItinerary;
+    if (socialRecommendations.length === 0) socialRecommendations = normalizeRecommendations([], provider);
+  }
 
   if (dayPlanItinerary.length === 0 && socialRecommendations.length > 0) {
     dayPlanItinerary = synthesizeLocationsFromSocial({ userInput, socialRecommendations, provider, mcpTrace });
@@ -698,7 +779,10 @@ async function generatePlan(payload, requestId) {
     }
   }
 
-  const enrichedItinerary = enrichWithMcpSignals(plan.dayPlanItinerary || [], mcpTrace);
+  const expectedCity = extractExpectedCityFromInput(payload.userInput, plan.socialRecommendations || []);
+  let alignedItinerary = harmonizeItineraryCity(plan.dayPlanItinerary || [], expectedCity, mcpTrace);
+  alignedItinerary = ensureMinimumItemsByRequestedDays(alignedItinerary, payload.userInput, mcpTrace);
+  const enrichedItinerary = enrichWithMcpSignals(alignedItinerary, mcpTrace);
   const verifierWarnings = verifyPlan(enrichedItinerary, mcpTrace);
 
   const result = {
