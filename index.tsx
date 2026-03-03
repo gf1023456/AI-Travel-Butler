@@ -9,6 +9,7 @@ let map: L.Map;
 let dayPlanItinerary: any[] = [];
 let socialRecommendations: any[] = [];
 let itinerarySummary = "";
+let itineraryEvidence: any[] = [];
 let mapLayers: L.Layer[] = []; // Store markers and polylines to clear them easily
 let tdtLayer: L.TileLayer;
 let tdtAnnoLayer: L.TileLayer;
@@ -253,6 +254,7 @@ async function tryBackendPlan(userInput: string, modelType: string, isPlannerMod
     dayPlanItinerary = Array.isArray(data.dayPlanItinerary) ? data.dayPlanItinerary : [];
     socialRecommendations = Array.isArray(data.socialRecommendations) ? data.socialRecommendations : [];
     itinerarySummary = data.itinerarySummary || '排期已生成';
+    itineraryEvidence = Array.isArray(data.evidence) ? data.evidence : [];
     return true;
   } catch (error) {
     console.warn('Backend planner unavailable.', error);
@@ -273,7 +275,18 @@ function renderAll() {
   summaryDiv.style.borderLeft = 'none'; // Clean look
   summaryDiv.innerHTML = `<h5 style="color:var(--text-title); font-size:15px; margin-bottom:10px;">🌟 行程综述</h5><p style="color:#3C3C43; font-size:14px; line-height:1.5;">${itinerarySummary}</p>`;
   container.appendChild(summaryDiv);
-  
+
+  if (itineraryEvidence.length > 0) {
+    const evidenceDiv = document.createElement('div');
+    evidenceDiv.className = 'timeline-card';
+    const evidenceHtml = itineraryEvidence
+      .slice(0, 3)
+      .map((e, i) => `<p style="font-size:12px;color:#666;margin:6px 0;"><b>[${i + 1}]</b> ${e.snippet || ''}<br/><span style="opacity:.7;">来源: ${e.source || ''}</span></p>`)
+      .join('');
+    evidenceDiv.innerHTML = `<h5 style="color:var(--text-title); font-size:14px; margin-bottom:8px;">📚 证据引用</h5>${evidenceHtml}`;
+    container.appendChild(evidenceDiv);
+  }
+
   // 2. Render Social Recommendations
   if (socialRecommendations.length > 0) {
     const socialDiv = document.createElement('div');
@@ -400,6 +413,7 @@ function restart() {
   
   dayPlanItinerary = [];
   socialRecommendations = [];
+  itineraryEvidence = [];
   getEl('timeline-content').innerHTML = `<div class="empty-state"><i class="fas fa-route"></i><p>正在规划中...</p></div>`;
 }
 

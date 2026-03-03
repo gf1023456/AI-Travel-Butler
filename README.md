@@ -46,3 +46,15 @@ Optional runtime controls:
 
 - `REQUEST_TIMEOUT_MS` (default `20000`)
 - `MAX_RETRIES` (default `2`)
+
+
+### New backend endpoints
+
+- `POST /api/plan` : generate initial itinerary
+- `POST /api/plan/refine` : refine an existing plan with new instructions
+- `GET /api/knowledge/search?q=...` : inspect local RAG retrieval results
+
+### Local knowledge base (RAG MVP)
+
+- Seed data file: `knowledge/processed/chunks.jsonl`
+- Configure via `KNOWLEDGE_FILE` and `RAG_TOP_K`

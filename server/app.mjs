@@ -1,16 +1,20 @@
 import { createServer } from 'node:http';
 import crypto from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { GoogleGenAI } from '@google/genai';
 
 const PORT = Number(process.env.PORT || 8787);
 const REQUEST_TIMEOUT_MS = Number(process.env.REQUEST_TIMEOUT_MS || 20000);
 const MAX_RETRIES = Number(process.env.MAX_RETRIES || 2);
+const RAG_TOP_K = Number(process.env.RAG_TOP_K || 3);
+const KNOWLEDGE_FILE = process.env.KNOWLEDGE_FILE || 'knowledge/processed/chunks.jsonl';
 
 const GLOBAL_SYSTEM_PROMPT = `你是一位世界顶级的深度旅游规划专家。
 你的任务是完成一个【三位一体】的规划报告。
 1) 社交分析(get_social_recommendations)
 2) 地图标注(location)
-3) 文字总结。`;
+3) 文字总结。
+请优先利用提供的本地知识上下文（如存在）来提高准确性。`;
 
 const locationTool = {
   name: 'location',
@@ -47,11 +51,71 @@ const socialRecommendationTool = {
   }
 };
 
-function constructUserPrompt(userInput, isPlannerMode, travelMode) {
-  if (isPlannerMode) {
-    return `旅行风格：${travelMode}。请生成详细每日行程：${userInput}`;
+let knowledgeCache;
+
+async function loadKnowledgeChunks() {
+  if (knowledgeCache) return knowledgeCache;
+  try {
+    const raw = await readFile(KNOWLEDGE_FILE, 'utf8');
+    knowledgeCache = raw
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => JSON.parse(line));
+    return knowledgeCache;
+  } catch {
+    knowledgeCache = [];
+    return knowledgeCache;
   }
-  return `请推荐 5-10 个地点并标注地图：${userInput}`;
+}
+
+function toKeywords(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter((t) => t.length > 1);
+}
+
+function keywordScore(query, chunk) {
+  const q = new Set(toKeywords(query));
+  const content = `${chunk.city || ''} ${chunk.tags?.join(' ') || ''} ${chunk.snippet || ''}`.toLowerCase();
+  let score = 0;
+  for (const token of q) {
+    if (content.includes(token)) score += 1;
+  }
+  return score;
+}
+
+async function retrieveEvidence(query, topK) {
+  const chunks = await loadKnowledgeChunks();
+  const scored = chunks
+    .map((chunk) => ({ chunk, score: keywordScore(query, chunk) }))
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, topK);
+
+  return scored.map((x) => ({
+    claim: `与需求相关：${x.chunk.city || '目的地'}知识片段`,
+    source: x.chunk.source || KNOWLEDGE_FILE,
+    snippet: x.chunk.snippet,
+    fetched_at: new Date().toISOString(),
+    score: x.score,
+    chunk_id: x.chunk.id
+  }));
+}
+
+function buildRagContext(evidence) {
+  if (!evidence.length) return '';
+  const lines = evidence.map((e, i) => `${i + 1}. ${e.snippet}（source: ${e.source}）`);
+  return `\n\n【本地知识库检索上下文】\n${lines.join('\n')}\n请优先参考以上信息。`;
+}
+
+function constructUserPrompt(userInput, isPlannerMode, travelMode, ragContext) {
+  if (isPlannerMode) {
+    return `旅行风格：${travelMode}。请生成详细每日行程：${userInput}${ragContext}`;
+  }
+  return `请推荐 5-10 个地点并标注地图：${userInput}${ragContext}`;
 }
 
 function json(res, status, payload, requestId) {
@@ -65,7 +129,7 @@ function json(res, status, payload, requestId) {
   res.end(JSON.stringify(payload));
 }
 
-function normalizeLocation(item = {}) {
+function normalizeLocation(item = {}, provider) {
   if (!item.name || !item.lat || !item.lng) return null;
   return {
     name: String(item.name),
@@ -80,8 +144,25 @@ function normalizeLocation(item = {}) {
     category: item.category ? String(item.category) : undefined,
     weather_icon: item.weather_icon ? String(item.weather_icon) : undefined,
     weather_condition: item.weather_condition ? String(item.weather_condition) : undefined,
-    temperature: item.temperature ? String(item.temperature) : undefined
+    temperature: item.temperature ? String(item.temperature) : undefined,
+    source: item.source || `provider:${provider}:location`,
+    source_timestamp: new Date().toISOString(),
+    confidence: typeof item.confidence === 'number' ? item.confidence : 0.6
   };
+}
+
+function normalizeRecommendations(list, provider) {
+  return (list || []).map((r, idx) => ({
+    rank: Number(r.rank || idx + 1),
+    title: String(r.title || ''),
+    platform: String(r.platform || '综合'),
+    hot_score: String(r.hot_score || 'N/A'),
+    reason: String(r.reason || ''),
+    photo_tips: r.photo_tips ? String(r.photo_tips) : undefined,
+    source: r.source || `provider:${provider}:social`,
+    source_timestamp: new Date().toISOString(),
+    confidence: typeof r.confidence === 'number' ? r.confidence : 0.6
+  }));
 }
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -127,11 +208,7 @@ async function requestWithRetry({ provider, requestId, url, options, mcpTrace })
       const isAbort = error?.name === 'AbortError';
       const retryable = isAbort || error?.isRetryable || false;
       mcpTrace.push(`provider:${provider}:attempt:${attempt + 1}:error:${isAbort ? 'timeout' : 'exception'}:ms:${elapsed}`);
-
-      console.error(`[${requestId}] ${provider} attempt ${attempt + 1} failed`, {
-        message: error?.message,
-        retryable
-      });
+      console.error(`[${requestId}] ${provider} attempt ${attempt + 1} failed`, { message: error?.message, retryable });
 
       if (!retryable || attempt >= MAX_RETRIES) break;
       await wait(300 * (attempt + 1));
@@ -145,7 +222,7 @@ async function requestWithRetry({ provider, requestId, url, options, mcpTrace })
     throw timeoutError;
   }
 
-  if (!lastError.statusCode) lastError.statusCode = 502;
+  if (!lastError?.statusCode) lastError.statusCode = 502;
   throw lastError;
 }
 
@@ -159,13 +236,13 @@ function mapToolCalls(toolCalls, mcpTrace, provider) {
     const args = rawArgs ? JSON.parse(rawArgs) : tc.args || {};
 
     if (fnName === 'location') {
-      const item = normalizeLocation(args);
+      const item = normalizeLocation(args, provider);
       if (item) dayPlanItinerary.push(item);
       mcpTrace.push(`tool:${provider}:location`);
     }
 
     if (fnName === 'get_social_recommendations') {
-      socialRecommendations = args.recommendations || [];
+      socialRecommendations = normalizeRecommendations(args.recommendations || [], provider);
       mcpTrace.push(`tool:${provider}:get_social_recommendations`);
     }
   }
@@ -182,8 +259,8 @@ async function callGemini(modelType, prompt, mcpTrace, requestId) {
   }
 
   const ai = new GoogleGenAI({ apiKey });
-
   let response;
+
   for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt += 1) {
     const start = Date.now();
     try {
@@ -221,7 +298,7 @@ async function callGemini(modelType, prompt, mcpTrace, requestId) {
   };
 }
 
-async function callCompatible({ endpoint, apiKey, model, userInput, provider, mcpTrace, requestId }) {
+async function callCompatible({ endpoint, apiKey, model, userInput, provider, mcpTrace, requestId, prompt }) {
   const response = await requestWithRetry({
     provider,
     requestId,
@@ -233,7 +310,7 @@ async function callCompatible({ endpoint, apiKey, model, userInput, provider, mc
         model,
         messages: [
           { role: 'system', content: GLOBAL_SYSTEM_PROMPT },
-          { role: 'user', content: `需求：${userInput}。必须同时调用 get_social_recommendations 与 location。` }
+          { role: 'user', content: `需求：${userInput}。${prompt}。必须同时调用 get_social_recommendations 与 location。` }
         ],
         tools: [
           { type: 'function', function: { name: 'get_social_recommendations', parameters: socialRecommendationTool.parameters } },
@@ -266,57 +343,73 @@ async function callCompatible({ endpoint, apiKey, model, userInput, provider, mc
 
 async function generatePlan(payload, requestId) {
   const mcpTrace = [`request:${requestId}:received`];
-  const prompt = constructUserPrompt(payload.userInput, payload.isPlannerMode, payload.travelMode);
+  const evidence = await retrieveEvidence(payload.userInput, RAG_TOP_K);
+  mcpTrace.push(`rag:retrieved:${evidence.length}`);
+  const ragContext = buildRagContext(evidence);
+  const prompt = constructUserPrompt(payload.userInput, payload.isPlannerMode, payload.travelMode, ragContext);
+
+  let plan;
 
   if (payload.modelType?.startsWith('gemini')) {
-    return callGemini(payload.modelType, prompt, mcpTrace, requestId);
-  }
-
-  if (payload.modelType?.includes('deepseek')) {
+    plan = await callGemini(payload.modelType, prompt, mcpTrace, requestId);
+  } else if (payload.modelType?.includes('deepseek')) {
     if (!process.env.DEEPSEEK_API_KEY) {
       const error = new Error('Missing DEEPSEEK_API_KEY on server');
       error.statusCode = 500;
       throw error;
     }
-    return callCompatible({
+
+    plan = await callCompatible({
       endpoint: 'https://api.deepseek.com/chat/completions',
       apiKey: process.env.DEEPSEEK_API_KEY,
       model: payload.modelType,
       userInput: payload.userInput,
       provider: 'deepseek',
       mcpTrace,
-      requestId
+      requestId,
+      prompt
+    });
+  } else {
+    if (!process.env.ZHIPU_API_KEY) {
+      const error = new Error('Missing ZHIPU_API_KEY on server');
+      error.statusCode = 500;
+      throw error;
+    }
+
+    plan = await callCompatible({
+      endpoint: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
+      apiKey: process.env.ZHIPU_API_KEY,
+      model: payload.modelType || 'glm-4-flash',
+      userInput: payload.userInput,
+      provider: 'zhipu',
+      mcpTrace,
+      requestId,
+      prompt
     });
   }
 
-  if (!process.env.ZHIPU_API_KEY) {
-    const error = new Error('Missing ZHIPU_API_KEY on server');
-    error.statusCode = 500;
-    throw error;
-  }
-
-  return callCompatible({
-    endpoint: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
-    apiKey: process.env.ZHIPU_API_KEY,
-    model: payload.modelType || 'glm-4-flash',
-    userInput: payload.userInput,
-    provider: 'zhipu',
-    mcpTrace,
-    requestId
-  });
+  return {
+    ...plan,
+    evidence,
+    execution_log_id: requestId
+  };
 }
 
 function validatePayload(payload) {
-  if (!payload || typeof payload !== 'object') {
-    return 'Request body must be a JSON object';
-  }
-  if (!payload.userInput || typeof payload.userInput !== 'string') {
-    return 'userInput is required';
-  }
-  if (!payload.modelType || typeof payload.modelType !== 'string') {
-    return 'modelType is required';
-  }
+  if (!payload || typeof payload !== 'object') return 'Request body must be a JSON object';
+  if (!payload.userInput || typeof payload.userInput !== 'string') return 'userInput is required';
+  if (!payload.modelType || typeof payload.modelType !== 'string') return 'modelType is required';
   return null;
+}
+
+function toRefinePayload(payload) {
+  const baseSummary = payload.basePlan?.itinerarySummary || '';
+  return {
+    userInput: `${payload.userInput || ''}\n\n请基于已有方案继续调整：${payload.refineInstruction || ''}\n已有摘要：${baseSummary}`.trim(),
+    modelType: payload.modelType,
+    isPlannerMode: payload.isPlannerMode !== false,
+    travelMode: payload.travelMode || 'deep'
+  };
 }
 
 const server = createServer(async (req, res) => {
@@ -328,7 +421,14 @@ const server = createServer(async (req, res) => {
     return json(res, 200, { ok: true, service: 'ai-travel-butler-server', city: 'xian' }, requestId);
   }
 
-  if (req.method === 'POST' && req.url === '/api/plan') {
+  if (req.method === 'GET' && req.url?.startsWith('/api/knowledge/search')) {
+    const url = new URL(req.url, `http://localhost:${PORT}`);
+    const q = url.searchParams.get('q') || '';
+    const evidence = await retrieveEvidence(q, RAG_TOP_K);
+    return json(res, 200, { q, evidence, requestId }, requestId);
+  }
+
+  if (req.method === 'POST' && (req.url === '/api/plan' || req.url === '/api/plan/refine')) {
     let body = '';
     req.on('data', (chunk) => {
       body += chunk;
@@ -337,11 +437,11 @@ const server = createServer(async (req, res) => {
 
     req.on('end', async () => {
       try {
-        const payload = JSON.parse(body || '{}');
+        const rawPayload = JSON.parse(body || '{}');
+        const payload = req.url === '/api/plan/refine' ? toRefinePayload(rawPayload) : rawPayload;
+
         const validationError = validatePayload(payload);
-        if (validationError) {
-          return json(res, 400, { error: validationError, requestId }, requestId);
-        }
+        if (validationError) return json(res, 400, { error: validationError, requestId }, requestId);
 
         const started = Date.now();
         const data = await generatePlan(payload, requestId);
@@ -349,7 +449,7 @@ const server = createServer(async (req, res) => {
         return json(res, 200, { ...data, requestId }, requestId);
       } catch (error) {
         const status = error?.statusCode || 500;
-        console.error(`[${requestId}] /api/plan failed`, error?.message || error);
+        console.error(`[${requestId}] ${req.url} failed`, error?.message || error);
         return json(res, status, { error: error?.message || 'Planner error', requestId }, requestId);
       }
     });
