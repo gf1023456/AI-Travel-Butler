@@ -6,6 +6,8 @@
 
 This contains everything you need to run your app locally.
 
+[中文版本](./README_zh.md)
+
 View your app in AI Studio: https://ai.studio.apps/drive/1-73WjYkWmwZZLqaEGJ3mLvX4sx5TrDVX
 
 ## Run Locally
