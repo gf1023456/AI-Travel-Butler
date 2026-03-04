@@ -40,7 +40,11 @@ Frontend now routes planning requests to `http://localhost:8787/api/plan` only (
 Server reads configuration from `server/config.json` (frontend no longer stores provider keys).
 
 - Copy `server/config.example.json` to `server/config.json`
-- Fill `providers.geminiApiKey` / `providers.deepseekApiKey` / `providers.zhipuApiKey` / `providers.dashscopeApiKey`
+- Edit `server/config.json` and fill in your API keys:
+  - `providers.geminiApiKey`
+  - `providers.deepseekApiKey`
+  - `providers.zhipuApiKey`
+  - `providers.dashscopeApiKey`
 - Tune runtime values under `server`, `rag`, `rollout`, `performance` sections
 
 

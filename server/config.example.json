@@ -21,9 +21,9 @@
   },
   "providers": {
     "geminiApiKey": " ",
-    "deepseekApiKey": "sk-6107644d8e5141bdb6b907a6579b954f",
+    "deepseekApiKey": "",
     "zhipuApiKey": " ",
-    "dashscopeApiKey": "sk-3edb0b9c8fe442a7942ebe852ea95ecd",
+    "dashscopeApiKey": "",
     "defaultGeminiModel": "gemini-2.5-flash",
     "defaultDeepseekModel": "deepseek-chat",
     "defaultZhipuModel": "glm-4-flash",
