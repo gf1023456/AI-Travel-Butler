@@ -4,6 +4,27 @@ import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { GoogleGenAI } from '@google/genai';
 
+// 引入MCP工具
+import { handleBatchMcpInvocations } from '../mcp-tools/index.js';
+
+// 引入分离的工具模块
+import { tools } from './modules/tools.mjs';
+import { mapToolCalls } from './modules/tool-handler.mjs';
+import { 
+  enrichWithMcpData, 
+  incorporateMcpResults 
+} from './modules/mcp-enhancements.mjs';
+import { 
+  extractExpectedCityFromInput,
+  harmonizeItineraryCity,
+  synthesizeLocationsFromSocial,
+  ensureMinimumItemsByRequestedDays,
+  enrichWithMcpSignals  
+} from './modules/post-processor.mjs';
+import { verifyPlan } from './modules/verifier.mjs';
+import { normalizeRecommendations } from './modules/normalizer.mjs';
+
+// 加载和配置管理
 const CONFIG_FILE = process.argv[2] || 'server/config.json';
 
 const DEFAULT_CONFIG = {
@@ -20,7 +41,7 @@ const DEFAULT_CONFIG = {
     enableCanary: false,
     canaryPercent: 10,
     primaryProvider: 'gemini',
-    canaryProvider: 'zhipu',
+    canaryProvider: 'dashscope',
     autoRollbackOnFailure: true
   },
   performance: {
@@ -31,9 +52,11 @@ const DEFAULT_CONFIG = {
     geminiApiKey: '',
     deepseekApiKey: '',
     zhipuApiKey: '',
+    dashscopeApiKey: '',
     defaultGeminiModel: 'gemini-2.5-flash',
     defaultDeepseekModel: 'deepseek-chat',
-    defaultZhipuModel: 'glm-4-flash'
+    defaultZhipuModel: 'glm-4-flash',
+    defaultDashscopeModel: 'qwen-plus'
   }
 };
 
@@ -60,6 +83,11 @@ async function loadConfig() {
 }
 
 const CONFIG = await loadConfig();
+
+// 为mcp模块设置全局配置
+globalThis.SERVER_CONFIG = CONFIG;
+
+const EXTERNAL_APIS_CONFIG = CONFIG.external_apis || {}; // 获取外部API配置
 const PORT = Number(CONFIG.server.port || 8787);
 const REQUEST_TIMEOUT_MS = Number(CONFIG.server.requestTimeoutMs || 20000);
 const MAX_RETRIES = Number(CONFIG.server.maxRetries || 2);
@@ -74,76 +102,33 @@ const CACHE_TTL_MS = Number(CONFIG.performance.cacheTtlMs || 120000);
 const COST_ALERT_THRESHOLD = Number(CONFIG.performance.costAlertThreshold || 2);
 
 const GLOBAL_SYSTEM_PROMPT = `你是一位世界顶级的深度旅游规划专家。
-你的任务是完成一个【三位一体】的规划报告。
-
+采用思维链(CoT)方法，逐步制定最优行程。
+思考步骤：
+1. 明确用户目标地点和时间约束
+2. 研究当地的交通连通性
+3. 考虑开放时间和其他限制因素
+4. 设计地理连贯的路线，优化空间连续性
+5. 合理分配时间，包含交通和游玩所需时间
+6. 最后输出结构化结果
 【关键逻辑 - 出发地与目的地】
-当用户输入“从 A 到 B”时，A 是出发地，B 是目的地；地点推荐与打点必须落在目的地 B，不得混淆。
-
-【必须包含的三大部分】
+当用户输入"从 A 到 B"时，A 是出发地，B 是目的地；地点推荐与打点必须落在目的地 B，不得混淆。
+【必需包含的三大部分】
 1) 社交分析 (工具: get_social_recommendations)
    - 必须调用一次，给出趋势与理由。
 2) 地图标注 (工具: location)
    - 必须针对用户要求的每一天调用多次。
    - 每天至少 3-4 个 location（早/中/晚/交通）。
-   - 完成社交推荐后必须继续进行地图打点。
+   - 合成社交推荐后必须继续进行地图打点。
+   - 推荐地点必须彼此地理接近，形成合理的游览路径。
 3) 文字总结
    - 在工具调用后输出简短亮点。
-
 【严苛禁令】
 - 严禁只做其一：社交趋势与地图行程必须同时给出。
-- 严禁输出 <think> 标签内容。`
+- 严禁输出 逛 标签内容。
+- 严格按照指定城市的地理逻辑安排地点和路线，确保相邻推荐点彼此接近，最小化交通需求。`;
 
-const locationTool = {
-  name: 'location',
-  parameters: {
-    type: 'object',
-    properties: {
-      name: { type: 'string' }, city: { type: 'string' }, description: { type: 'string' },
-      lat: { type: 'string' }, lng: { type: 'string' }, time: { type: 'string' },
-      day: { type: 'number' }, sequence: { type: 'number' }, transit_hint: { type: 'string' },
-      category: { type: 'string' }, weather_icon: { type: 'string' }, weather_condition: { type: 'string' }, temperature: { type: 'string' }
-    },
-    required: ['name', 'city', 'description', 'lat', 'lng', 'time', 'day', 'sequence', 'transit_hint']
-  }
-};
-
-const socialRecommendationTool = {
-  name: 'get_social_recommendations',
-  parameters: {
-    type: 'object',
-    properties: {
-      recommendations: {
-        type: 'array',
-        items: {
-          type: 'object',
-          properties: {
-            rank: { type: 'number' }, title: { type: 'string' }, platform: { type: 'string' },
-            hot_score: { type: 'string' }, reason: { type: 'string' }, photo_tips: { type: 'string' }
-          },
-          required: ['rank', 'title', 'platform', 'hot_score', 'reason']
-        }
-      }
-    },
-    required: ['recommendations']
-  }
-};
-
-let knowledgeCache;
-const executionLogStore = new Map();
-const responseCache = new Map();
-const alerts = [];
-const metrics = {
-  totalRequests: 0,
-  planRequests: 0,
-  refineRequests: 0,
-  failedRequests: 0,
-  cacheHits: 0,
-  totalEstimatedCost: 0,
-  providerCounts: { gemini: 0, deepseek: 0, zhipu: 0, unknown: 0 },
-  lastError: null
-};
-
-
+// 将全局变量和辅助函数
+import { getCityCenter, extractDestinationFromInput, inferCityFromRequest, inferRequestedDays } from './modules/utils.mjs';
 
 function pushAlert(level, code, message, extra = {}) {
   alerts.unshift({ level, code, message, at: new Date().toISOString(), ...extra });
@@ -172,6 +157,7 @@ function chooseRolloutProvider(payload) {
     if (requested.startsWith('gemini')) return { provider: 'gemini', modelType: payload.modelType, rollout: 'fixed' };
     if (requested.includes('deepseek')) return { provider: 'deepseek', modelType: payload.modelType, rollout: 'fixed' };
     if (requested.includes('glm')) return { provider: 'zhipu', modelType: payload.modelType, rollout: 'fixed' };
+    if (requested.includes('qwen')) return { provider: 'dashscope', modelType: payload.modelType, rollout: 'fixed' };
   }
 
   const bucket = stableBucket(payload.userInput);
@@ -181,7 +167,9 @@ function chooseRolloutProvider(payload) {
     ? (CONFIG.providers.defaultGeminiModel || 'gemini-2.5-flash')
     : provider === 'deepseek'
       ? (CONFIG.providers.defaultDeepseekModel || 'deepseek-chat')
-      : (CONFIG.providers.defaultZhipuModel || 'glm-4-flash');
+      : provider === 'zhipu'
+        ? (CONFIG.providers.defaultZhipuModel || 'glm-4.6v')
+        : (CONFIG.providers.defaultDashscopeModel || 'qwen-plus');
 
   return { provider, modelType, rollout: canaryHit ? 'canary' : 'primary' };
 }
@@ -192,6 +180,7 @@ function estimateCostUsd(result) {
   return Number((0.002 + poi * 0.0004 + evidence * 0.0002).toFixed(4));
 }
 
+// 引入的模块函数
 async function loadKnowledgeChunks() {
   if (knowledgeCache) return knowledgeCache;
   try {
@@ -251,7 +240,7 @@ function buildRagContext(evidence) {
 }
 
 function constructUserPrompt(userInput, isPlannerMode, travelMode, ragContext) {
-  const hardConstraints = '硬性要求：必须输出与用户目标城市一致；若输入包含“从A到B”，地点必须全部落在B；必须覆盖用户要求的天数（如“三天/3天”则 day 至少包含 1,2,3）；每一天至少 3 个 location 点位；location.city 必须是目标城市，不得填写其他城市。';
+  const hardConstraints = '硬性要求：必须输出与用户目标城市一致；若输入包含"从A到B"，地点必须全部落在B；必须覆盖用户要求的天数（如"三天/3天"则 day 至少包含 1,2,3）；每一天至少 3 个 location 点位；location.city 必须是目标城市，不得填写其他城市。';
   if (isPlannerMode) {
     return `旅行风格：${travelMode}。请生成详细每日行程：${userInput}。${hardConstraints}${ragContext}`;
   }
@@ -262,49 +251,14 @@ function json(res, status, payload, requestId) {
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type,X-Request-Id',
+    'Access-Control-Allow-Headers': 'Content-Type,X-RequestId',
     'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
     'X-Request-Id': requestId || ''
   });
   res.end(JSON.stringify(payload));
 }
 
-function normalizeLocation(item = {}, provider) {
-  if (!item.name || !item.lat || !item.lng) return null;
-  return {
-    name: String(item.name),
-    city: String(item.city || ''),
-    description: String(item.description || ''),
-    lat: String(item.lat),
-    lng: String(item.lng),
-    time: String(item.time || ''),
-    day: Number(item.day || 1),
-    sequence: Number(item.sequence || 1),
-    transit_hint: String(item.transit_hint || ''),
-    category: item.category ? String(item.category) : undefined,
-    weather_icon: item.weather_icon ? String(item.weather_icon) : undefined,
-    weather_condition: item.weather_condition ? String(item.weather_condition) : undefined,
-    temperature: item.temperature ? String(item.temperature) : undefined,
-    source: item.source || `provider:${provider}:location`,
-    source_timestamp: new Date().toISOString(),
-    confidence: typeof item.confidence === 'number' ? item.confidence : 0.6
-  };
-}
-
-function normalizeRecommendations(list, provider) {
-  return (list || []).map((r, idx) => ({
-    rank: Number(r.rank || idx + 1),
-    title: String(r.title || ''),
-    platform: String(r.platform || '综合'),
-    hot_score: String(r.hot_score || 'N/A'),
-    reason: String(r.reason || ''),
-    photo_tips: r.photo_tips ? String(r.photo_tips) : undefined,
-    source: r.source || `provider:${provider}:social`,
-    source_timestamp: new Date().toISOString(),
-    confidence: typeof r.confidence === 'number' ? r.confidence : 0.6
-  }));
-}
-
+// 延迟工具函数
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function isRetryableStatus(status) {
@@ -345,10 +299,10 @@ async function requestWithRetry({ provider, requestId, url, options, mcpTrace })
     } catch (error) {
       lastError = error;
       const elapsed = Date.now() - start;
-      const isAbort = error?.name === 'AbortError';
-      const retryable = isAbort || error?.isRetryable || false;
+      const isAbort = error.name === 'AbortError';
+      const retryable = isAbort || error.isRetryable || false;
       mcpTrace.push(`provider:${provider}:attempt:${attempt + 1}:error:${isAbort ? 'timeout' : 'exception'}:ms:${elapsed}`);
-      console.error(`[${requestId}] ${provider} attempt ${attempt + 1} failed`, { message: error?.message, retryable });
+      console.error(`[${requestId}] ${provider} attempt ${attempt + 1} failed`, { message: error.message, retryable });
 
       if (!retryable || attempt >= MAX_RETRIES) break;
       await wait(300 * (attempt + 1));
@@ -356,257 +310,23 @@ async function requestWithRetry({ provider, requestId, url, options, mcpTrace })
     }
   }
 
-  if (lastError?.name === 'AbortError') {
+  if (lastError.name === 'AbortError') {
     const timeoutError = new Error(`${provider} timeout after ${REQUEST_TIMEOUT_MS}ms`);
     timeoutError.statusCode = 504;
     throw timeoutError;
   }
 
-  if (!lastError?.statusCode) lastError.statusCode = 502;
+  if (!lastError.statusCode) lastError.statusCode = 502;
   throw lastError;
 }
 
-function mapToolCalls(toolCalls, mcpTrace, provider) {
-  const dayPlanItinerary = [];
-  let socialRecommendations = [];
-
-  for (const tc of toolCalls || []) {
-    const fnName = tc.function?.name || tc.name;
-    const rawArgs = tc.function?.arguments;
-    const args = rawArgs ? JSON.parse(rawArgs) : tc.args || {};
-
-    if (fnName === 'location') {
-      const item = normalizeLocation(args, provider);
-      if (item) dayPlanItinerary.push(item);
-      mcpTrace.push(`tool:${provider}:location`);
-    }
-
-    if (fnName === 'get_social_recommendations') {
-      socialRecommendations = normalizeRecommendations(args.recommendations || [], provider);
-      mcpTrace.push(`tool:${provider}:get_social_recommendations`);
-    }
-  }
-
-  return { dayPlanItinerary, socialRecommendations };
+// 延迟工具调用函数（重命名以避免冲突）
+function callCompatibleExternal({ endpoint, apiKey, model, userInput, provider, mcpTrace, requestId, prompt }) {
+  // 实际的具体外部调用实现
+  return { provider, itinerarySummary: '兼容模式调用待扩展', dayPlanItinerary: [], socialRecommendations: [], mcpTrace };
 }
 
-
-
-
-
-function getCityCenter(city) {
-  const map = {
-    '大理': { lat: 25.6075, lng: 100.2676 },
-    '呼和浩特': { lat: 40.8426, lng: 111.7492 },
-    '西安': { lat: 34.3416, lng: 108.9398 },
-    '北京': { lat: 39.9042, lng: 116.4074 },
-    '上海': { lat: 31.2304, lng: 121.4737 },
-    '成都': { lat: 30.5728, lng: 104.0668 },
-    '重庆': { lat: 29.563, lng: 106.5516 },
-    '广州': { lat: 23.1291, lng: 113.2644 },
-    '深圳': { lat: 22.5431, lng: 114.0579 },
-    '杭州': { lat: 30.2741, lng: 120.1551 },
-    '南京': { lat: 32.0603, lng: 118.7969 },
-    '苏州': { lat: 31.2989, lng: 120.5853 },
-    '昆明': { lat: 25.0389, lng: 102.7183 },
-    '丽江': { lat: 26.8721, lng: 100.2296 }
-  };
-  return map[city] || { lat: 39.9042, lng: 116.4074 };
-}
-
-function inferCityFromRequest(userInput, recommendations) {
-  const destination = extractDestinationFromInput(userInput);
-  if (destination) return destination;
-
-  const text = String(userInput || '');
-  const fromRecs = (recommendations || [])
-    .map((x) => `${x.title || ''} ${x.reason || ''}`)
-    .join(' ');
-  const combined = `${text} ${fromRecs}`;
-
-  const known = ['大理', '呼和浩特', '西安', '北京', '上海', '成都', '重庆', '广州', '深圳', '杭州', '南京', '苏州', '昆明', '丽江'];
-  for (const city of known) {
-    if (combined.includes(city)) return city;
-  }
-  return '';
-}
-
-function inferRequestedDays(userInput) {
-  const text = String(userInput || '');
-  const direct = text.match(/(\d+)\s*[天日]/);
-  if (direct) return Math.min(10, Math.max(1, Number(direct[1])));
-  if (/一[天日]/.test(text)) return 1;
-  if (/两[天日]|二[天日]/.test(text)) return 2;
-  if (/三[天日]/.test(text)) return 3;
-  if (/四[天日]/.test(text)) return 4;
-  if (/五[天日]/.test(text)) return 5;
-  return 1;
-}
-
-
-function extractDestinationFromInput(userInput) {
-  const text = String(userInput || '');
-  const routeMatch = text.match(/从\s*([一-龥A-Za-z]+)\s*(到|去|前往|->|→)\s*([一-龥A-Za-z]+)/);
-  if (routeMatch?.[3]) return routeMatch[3];
-  const toMatch = text.match(/到\s*([一-龥A-Za-z]+)/);
-  if (toMatch?.[1]) return toMatch[1];
-  return '';
-}
-
-function harmonizeItineraryCity(items, expectedCity, mcpTrace) {
-  if (!expectedCity) return items;
-  let replaced = 0;
-  const normalized = (items || []).map((item) => {
-    if (item.city === expectedCity) return item;
-    replaced += 1;
-    return { ...item, city: expectedCity };
-  });
-  if (replaced > 0) mcpTrace.push(`postprocess:city_aligned:${expectedCity}:count:${replaced}`);
-  return normalized;
-}
-
-function synthesizeLocationsFromSocial({ userInput, socialRecommendations, provider, mcpTrace }) {
-  if (!Array.isArray(socialRecommendations) || socialRecommendations.length === 0) return [];
-  const city = inferCityFromRequest(userInput, socialRecommendations);
-  const center = getCityCenter(city || '北京');
-  const requestedDays = inferRequestedDays(userInput);
-  const targetCount = Math.min(12, Math.max(4, requestedDays * 3));
-  const picks = [];
-  for (let i = 0; i < targetCount; i += 1) {
-    picks.push(socialRecommendations[i % socialRecommendations.length]);
-  }
-  const slots = ['09:30 - 11:00', '12:30 - 14:00', '15:30 - 17:00', '19:00 - 21:00'];
-
-  const items = picks.map((rec, idx) => normalizeLocation({
-    name: rec.title,
-    city: city || '目的地待确认',
-    description: rec.reason || `热门打卡：${rec.title}`,
-    lat: String((center.lat + (idx - 1.5) * 0.02).toFixed(6)),
-    lng: String((center.lng + (idx - 1.5) * 0.02).toFixed(6)),
-    time: slots[idx % slots.length] || '10:00 - 12:00',
-    day: Math.min(requestedDays, Math.floor(idx / 3) + 1),
-    sequence: (idx % 3) + 1,
-    transit_hint: idx === 0 ? '从酒店/出发地前往首站' : `从上一站前往 ${rec.title}`,
-    category: idx === 1 ? 'FOOD' : 'SIGHT',
-    source: `fallback:${provider}:social_to_location`,
-    confidence: 0.45
-  }, provider));
-
-  mcpTrace.push(`fallback:${provider}:synthesized_locations:${items.length}:days:${requestedDays}`);
-  return items.filter(Boolean);
-}
-
-function estimateWeatherByHour(timeRange) {
-  const firstHour = Number(String(timeRange || '').match(/(\d{1,2})/)?.[1] || 12);
-  if (firstHour <= 8) return { weather_icon: '🌤️', weather_condition: '清晨晴朗', temperature: '18°C' };
-  if (firstHour <= 16) return { weather_icon: '☀️', weather_condition: '白天晴朗', temperature: '25°C' };
-  return { weather_icon: '🌙', weather_condition: '夜间微风', temperature: '20°C' };
-}
-
-function enrichWithMcpSignals(items, mcpTrace) {
-  const sorted = [...items].sort((a, b) => (a.day - b.day) || (a.sequence - b.sequence));
-
-  const enriched = sorted.map((item, idx) => {
-    let nextTransit = item.transit_hint;
-    if (!nextTransit && idx < sorted.length - 1) {
-      const next = sorted[idx + 1];
-      nextTransit = `建议打车前往下一站 ${next.name}，约 ${15 + (idx % 3) * 10} 分钟`;
-      mcpTrace.push('mcp:route:estimated_transit_hint');
-    }
-
-    const weather = item.weather_icon && item.temperature
-      ? { weather_icon: item.weather_icon, weather_condition: item.weather_condition, temperature: item.temperature }
-      : estimateWeatherByHour(item.time);
-
-    if (!item.weather_icon || !item.temperature) {
-      mcpTrace.push('mcp:weather:estimated_point_forecast');
-    }
-
-    return {
-      ...item,
-      transit_hint: nextTransit || '建议步行或公共交通前往',
-      ...weather,
-      source: item.source || 'mcp:enriched',
-      source_timestamp: item.source_timestamp || new Date().toISOString(),
-      confidence: typeof item.confidence === 'number' ? item.confidence : 0.62
-    };
-  });
-
-  return enriched;
-}
-
-
-function extractExpectedCityFromInput(userInput, socialRecommendations) {
-  return inferCityFromRequest(userInput, socialRecommendations) || '';
-}
-
-function ensureMinimumItemsByRequestedDays(items, userInput, socialRecommendations, provider, mcpTrace) {
-  const requestedDays = inferRequestedDays(userInput);
-  const minRequired = Math.max(3, requestedDays * 3);
-  const safeItems = Array.isArray(items) ? items : [];
-  const daySet = new Set(safeItems.map((x) => Number(x.day || 1)));
-
-  const dayCoverageOk = daySet.size >= requestedDays;
-  const countOk = safeItems.length >= minRequired;
-  if (dayCoverageOk && countOk) return safeItems;
-
-  if (!dayCoverageOk) mcpTrace.push(`postprocess:days_mismatch:need:${requestedDays}:got:${daySet.size}`);
-  if (!countOk) mcpTrace.push(`postprocess:count_mismatch:need:${minRequired}:got:${safeItems.length}`);
-
-  const synthesized = synthesizeLocationsFromSocial({ userInput, socialRecommendations, provider, mcpTrace });
-  if (!synthesized.length) return safeItems;
-
-  if (!safeItems.length) return synthesized;
-
-  const merged = [...safeItems];
-  const byKey = new Set(merged.map((x) => `${x.day}|${x.sequence}|${x.name}`));
-  for (const item of synthesized) {
-    const key = `${item.day}|${item.sequence}|${item.name}`;
-    if (byKey.has(key)) continue;
-    merged.push(item);
-    byKey.add(key);
-    if (merged.length >= minRequired) break;
-  }
-
-  mcpTrace.push(`postprocess:backfill_from_social:added:${merged.length - safeItems.length}`);
-  return merged;
-}
-
-function verifyPlan(items, mcpTrace) {
-  const warnings = [];
-  if (!items || items.length === 0) {
-    warnings.push('未生成任何地图标注点，请重试或切换模型。');
-    mcpTrace.push('agent:verifier:warnings:1:no_locations');
-    return warnings;
-  }
-  const byDay = new Map();
-  for (const item of items) {
-    if (!byDay.has(item.day)) byDay.set(item.day, []);
-    byDay.get(item.day).push(item);
-  }
-
-  for (const [day, dayItems] of byDay.entries()) {
-    if (dayItems.length < 3) {
-      warnings.push(`Day ${day} 行程点位少于 3 个，建议补充早餐/晚间活动/交通节点。`);
-    }
-    const seq = dayItems.map((x) => Number(x.sequence || 0)).sort((a, b) => a - b);
-    for (let i = 1; i < seq.length; i += 1) {
-      if (seq[i] === seq[i - 1]) {
-        warnings.push(`Day ${day} 存在重复 sequence=${seq[i]}，可能导致顺序冲突。`);
-        break;
-      }
-    }
-  }
-
-  if (warnings.length === 0) {
-    mcpTrace.push('agent:verifier:pass');
-  } else {
-    mcpTrace.push(`agent:verifier:warnings:${warnings.length}`);
-  }
-
-  return warnings;
-}
-
+// AI服务调用
 async function callGemini(modelType, prompt, mcpTrace, requestId) {
   const apiKey = CONFIG.providers.geminiApiKey;
   if (!apiKey) {
@@ -627,7 +347,7 @@ async function callGemini(modelType, prompt, mcpTrace, requestId) {
         contents: prompt,
         config: {
           systemInstruction: GLOBAL_SYSTEM_PROMPT,
-          tools: [{ functionDeclarations: [locationTool, socialRecommendationTool] }]
+          tools: [{ functionDeclarations: [tools.location, tools.socialRecommendations] }]
         }
       });
       mcpTrace.push(`provider:gemini:attempt:${attempt}:ok:ms:${Date.now() - start}`);
@@ -652,52 +372,122 @@ async function callGemini(modelType, prompt, mcpTrace, requestId) {
     dayPlanItinerary = synthesizeLocationsFromSocial({ userInput: prompt, socialRecommendations, provider: 'gemini', mcpTrace });
   }
 
+  // 现在调用更详尽的MCP工具来补充实时信息
+  const mcpResults = await enrichWithMcpData(dayPlanItinerary, mcpTrace);
+
   return {
     provider: 'gemini',
     itinerarySummary: response.text || '排期已生成',
     dayPlanItinerary,
     socialRecommendations,
-    mcpTrace
+    mcpTrace,
+    mcpResults
   };
 }
 
 async function callCompatible({ endpoint, apiKey, model, userInput, provider, mcpTrace, requestId, prompt }) {
-  const response = await requestWithRetry({
-    provider,
-    requestId,
-    url: endpoint,
-    options: {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: GLOBAL_SYSTEM_PROMPT },
-          { role: 'user', content: `【强制执行】需求：${userInput}。${prompt}。你需要同时执行两个子任务：任务A 调用 get_social_recommendations；任务B 为每一天多次调用 location。请立刻开始调用工具，不要回复文字说明。` }
-        ],
-        tools: [
-          { type: 'function', function: { name: 'get_social_recommendations', parameters: socialRecommendationTool.parameters } },
-          { type: 'function', function: { name: 'location', parameters: locationTool.parameters } }
-        ],
-        tool_choice: 'auto',
-        max_tokens: 4096,
-        temperature: 0.1
-      })
-    },
-    mcpTrace
-  });
+  const MAX_TOOL_ROUNDS = 10;
+  
+  let messages = [
+    { role: 'system', content: GLOBAL_SYSTEM_PROMPT },
+    { role: 'user', content: `【强制执行】需求：${userInput}。${prompt}。你需要同时执行两个子任务：任务A 调用 get_social_recommendations；任务B 为每一天多次调用 location。请立刻开始调用工具，不要回复文字说明。` }
+  ];
+  
+  let dayPlanItinerary = [];
+  let socialRecommendations = [];
+  let finalMessage = null;
+  
+  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+    mcpTrace.push(`tool_round:${round}:start`);
+    
+    const response = await requestWithRetry({
+      provider,
+      requestId,
+      url: endpoint,
+      options: {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model,
+          messages,
+          tools: [
+            { type: 'function', function: { name: 'get_social_recommendations', parameters: tools.socialRecommendations.parameters } },
+            { type: 'function', function: { name: 'location', parameters: tools.location.parameters } }
+          ],
+          tool_choice: 'auto',
+          max_tokens: 4096,
+          temperature: 0.1,
+          ...(provider === 'zhipu' && { top_p: 0.8 }),
+          ...(provider === 'deepseek' && { frequency_penalty: 0.1, presence_penalty: 0.1 }),
+          ...(provider === 'dashscope' && { top_p: 0.7, seed: Math.floor(Math.random() * 1000) })
+        })
+      },
+      mcpTrace
+    });
 
-  const data = await response.json();
-  const message = data.choices?.[0]?.message;
-  if (!message) {
-    const error = new Error(`${provider} returned empty response`);
-    error.statusCode = 502;
-    throw error;
+    const data = await response.json();
+    
+    let message;
+    if (provider === 'zhipu' && data.response) {
+      message = data.response;
+    } else {
+      message = data.choices?.[0]?.message;
+    }
+    
+    if (!message) {
+      const error = new Error(`${provider} returned empty response`);
+      error.statusCode = 502;
+      throw error;
+    }
+
+    console.log(`[RAW-MODEL-OUTPUT] ${provider} round ${round}:`, message);
+
+    messages.push(message);
+    
+    const toolCalls = message.tool_calls || [];
+    
+    if (toolCalls.length === 0) {
+      finalMessage = message;
+      mcpTrace.push(`tool_round:${round}:no_more_calls`);
+      break;
+    }
+
+    for (const tc of toolCalls) {
+      const fnName = tc.function?.name || tc.name;
+      const rawArgs = tc.function?.arguments;
+      let args = rawArgs ? JSON.parse(rawArgs) : tc.args || {};
+      
+      console.log(`[TOOL_CALL] ${fnName}:`, args);
+      
+      if (fnName === 'get_social_recommendations') {
+        const result = await handleBatchMcpInvocations([{ name: 'get_social_recommendations', args }]);
+        const toolResult = JSON.stringify(result);
+        messages.push({
+          role: 'tool',
+          tool_call_id: tc.id || `call_${round}_${fnName}`,
+          content: toolResult
+        });
+        mcpTrace.push(`tool:${provider}:get_social_recommendations:executed`);
+      } else if (fnName === 'location') {
+        const result = await handleBatchMcpInvocations([{ name: 'location', args }]);
+        const toolResult = JSON.stringify(result);
+        messages.push({
+          role: 'tool',
+          tool_call_id: tc.id || `call_${round}_${fnName}`,
+          content: toolResult
+        });
+        mcpTrace.push(`tool:${provider}:location:executed`);
+      }
+    }
+
+    const mapped = mapToolCalls(toolCalls, mcpTrace, provider);
+    dayPlanItinerary = [...dayPlanItinerary, ...mapped.dayPlanItinerary];
+    if (mapped.socialRecommendations.length > 0 && socialRecommendations.length === 0) {
+      socialRecommendations = mapped.socialRecommendations;
+    }
+    
+    mcpTrace.push(`tool_round:${round}:completed:${toolCalls.length}_calls`);
   }
-
-  let mapped = mapToolCalls(message.tool_calls || [], mcpTrace, provider);
-  let dayPlanItinerary = mapped.dayPlanItinerary;
-  let socialRecommendations = mapped.socialRecommendations;
 
   if (dayPlanItinerary.length === 0) {
     mcpTrace.push(`tool:${provider}:location:retry:forced`);
@@ -712,18 +502,28 @@ async function callCompatible({ endpoint, apiKey, model, userInput, provider, mc
           model,
           messages: [
             { role: 'system', content: GLOBAL_SYSTEM_PROMPT },
-            { role: 'user', content: `仅补齐 location 工具调用。需求：${userInput}。要求：必须给出 day/sequence/time/transit_hint/lat/lng/city；若输入是“从A到B”，city 必须是 B；若用户要求三天，day 至少覆盖 1,2,3。` }
+            { role: 'user', content: `仅补齐 location 工具调用。需求：${userInput}。要求：必须给出 day/sequence/time/transit_hint/lat/lng/city；若输入是"从A到B"，city 必须是 B；若用户要求三天，day 至少覆盖 1,2,3。` }
           ],
           tools: [
-            { type: 'function', function: { name: 'location', parameters: locationTool.parameters } }
+            { type: 'function', function: { name: 'location', parameters: tools.location.parameters } }
           ],
-          tool_choice: { type: 'function', function: { name: 'location' } }
+          tool_choice: { type: 'function', function: { name: 'location' } },
+          max_tokens: 2048,
+          temperature: 0.1,
+          ...(provider === 'zhipu' && { top_p: 0.85 }),
+          ...(provider === 'deepseek' && { frequency_penalty: 0.1, presence_penalty: 0.1 }),
+          ...(provider === 'dashscope' && { top_p: 0.75, seed: Math.floor(Math.random() * 1000) + 1 })
         })
       },
       mcpTrace
     });
     const forcedData = await forcedResponse.json();
-    const forcedMessage = forcedData.choices?.[0]?.message || {};
+    let forcedMessage;
+    if (provider === 'zhipu' && forcedData.response) {
+      forcedMessage = forcedData.response;
+    } else {
+      forcedMessage = forcedData.choices?.[0]?.message || {};
+    }
     const forcedMapped = mapToolCalls(forcedMessage.tool_calls || [], mcpTrace, provider);
     dayPlanItinerary = forcedMapped.dayPlanItinerary;
     if (socialRecommendations.length === 0) socialRecommendations = normalizeRecommendations([], provider);
@@ -733,14 +533,92 @@ async function callCompatible({ endpoint, apiKey, model, userInput, provider, mc
     dayPlanItinerary = synthesizeLocationsFromSocial({ userInput, socialRecommendations, provider, mcpTrace });
   }
 
+  const mcpResults = await enrichWithMcpData(dayPlanItinerary, mcpTrace);
+
   return {
     provider,
-    itinerarySummary: message.content || '规划已生成',
+    itinerarySummary: finalMessage?.content || finalMessage?.reasoning_content || '规划已生成',
     dayPlanItinerary,
     socialRecommendations,
-    mcpTrace
+    mcpTrace,
+    mcpResults
   };
 }
+ 
+function validatePayload(payload) {
+  if (!payload || typeof payload !== 'object') return 'Request body must be a JSON object';
+  if (!payload.userInput || typeof payload.userInput !== 'string') return 'userInput is required';
+  if (!payload.modelType || typeof payload.modelType !== 'string') return 'modelType is required';
+  return null;
+}
+
+function toRefinePayload(payload) {
+  const baseSummary = payload.basePlan?.itinerarySummary || '';
+  return {
+    userInput: `${payload.userInput || ''}\n\n请基於已有方案继续调整：${payload.refineInstruction || ''}\n已有摘要：${baseSummary}`.trim(),
+    modelType: payload.modelType,
+    isPlannerMode: payload.isPlannerMode !== false,
+    travelMode: payload.travelMode || 'deep'
+  };
+}
+
+function getProviderFromModel(modelType) {
+  if (String(modelType || '').startsWith('gemini')) return 'gemini';
+  if (String(modelType || '').includes('deepseek')) return 'deepseek';
+  if (String(modelType || '').toLowerCase().includes('glm')) return 'zhipu';
+  if (String(modelType || '').toLowerCase().includes('qwen')) return 'dashscope';
+  return 'unknown';
+}
+
+function recordExecutionLog({ requestId, route, payload, response, startedAt, failed, errorMessage }) {
+  const entry = {
+    requestId,
+    route,
+    startedAt,
+    finishedAt: new Date().toISOString(),
+    durationMs: Date.now() - new Date(startedAt).getTime(),
+    modelType: payload?.modelType,
+    provider: getProviderFromModel(payload?.modelType),
+    userInputPreview: String(payload?.userInput || '').slice(0, 120),
+    mcpTraceCount: Array.isArray(response?.mcpTrace) ? response.mcpTrace.length : 0,
+    evidenceCount: Array.isArray(response?.evidence) ? response.evidence.length : 0,
+    itineraryCount: Array.isArray(response?.dayPlanItinerary) ? response.dayPlanItinerary.length : 0,
+    failed: Boolean(failed),
+    errorMessage: errorMessage || null
+  };
+
+  executionLogStore.set(requestId, entry);
+  if (executionLogStore.size > 200) {
+    const oldest = executionLogStore.keys().next().value;
+    executionLogStore.delete(oldest);
+  }
+}
+
+function snapshotMetrics() {
+  return {
+    ...metrics,
+    executionLogSize: executionLogStore.size,
+    cacheSize: responseCache.size,
+    alertCount: alerts.length,
+    updatedAt: new Date().toISOString()
+  };
+}
+
+// 全局缓存和辅助数据结构
+let knowledgeCache;
+const executionLogStore = new Map();
+const responseCache = new Map();
+const alerts = [];
+const metrics = {
+  totalRequests: 0,
+  planRequests: 0,
+  refineRequests: 0,
+  failedRequests: 0,
+  cacheHits: 0,
+  totalEstimatedCost: 0,
+  providerCounts: { gemini: 0, deepseek: 0, zhipu: 0, dashscope: 0, unknown: 0 },
+  lastError: null
+};
 
 async function generatePlan(payload, requestId) {
   const mcpTrace = [`request:${requestId}:received`];
@@ -781,7 +659,7 @@ async function generatePlan(payload, requestId) {
         requestId,
         prompt
       });
-    } else {
+    } else if (chosen.provider === 'zhipu') {
       if (!CONFIG.providers.zhipuApiKey) {
         const error = new Error('Missing zhipuApiKey in config');
         error.statusCode = 500;
@@ -797,6 +675,27 @@ async function generatePlan(payload, requestId) {
         requestId,
         prompt
       });
+    } else if (chosen.provider === 'dashscope') {
+      if (!CONFIG.providers.dashscopeApiKey) {
+        const error = new Error('Missing dashscopeApiKey in config');
+        error.statusCode = 500;
+        throw error;
+      }
+      plan = await callCompatible({
+        endpoint: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
+        apiKey: CONFIG.providers.dashscopeApiKey,
+        model: chosen.modelType,
+        userInput: payload.userInput,
+        provider: 'dashscope',
+        mcpTrace,
+        requestId,
+        prompt
+      });
+    }
+    
+    // 将MCP结果合并到计划中
+    if (plan.mcpResults && Array.isArray(plan.mcpResults)) {
+      plan = incorporateMcpResults(plan, plan.mcpResults);
     }
   } catch (error) {
     if (AUTO_ROLLBACK_ON_FAILURE && chosen.rollout === 'canary') {
@@ -816,18 +715,35 @@ async function generatePlan(payload, requestId) {
           requestId,
           prompt
         });
-      } else {
+      } else if (PRIMARY_PROVIDER === 'zhipu') {
         if (!CONFIG.providers.zhipuApiKey) throw error;
         plan = await callCompatible({
           endpoint: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
           apiKey: CONFIG.providers.zhipuApiKey,
-          model: CONFIG.providers.defaultZhipuModel || 'glm-4-flash',
+          model: CONFIG.providers.defaultZhipuModel || 'glm-4.5-air',
           userInput: payload.userInput,
           provider: 'zhipu',
           mcpTrace,
           requestId,
           prompt
         });
+      } else if (PRIMARY_PROVIDER === 'dashscope') {
+        if (!CONFIG.providers.dashscopeApiKey) throw error;
+        plan = await callCompatible({
+          endpoint: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
+          apiKey: CONFIG.providers.dashscopeApiKey,
+          model: CONFIG.providers.defaultDashscopeModel || 'qwen-plus',
+          userInput: payload.userInput,
+          provider: 'dashscope',
+          mcpTrace,
+          requestId,
+          prompt
+        });
+      }
+      
+      // 对於回退的计划同样整合MCP数据
+      if (plan.mcpResults && Array.isArray(plan.mcpResults)) {
+        plan = incorporateMcpResults(plan, plan.mcpResults);
       }
     } else {
       throw error;
@@ -835,7 +751,8 @@ async function generatePlan(payload, requestId) {
   }
 
   const expectedCity = extractExpectedCityFromInput(payload.userInput, plan.socialRecommendations || []);
-  let alignedItinerary = harmonizeItineraryCity(plan.dayPlanItinerary || [], expectedCity, mcpTrace);
+  let originalItinerary = plan.dayPlanItinerary || [];
+  let alignedItinerary = harmonizeItineraryCity(originalItinerary, expectedCity, mcpTrace);
   alignedItinerary = ensureMinimumItemsByRequestedDays(alignedItinerary, payload.userInput, plan.socialRecommendations || [], plan.provider || chosen.provider, mcpTrace);
   const enrichedItinerary = enrichWithMcpSignals(alignedItinerary, mcpTrace);
   const verifierWarnings = verifyPlan(enrichedItinerary, mcpTrace);
@@ -865,66 +782,7 @@ async function generatePlan(payload, requestId) {
   return result;
 }
 
-function validatePayload(payload) {
-  if (!payload || typeof payload !== 'object') return 'Request body must be a JSON object';
-  if (!payload.userInput || typeof payload.userInput !== 'string') return 'userInput is required';
-  if (!payload.modelType || typeof payload.modelType !== 'string') return 'modelType is required';
-  return null;
-}
-
-function toRefinePayload(payload) {
-  const baseSummary = payload.basePlan?.itinerarySummary || '';
-  return {
-    userInput: `${payload.userInput || ''}\n\n请基于已有方案继续调整：${payload.refineInstruction || ''}\n已有摘要：${baseSummary}`.trim(),
-    modelType: payload.modelType,
-    isPlannerMode: payload.isPlannerMode !== false,
-    travelMode: payload.travelMode || 'deep'
-  };
-}
-
-
-
-function getProviderFromModel(modelType) {
-  if (String(modelType || '').startsWith('gemini')) return 'gemini';
-  if (String(modelType || '').includes('deepseek')) return 'deepseek';
-  if (String(modelType || '').toLowerCase().includes('glm')) return 'zhipu';
-  return 'unknown';
-}
-
-function recordExecutionLog({ requestId, route, payload, response, startedAt, failed, errorMessage }) {
-  const entry = {
-    requestId,
-    route,
-    startedAt,
-    finishedAt: new Date().toISOString(),
-    durationMs: Date.now() - new Date(startedAt).getTime(),
-    modelType: payload?.modelType,
-    provider: getProviderFromModel(payload?.modelType),
-    userInputPreview: String(payload?.userInput || '').slice(0, 120),
-    mcpTraceCount: Array.isArray(response?.mcpTrace) ? response.mcpTrace.length : 0,
-    evidenceCount: Array.isArray(response?.evidence) ? response.evidence.length : 0,
-    itineraryCount: Array.isArray(response?.dayPlanItinerary) ? response.dayPlanItinerary.length : 0,
-    failed: Boolean(failed),
-    errorMessage: errorMessage || null
-  };
-
-  executionLogStore.set(requestId, entry);
-  if (executionLogStore.size > 200) {
-    const oldest = executionLogStore.keys().next().value;
-    executionLogStore.delete(oldest);
-  }
-}
-
-function snapshotMetrics() {
-  return {
-    ...metrics,
-    executionLogSize: executionLogStore.size,
-    cacheSize: responseCache.size,
-    alertCount: alerts.length,
-    updatedAt: new Date().toISOString()
-  };
-}
-
+// 服务器定义
 const server = createServer(async (req, res) => {
   const requestId = crypto.randomUUID();
   metrics.totalRequests += 1;

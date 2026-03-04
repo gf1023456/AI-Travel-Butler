@@ -12,7 +12,7 @@
     "enableCanary": false,
     "canaryPercent": 10,
     "primaryProvider": "gemini",
-    "canaryProvider": "zhipu",
+    "canaryProvider": "dashscope",
     "autoRollbackOnFailure": true
   },
   "performance": {
@@ -20,11 +20,13 @@
     "costAlertThreshold": 2
   },
   "providers": {
-    "geminiApiKey": "",
-    "deepseekApiKey": "",
-    "zhipuApiKey": "",
+    "geminiApiKey": " ",
+    "deepseekApiKey": "sk-6107644d8e5141bdb6b907a6579b954f",
+    "zhipuApiKey": " ",
+    "dashscopeApiKey": "sk-3edb0b9c8fe442a7942ebe852ea95ecd",
     "defaultGeminiModel": "gemini-2.5-flash",
     "defaultDeepseekModel": "deepseek-chat",
-    "defaultZhipuModel": "glm-4-flash"
+    "defaultZhipuModel": "glm-4-flash",
+    "defaultDashscopeModel": "qwen3.5-plus"
   }
 }
