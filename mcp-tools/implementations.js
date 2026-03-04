@@ -223,7 +223,10 @@ export async function getWeather(latOrArgs, lonOrDate, dateOrUndef = null) {
   
   try {
     const { external_apis = {} } = globalThis.SERVER_CONFIG || {};
-    const weatherApiKey = external_apis.weatherApiKeyKeyName || process.env.WEATHER_API_KEY || '';
+    const weatherApiKey = external_apis.weatherApiKey || process.env.WEATHER_API_KEY || '';
+    
+    console.log(`[WEATHER] API Key present: ${!!weatherApiKey}, Key: ${weatherApiKey ? weatherApiKey.substring(0, 4) + '...' : 'none'}`);
+    console.log(`[WEATHER] Config:`, JSON.stringify(external_apis));
     
     if (weatherApiKey && weatherApiKey !== '') {
       // 使用和风天气或其他天气服务API
@@ -238,6 +241,7 @@ export async function getWeather(latOrArgs, lonOrDate, dateOrUndef = null) {
 
         if (response.ok) {
           const data = await response.json();
+          console.log(`[WEATHER] API Response:`, JSON.stringify(data));
           
           if (data.code === '200' && data.now) {
             return {
@@ -406,4 +410,61 @@ function levenshteinDistance(str1, str2) {
   }
 
   return matrix[str2.length][str1.length];
+}
+
+/**
+ * 获取POI详细信息
+ */
+export async function getPoiInfo(name, latitude, longitude, city) {
+  const { external_apis = {} } = globalThis.SERVER_CONFIG || {};
+  const amapApiKey = external_apis.amapApiKey || process.env.AMAP_API_KEY || '';
+  
+  try {
+    if (amapApiKey && amapApiKey !== '') {
+      const url = `https://restapi.amap.com/v3/place/detail?parameters=${encodeURIComponent(name)}&city=${encodeURIComponent(city)}&output=json&key=${amapApiKey}`;
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      
+      try {
+        const response = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+          const data = await response.json();
+          
+          if (data.pois && data.pois.length > 0) {
+            const poi = data.pois[0];
+            return {
+              name: poi.name,
+              address: poi.address || '暂无地址',
+              city: poi.city || city,
+              type: poi.type || '景点',
+              rating: poi.rating || null,
+              open_hours: poi.opening_hours || '暂无营业时间',
+              price: poi.price || null,
+              description: poi.description || `位于${city}的${poi.type || '地点'}`,
+              location: { lat: latitude, lng: longitude }
+            };
+          }
+        }
+      } catch (fetchErr) {
+        console.error(`[MCP] getPoiInfo fetch error:`, fetchErr.message);
+      }
+    }
+  } catch (error) {
+    console.error(`[MCP] getPoiInfo failed:`, error);
+  }
+  
+  return {
+    name,
+    city,
+    address: '暂无地址',
+    type: '景点',
+    rating: null,
+    open_hours: '暂无营业时间',
+    price: null,
+    description: `位于${city}的景点`,
+    location: { lat: latitude, lng: longitude }
+  };
 }

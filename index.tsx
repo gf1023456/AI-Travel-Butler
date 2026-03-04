@@ -378,6 +378,8 @@ function renderAll() {
       <h5 style="color:${dayColor}">Day ${item.day} <span style="color:#8E8E93; font-weight:normal;">${item.time}</span> ${cityBadge} ${weatherHtml}</h5>
       <div style="font-weight:700; font-size:16px; margin-bottom:4px; color:#000;">${item.name}</div>
       <p style="color:#3C3C43; font-size:14px;">${item.description}</p>
+      ${item.transit_hint ? `<p style="color:#666; font-size:12px; margin-top:4px;">🚗 交通: ${item.transit_hint}</p>` : ''}
+      ${item.visit_duration ? `<p style="color:#666; font-size:12px; margin-top:2px;">⏱️ 建议游玩: ${item.visit_duration}</p>` : ''}
     `;
     
     // Interaction: Click Card -> FlyTo Marker
