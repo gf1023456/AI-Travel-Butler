@@ -455,7 +455,21 @@ async function callCompatible({ endpoint, apiKey, model, userInput, provider, mc
     for (const tc of toolCalls) {
       const fnName = tc.function?.name || tc.name;
       const rawArgs = tc.function?.arguments;
-      let args = rawArgs ? JSON.parse(rawArgs) : tc.args || {};
+      let args;
+      try {
+        args = rawArgs ? JSON.parse(rawArgs) : tc.args || {};
+      } catch (parseErr) {
+        console.error(`[WARN] JSON parse failed for ${fnName}, trying fix:`, parseErr.message);
+        try {
+          const fixed = rawArgs
+            .replace(/'/g, '"')
+            .replace(/([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:/g, '$1"$2":');
+          args = JSON.parse(fixed);
+          console.log(`[WARN] Successfully parsed with fixes`);
+        } catch (e2) {
+          args = tc.args || {};
+        }
+      }
       
       console.log(`[TOOL_CALL] ${fnName}:`, args);
       
