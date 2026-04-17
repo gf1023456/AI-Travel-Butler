@@ -821,6 +821,27 @@ const server = createServer(async (req, res) => {
     }, requestId);
   }
 
+  // 前端配置接口
+  if (req.method === 'GET' && req.url === '/api/frontend-config') {
+    const frontendConfigFile = 'server/frontend.config.json';
+    let frontendConfig = {
+      backendUrl: `http://localhost:${PORT}`,
+      tdtApiKey: '',
+      mapCenter: [30.5728, 104.0668],
+      mapZoom: 12,
+      defaultMapType: 'tdt_vec'
+    };
+    try {
+      if (existsSync(frontendConfigFile)) {
+        const raw = await readFile(frontendConfigFile, 'utf8');
+        frontendConfig = { ...frontendConfig, ...JSON.parse(raw) };
+      }
+    } catch (e) {
+      console.error('Failed to load frontend config:', e.message);
+    }
+    return json(res, 200, { ...frontendConfig, requestId }, requestId);
+  }
+
   if (req.method === 'GET' && req.url?.startsWith('/api/execution-log/')) {
     const id = req.url.split('/').pop();
     const log = executionLogStore.get(id);

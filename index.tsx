@@ -4,6 +4,15 @@
 */
 import L from 'leaflet';
 
+// 前端配置（从后端获取）
+let FRONTEND_CONFIG = {
+  backendUrl: 'http://tonystark-ai.ccwu.cc/aiTraver',
+  tdtApiKey: '',
+  mapCenter: [30.5728, 104.0668] as [number, number],
+  mapZoom: 12,
+  defaultMapType: 'tdt_vec' as 'tdt_vec' | 'tdt_img'
+};
+
 // Application state
 let map: L.Map;
 let dayPlanItinerary: any[] = [];
@@ -18,10 +27,23 @@ let currentMapType: 'tdt_vec' | 'tdt_img' = 'tdt_vec'; // Track map type
 let activeSheet: string | null = null; // Track currently open sheet
 
 // Constants
-const TDT_DEFAULT_KEY = "97f9870fb795ba80ef201d6edae71d73";
 const DAY_COLORS = ['#ff5722', '#2196f3', '#4caf50', '#9c27b0', '#ffeb3b', '#00bcd4', '#795548'];
 const STORAGE_KEY = 'travel_pro_history_v2';
-const BACKEND_BASE_URL = (window as any).__TRAVEL_BACKEND_URL__ || 'http://localhost:8787';
+const BACKEND_BASE_URL = FRONTEND_CONFIG.backendUrl;
+
+// 获取前端配置
+async function loadFrontendConfig(): Promise<void> {
+  try {
+    const res = await fetch(`${BACKEND_BASE_URL}/api/frontend-config`);
+    if (res.ok) {
+      const data = await res.json();
+      FRONTEND_CONFIG = { ...FRONTEND_CONFIG, ...data };
+      console.log('Frontend config loaded:', FRONTEND_CONFIG);
+    }
+  } catch (e) {
+    console.warn('Failed to load frontend config, using defaults:', e);
+  }
+}
 
 const getEl = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -29,19 +51,19 @@ function initApp() {
   const mapContainer = document.getElementById('map');
   if (!mapContainer) return;
 
-  // Initialize Map
+  // Initialize Map (使用配置中的中心点和缩放级别)
   map = L.map('map', {
-    center: [30.5728, 104.0668],
-    zoom: 12,
+    center: FRONTEND_CONFIG.mapCenter,
+    zoom: FRONTEND_CONFIG.mapZoom,
     zoomControl: false,
     attributionControl: false
   });
 
   // Load saved keys
-  const savedTdtKey = localStorage.getItem('tdt_api_key') || TDT_DEFAULT_KEY;
+  const savedTdtKey = localStorage.getItem('tdt_api_key') || FRONTEND_CONFIG.tdtApiKey;
   (getEl('tdt-key-input') as HTMLInputElement).value = savedTdtKey;
 
-  switchTDT('tdt_vec', savedTdtKey);
+  switchTDT(FRONTEND_CONFIG.defaultMapType, savedTdtKey);
   
   // Initialize UI Bindings
   bindNavigation();
@@ -99,7 +121,7 @@ function bindNavigation() {
   // 3. Layers (Direct Action)
   getEl('nav-layers').onclick = () => {
     currentMapType = currentMapType === 'tdt_vec' ? 'tdt_img' : 'tdt_vec';
-    const key = localStorage.getItem('tdt_api_key') || TDT_DEFAULT_KEY;
+    const key = localStorage.getItem('tdt_api_key') || FRONTEND_CONFIG.tdtApiKey;
     switchTDT(currentMapType, key);
     
     // Toggle active state visual
@@ -227,7 +249,7 @@ function bindEvents() {
     if (tdtKey) localStorage.setItem('tdt_api_key', tdtKey);
     
     // Refresh map if key changed
-    switchTDT(currentMapType, tdtKey || TDT_DEFAULT_KEY);
+    switchTDT(currentMapType, tdtKey || FRONTEND_CONFIG.tdtApiKey);
     getEl('settings-modal').classList.remove('active');
     showToast("配置已保存", 'success');
   };
