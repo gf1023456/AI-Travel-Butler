@@ -30,8 +30,8 @@ const CONFIG_FILE = process.argv[2] || 'server/config.json';
 const DEFAULT_CONFIG = {
   server: {
     port: 8787,
-    requestTimeoutMs: 20000,
-    maxRetries: 2
+    requestTimeoutMs: 120000,  // 增加到120秒，支持复杂的AI请求
+    maxRetries: 3               // 增加重试次数
   },
   rag: {
     topK: 3,
@@ -635,34 +635,60 @@ const metrics = {
 };
 
 async function generatePlan(payload, requestId) {
+  console.log(`========== 开始生成行程 [${requestId}] ==========`);
+  console.log('请求ID:', requestId);
+  console.log('用户输入:', payload.userInput);
+  console.log('模型类型:', payload.modelType);
+  console.log('规划模式:', payload.isPlannerMode);
+  console.log('旅行风格:', payload.travelMode);
+  console.log('请求时间:', new Date().toISOString());
+  console.log('===============================================');
+
   const mcpTrace = [`request:${requestId}:received`];
   const cacheKey = cacheKeyOf(payload);
   const cached = responseCache.get(cacheKey);
+  
   if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
     metrics.cacheHits += 1;
     const cloned = JSON.parse(JSON.stringify(cached.value));
     cloned.mcpTrace = [...(cloned.mcpTrace || []), 'cache:hit'];
+    
+    console.log(`✅ 缓存命中 [${requestId}] - 返回缓存结果`);
     return cloned;
   }
+  
+  console.log(`🔍 缓存未命中 [${requestId}] - 开始RAG检索`);
 
   const evidence = await retrieveEvidence(payload.userInput, RAG_TOP_K);
+  console.log(`📚 检索到 ${evidence.length} 条RAG知识 [${requestId}]`);
   mcpTrace.push(`rag:retrieved:${evidence.length}`);
   const ragContext = buildRagContext(evidence);
   const prompt = constructUserPrompt(payload.userInput, payload.isPlannerMode, payload.travelMode, ragContext);
+
+  console.log(`🔧 构建提示词完成 [${requestId}]`);
+  console.log('提示词长度:', prompt.length);
+  console.log('RAG上下文长度:', ragContext.length);
 
   let plan;
   const chosen = chooseRolloutProvider(payload);
   mcpTrace.push(`rollout:${chosen.rollout}:provider:${chosen.provider}:model:${chosen.modelType}`);
 
+  console.log(`🤖 选择提供商 [${requestId}] - ${chosen.provider} (${chosen.rollout} rollout)`);
+  console.log('模型:', chosen.modelType);
+  console.log('开始调用AI模型...');
+
   try {
     if (chosen.provider === 'gemini') {
+      console.log(`🔄 调用 Gemini 模型 [${requestId}]`);
       plan = await callGemini(chosen.modelType, prompt, mcpTrace, requestId);
     } else if (chosen.provider === 'deepseek') {
       if (!CONFIG.providers.deepseekApiKey) {
+        console.error(`❌ DeepSeek API Key未配置 [${requestId}]`);
         const error = new Error('Missing deepseekApiKey in config');
         error.statusCode = 500;
         throw error;
       }
+      console.log(`🔄 调用 DeepSeek 模型 [${requestId}]`);
       plan = await callCompatible({
         endpoint: 'https://api.deepseek.com/chat/completions',
         apiKey: CONFIG.providers.deepseekApiKey,
@@ -675,10 +701,12 @@ async function generatePlan(payload, requestId) {
       });
     } else if (chosen.provider === 'zhipu') {
       if (!CONFIG.providers.zhipuApiKey) {
+        console.error(`❌ 智谱API Key未配置 [${requestId}]`);
         const error = new Error('Missing zhipuApiKey in config');
         error.statusCode = 500;
         throw error;
       }
+      console.log(`🔄 调用 智谱GLM 模型 [${requestId}]`);
       plan = await callCompatible({
         endpoint: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
         apiKey: CONFIG.providers.zhipuApiKey,
@@ -691,10 +719,12 @@ async function generatePlan(payload, requestId) {
       });
     } else if (chosen.provider === 'dashscope') {
       if (!CONFIG.providers.dashscopeApiKey) {
+        console.error(`❌ 通义千问API Key未配置 [${requestId}]`);
         const error = new Error('Missing dashscopeApiKey in config');
         error.statusCode = 500;
         throw error;
       }
+      console.log(`🔄 调用 通义千问 模型 [${requestId}] - ${chosen.modelType}`);
       plan = await callCompatible({
         endpoint: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
         apiKey: CONFIG.providers.dashscopeApiKey,
@@ -707,18 +737,30 @@ async function generatePlan(payload, requestId) {
       });
     }
     
+    console.log(`✅ AI模型调用完成 [${requestId}]`);
+    
     // 将MCP结果合并到计划中
     if (plan.mcpResults && Array.isArray(plan.mcpResults)) {
+      console.log(`🔧 合并MCP结果 [${requestId}] - ${plan.mcpResults.length} 个结果`);
       plan = incorporateMcpResults(plan, plan.mcpResults);
     }
   } catch (error) {
+    console.error(`❌ AI模型调用失败 [${requestId}] -`, error.message);
+    
     if (AUTO_ROLLBACK_ON_FAILURE && chosen.rollout === 'canary') {
+      console.warn(`🔄 触发回滚机制 [${requestId}] - 切换到主提供商`);
       mcpTrace.push('rollout:rollback:triggered');
       pushAlert('warning', 'rollout_rollback', 'Canary provider failed, fallback to primary provider', { requestId });
+      
       if (PRIMARY_PROVIDER === 'gemini') {
+        console.log(`🔄 回滚到 Gemini 模型 [${requestId}]`);
         plan = await callGemini(CONFIG.providers.defaultGeminiModel || 'gemini-2.5-flash', prompt, mcpTrace, requestId);
       } else if (PRIMARY_PROVIDER === 'deepseek') {
-        if (!CONFIG.providers.deepseekApiKey) throw error;
+        if (!CONFIG.providers.deepseekApiKey) {
+          console.error(`❌ 回滚失败 - DeepSeek API Key未配置 [${requestId}]`);
+          throw error;
+        }
+        console.log(`🔄 回滚到 DeepSeek 模型 [${requestId}]`);
         plan = await callCompatible({
           endpoint: 'https://api.deepseek.com/chat/completions',
           apiKey: CONFIG.providers.deepseekApiKey,
@@ -730,7 +772,11 @@ async function generatePlan(payload, requestId) {
           prompt
         });
       } else if (PRIMARY_PROVIDER === 'zhipu') {
-        if (!CONFIG.providers.zhipuApiKey) throw error;
+        if (!CONFIG.providers.zhipuApiKey) {
+          console.error(`❌ 回滚失败 - 智谱API Key未配置 [${requestId}]`);
+          throw error;
+        }
+        console.log(`🔄 回滚到 智谱GLM 模型 [${requestId}]`);
         plan = await callCompatible({
           endpoint: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
           apiKey: CONFIG.providers.zhipuApiKey,
@@ -742,7 +788,11 @@ async function generatePlan(payload, requestId) {
           prompt
         });
       } else if (PRIMARY_PROVIDER === 'dashscope') {
-        if (!CONFIG.providers.dashscopeApiKey) throw error;
+        if (!CONFIG.providers.dashscopeApiKey) {
+          console.error(`❌ 回滚失败 - 通义千问API Key未配置 [${requestId}]`);
+          throw error;
+        }
+        console.log(`🔄 回滚到 通义千问 模型 [${requestId}]`);
         plan = await callCompatible({
           endpoint: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
           apiKey: CONFIG.providers.dashscopeApiKey,
@@ -754,46 +804,15 @@ async function generatePlan(payload, requestId) {
           prompt
         });
       }
-      
-      // 对於回退的计划同样整合MCP数据
-      if (plan.mcpResults && Array.isArray(plan.mcpResults)) {
-        plan = incorporateMcpResults(plan, plan.mcpResults);
-      }
+      console.log(`✅ 回滚调用完成 [${requestId}]`);
     } else {
+      console.error(`❌ 无回滚机制或非金丝雀失败 [${requestId}]`);
       throw error;
     }
   }
-
-  const expectedCity = extractExpectedCityFromInput(payload.userInput, plan.socialRecommendations || []);
-  let originalItinerary = plan.dayPlanItinerary || [];
-  let alignedItinerary = harmonizeItineraryCity(originalItinerary, expectedCity, mcpTrace);
-  alignedItinerary = ensureMinimumItemsByRequestedDays(alignedItinerary, payload.userInput, plan.socialRecommendations || [], plan.provider || chosen.provider, mcpTrace);
-  const enrichedItinerary = enrichWithMcpSignals(alignedItinerary, mcpTrace);
-  const verifierWarnings = verifyPlan(enrichedItinerary, mcpTrace);
-
-  const result = {
-    ...plan,
-    dayPlanItinerary: enrichedItinerary,
-    verifierWarnings,
-    evidence,
-    execution_log_id: requestId
-  };
-
-  const estCost = estimateCostUsd(result);
-  metrics.totalEstimatedCost += estCost;
-  if (metrics.totalEstimatedCost >= COST_ALERT_THRESHOLD) {
-    pushAlert('warning', 'cost_threshold', `Estimated cumulative cost exceeded threshold ${COST_ALERT_THRESHOLD} USD`, {
-      totalEstimatedCost: Number(metrics.totalEstimatedCost.toFixed(4))
-    });
-  }
-
-  responseCache.set(cacheKey, { at: Date.now(), value: result });
-  if (responseCache.size > 200) {
-    const oldest = responseCache.keys().next().value;
-    responseCache.delete(oldest);
-  }
-
-  return result;
+  
+  console.log(`🏁 行程生成完成 [${requestId}] - 共 ${plan.dayPlanItinerary?.length || 0} 个行程点`);
+  return plan;
 }
 
 // 服务器定义
@@ -801,21 +820,34 @@ const server = createServer(async (req, res) => {
   const requestId = crypto.randomUUID();
   metrics.totalRequests += 1;
 
-  if (req.method === 'OPTIONS') return json(res, 204, {}, requestId);
+  console.log('\n' + '='.repeat(80));
+  console.log(`📨 [请求开始] ${req.method} ${req.url}`);
+  console.log(`🆔 Request ID: ${requestId}`);
+  console.log(`⏰ 请求时间: ${new Date().toLocaleString()}`);
+  console.log('='.repeat(80));
+
+  if (req.method === 'OPTIONS') {
+    console.log(`✅ [OPTIONS] 预检请求，返回204`);
+    return json(res, 204, {}, requestId);
+  }
 
   if (req.method === 'GET' && req.url === '/healthz') {
+    console.log(`💚 [健康检查] 返回服务状态`);
     return json(res, 200, { ok: true, service: 'ai-travel-butler-server', city: 'xian' }, requestId);
   }
 
   if (req.method === 'GET' && req.url === '/api/metrics') {
+    console.log(`📊 [指标查询] 返回系统指标`);
     return json(res, 200, snapshotMetrics(), requestId);
   }
 
   if (req.method === 'GET' && req.url === '/api/alerts') {
+    console.log(`🚨 [告警查询] 返回告警列表`);
     return json(res, 200, { alerts, requestId }, requestId);
   }
 
   if (req.method === 'GET' && req.url === '/api/release/status') {
+    console.log(`🚀 [发布状态] 返回发布配置`);
     return json(res, 200, {
       ENABLE_CANARY, CANARY_PERCENT, PRIMARY_PROVIDER, CANARY_PROVIDER, AUTO_ROLLBACK_ON_FAILURE, configFile: CONFIG_FILE, requestId
     }, requestId);
@@ -823,6 +855,7 @@ const server = createServer(async (req, res) => {
 
   // 前端配置接口
   if (req.method === 'GET' && req.url === '/api/frontend-config') {
+    console.log(`🌐 [前端配置] 返回前端配置`);
     const frontendConfigFile = 'server/frontend.config.json';
     let frontendConfig = {
       backendUrl: `http://localhost:${PORT}`,
@@ -837,9 +870,24 @@ const server = createServer(async (req, res) => {
         frontendConfig = { ...frontendConfig, ...JSON.parse(raw) };
       }
     } catch (e) {
-      console.error('Failed to load frontend config:', e.message);
+      console.error('❌ [前端配置] 加载失败:', e.message);
     }
     return json(res, 200, { ...frontendConfig, requestId }, requestId);
+  }
+
+  // 获取当前激活的AI模型接口
+  if (req.method === 'POST' && req.url === '/api/getModel') {
+    console.log(`🤖 [获取模型] 返回当前激活的AI模型`);
+    console.log(`📌 主提供商: ${PRIMARY_PROVIDER}`);
+    console.log(`📌 是否启用灰度: ${ENABLE_CANARY}`);
+    
+    // 根据配置返回当前主提供商
+    return json(res, 200, {
+      modelName: PRIMARY_PROVIDER,
+      canaryEnabled: ENABLE_CANARY,
+      canaryProvider: CANARY_PROVIDER,
+      requestId
+    }, requestId);
   }
 
   if (req.method === 'GET' && req.url?.startsWith('/api/execution-log/')) {
@@ -852,13 +900,21 @@ const server = createServer(async (req, res) => {
   if (req.method === 'GET' && req.url?.startsWith('/api/knowledge/search')) {
     const url = new URL(req.url, `http://localhost:${PORT}`);
     const q = url.searchParams.get('q') || '';
+    console.log(`🔍 [知识检索] 查询: "${q}"`);
     const evidence = await retrieveEvidence(q, RAG_TOP_K);
+    console.log(`🔍 [知识检索] 找到 ${evidence.length} 条结果`);
     return json(res, 200, { q, evidence, requestId }, requestId);
   }
 
   if (req.method === 'POST' && (req.url === '/api/plan' || req.url === '/api/plan/refine')) {
     let body = '';
     const startedAt = new Date().toISOString();
+    const routeType = req.url === '/api/plan' ? '🎯 行程规划' : '🔄 行程优化';
+    
+    console.log(`${routeType} [API请求] ${req.url}`);
+    console.log(`📝 请求ID: ${requestId}`);
+    console.log(`⏱️  超时设置: ${REQUEST_TIMEOUT_MS}ms (${REQUEST_TIMEOUT_MS/1000}秒)`);
+    
     if (req.url === '/api/plan') metrics.planRequests += 1;
     if (req.url === '/api/plan/refine') metrics.refineRequests += 1;
 
@@ -870,23 +926,66 @@ const server = createServer(async (req, res) => {
     req.on('end', async () => {
       let payload;
       try {
+        console.log(`\n${'─'.repeat(80)}`);
+        console.log(`📥 [请求体解析]`);
+        console.log(`原始大小: ${body.length} 字节`);
+        
         const rawPayload = JSON.parse(body || '{}');
         payload = req.url === '/api/plan/refine' ? toRefinePayload(rawPayload) : rawPayload;
+        
+        console.log(`📝 用户输入: "${payload.userInput}"`);
+        console.log(`🤖 模型类型: ${payload.modelType}`);
+        console.log(`🎨 旅行风格: ${payload.travelMode || '未指定'}`);
+        console.log(`📅 规划模式: ${payload.isPlannerMode ? '是' : '否'}`);
+        if (payload.refineInstruction) {
+          console.log(`✏️  优化指令: "${payload.refineInstruction}"`);
+        }
+        console.log(`${'─'.repeat(80)}\n`);
 
         const validationError = validatePayload(payload);
         if (validationError) {
+          console.log(`❌ [验证失败] ${validationError}`);
           metrics.failedRequests += 1;
           metrics.lastError = { message: validationError, at: new Date().toISOString(), route: req.url };
           recordExecutionLog({ requestId, route: req.url, payload, startedAt, failed: true, errorMessage: validationError });
           return json(res, 400, { error: validationError, requestId }, requestId);
         }
 
+        console.log(`✅ [验证通过] 开始生成行程方案...`);
+        console.log(`🔧 配置信息:`);
+        console.log(`   - 主提供商: ${PRIMARY_PROVIDER}`);
+        console.log(`   - 灰度发布: ${ENABLE_CANARY ? '启用' : '禁用'}`);
+        console.log(`   - RAG检索: ${RAG_TOP_K} 条知识`);
+        console.log(`   - 缓存TTL: ${CACHE_TTL_MS}ms`);
+        
         const started = Date.now();
+        console.log(`\n⏳ [开始处理] 调用AI生成行程...`);
+        
         const data = await generatePlan(payload, requestId);
+        
+        const duration = Date.now() - started;
         data.mcpTrace.push(`request:${requestId}:completed:ms:${Date.now() - started}`);
+
+        console.log(`\n✨ [处理完成]`);
+        console.log(`⏱️  处理耗时: ${duration}ms (${(duration/1000).toFixed(2)}秒)`);
+        console.log(`📊 生成数据:`);
+        console.log(`   - 行程项数: ${data.dayPlanItinerary?.length || 0}`);
+        console.log(`   - 社交推荐: ${data.socialRecommendations?.length || 0}`);
+        console.log(`   - 证据引用: ${data.evidence?.length || 0}`);
+        console.log(`   - 警告信息: ${data.verifierWarnings?.length || 0}`);
+        console.log(`   - 行程摘要: ${data.itinerarySummary?.substring(0, 100)}...`);
 
         const provider = data.provider || getProviderFromModel(payload.modelType);
         metrics.providerCounts[provider] = (metrics.providerCounts[provider] || 0) + 1;
+        
+        console.log(`🤖 使用提供商: ${provider}`);
+        console.log(`📈 累计统计:`);
+        console.log(`   - 总请求数: ${metrics.totalRequests}`);
+        console.log(`   - 成功请求: ${metrics.totalRequests - metrics.failedRequests}`);
+        console.log(`   - 失败请求: ${metrics.failedRequests}`);
+        console.log(`   - 缓存命中: ${metrics.cacheHits}`);
+        console.log(`${'─'.repeat(80)}\n`);
+        
         recordExecutionLog({ requestId, route: req.url, payload, response: data, startedAt, failed: false });
 
         return json(res, 200, { ...data, requestId }, requestId);
@@ -895,16 +994,73 @@ const server = createServer(async (req, res) => {
         metrics.failedRequests += 1;
         metrics.lastError = { message: error?.message || 'Planner error', at: new Date().toISOString(), route: req.url };
         recordExecutionLog({ requestId, route: req.url, payload, startedAt, failed: true, errorMessage: error?.message || 'Planner error' });
-        console.error(`[${requestId}] ${req.url} failed`, error?.message || error);
+        
+        console.error(`\n❌ [请求失败] ${req.url}`);
+        console.error(`🆔 请求ID: ${requestId}`);
+        console.error(`⏱️  已耗时: ${Date.now() - new Date(startedAt).getTime()}ms`);
+        console.error(`💥 错误信息:`, error?.message || error);
+        if (error?.stack) {
+          console.error(`📚 堆栈跟踪:`, error.stack);
+        }
+        console.error(`${'─'.repeat(80)}\n`);
+        
         return json(res, status, { error: error?.message || 'Planner error', requestId }, requestId);
       }
     });
     return;
   }
 
+  console.log(`⚠️ [404] 未找到路由: ${req.method} ${req.url}`);
   return json(res, 404, { error: 'Not found', requestId }, requestId);
+
 });
 
 server.listen(PORT, () => {
-  console.log(`AI Travel Butler backend running on http://localhost:${PORT}`);
+  console.log('\n' + '🚀'.repeat(20));
+  console.log('='.repeat(80));
+  console.log('🎉 AI Travel Butler Backend Server Started!');
+  console.log('='.repeat(80));
+  console.log(`🌐 服务地址: http://localhost:${PORT}`);
+  console.log(`📝 配置文件: ${CONFIG_FILE}`);
+  console.log('');
+  console.log('📋 配置详情:');
+  console.log(`   ├─ 主提供商: ${PRIMARY_PROVIDER}`);
+  console.log(`   ├─ 灰度发布: ${ENABLE_CANARY ? '启用 (' + CANARY_PERCENT + '%)' : '禁用'}`);
+  if (ENABLE_CANARY) {
+    console.log(`   ├─ 灰度提供商: ${CANARY_PROVIDER}`);
+    console.log(`   ├─ 自动回滚: ${AUTO_ROLLBACK_ON_FAILURE ? '是' : '否'}`);
+  }
+  console.log(`   ├─ 请求超时: ${REQUEST_TIMEOUT_MS}ms (${REQUEST_TIMEOUT_MS/1000}秒)`);
+  console.log(`   ├─ 最大重试: ${MAX_RETRIES}次`);
+  console.log(`   ├─ RAG检索: ${RAG_TOP_K}条`);
+  console.log(`   ├─ 缓存TTL: ${CACHE_TTL_MS}ms (${CACHE_TTL_MS/1000}秒)`);
+  console.log('');
+  console.log('🤖 模型配置:');
+  if (CONFIG.providers.geminiApiKey) {
+    console.log(`   ├─ Gemini: ${CONFIG.providers.defaultGeminiModel} ✅`);
+  }
+  if (CONFIG.providers.deepseekApiKey) {
+    console.log(`   ├─ DeepSeek: ${CONFIG.providers.defaultDeepseekModel} ✅`);
+  }
+  if (CONFIG.providers.zhipuApiKey) {
+    console.log(`   ├─ 智谱GLM: ${CONFIG.providers.defaultZhipuModel} ✅`);
+  }
+  if (CONFIG.providers.dashscopeApiKey) {
+    console.log(`   ├─ 通义千问: ${CONFIG.providers.defaultDashscopeModel} ✅`);
+  }
+  console.log('');
+  console.log('📊 API端点:');
+  console.log(`   ├─ GET  /healthz              - 健康检查`);
+  console.log(`   ├─ GET  /api/metrics          - 系统指标`);
+  console.log(`   ├─ GET  /api/alerts           - 告警列表`);
+  console.log(`   ├─ GET  /api/frontend-config  - 前端配置`);
+  console.log(`   ├─ POST /api/plan             - 生成行程`);
+  console.log(`   └─ POST /api/plan/refine      - 优化行程`);
+  console.log('');
+  console.log('💡 提示:');
+  console.log('   - 使用 Ctrl+C 停止服务');
+  console.log('   - 日志会实时输出到控制台');
+  console.log('   - 请求详情会显示详细的处理信息');
+  console.log('='.repeat(80));
+  console.log('🚀'.repeat(20) + '\n');
 });

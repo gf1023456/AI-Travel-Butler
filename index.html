@@ -49,13 +49,13 @@
           <div class="settings-group">
             <label>AI 决策引擎</label>
             <div class="ios-select-wrapper">
-              <select id="model-selector">
-                <option value="gemini-3-pro-preview">🧠 Gemini 3 Pro (推荐)</option>
+              <select id="model-selector" disabled>
+                <option value="auto" selected>模型由后端环境变量配置</option>🧠 Gemini 3 Pro (推荐)</option>
                 <option value="gemini-3-flash-preview">⚡ Gemini 3 Flash</option>
                 <option value="deepseek-chat">🤖 DeepSeek V3</option>
                 <option value="glm-4.6v">🇨🇳 智谱 GLM-GLM-4.7</option>
                 <option value="qwen3.5-plus">🇨🇳 通义千问 Plus</option>
-                <option value="kimi-k2.5">kimi-k2</option>
+                <option value="kimi-k2.5">kimi-k2</option> -->
               </select>
                 <i class="fas fa-chevron-down"></i>
             </div>
@@ -154,17 +154,34 @@
             <button id="close-settings" class="close-modal-btn">&times;</button>
           </div>
           
+          <!-- 天地图 Key 已从环境变量配置，不再允许用户修改 -->
           <div class="settings-group">
             <label>天地图 Key</label>
-            <input type="text" id="tdt-key-input" class="ios-input" placeholder="Key">
+            <input type="text" class="ios-input" value="已由后端配置（环境变量）" readonly disabled style="opacity:0.6">
+            <div style="font-size:12px;color:#888;margin-top:4px">💡 通过环境变量 TDT_API_KEY 配置</div>
           </div>
 
+          <!-- API Key 已从环境变量配置，不再允许用户修改 -->
           <div class="settings-group">
-             <label>模型网关</label>
-             <input type="text" class="ios-input" value="由后端统一管理（前端不再配置 Provider Key）" readonly>
+             <label>AI Provider Key</label>
+             <input type="text" class="ios-input" value="已由后端统一管理" readonly disabled style="opacity:0.6">
+             <div style="font-size:12px;color:#888;margin-top:4px">💡 通过环境变量 GEMINI_API_KEY 等配置</div>
           </div>
 
-          <button id="save-settings" class="btn-primary-ios">保存配置</button>
+          <!-- 模型选择已从环境变量配置 -->
+          <div class="settings-group">
+             <label>AI 模型</label>
+             <input type="text" class="ios-input" value="已由后端配置" readonly disabled style="opacity:0.6">
+             <div style="font-size:12px;color:#888;margin-top:4px">💡 通过环境变量 GEMINI_MODEL 等配置</div>
+          </div>
+
+          <div class="settings-group" style="opacity:0.6">
+            <label>当前配置（仅供参考）</label>
+            <div id="current-config-info" style="font-size:13px;color:#666;padding:8px;background:#f5f5f5;border-radius:8px">
+              Provider: 加载中...<br>
+              Model: 加载中...
+            </div>
+          </div>
         </div>
       </div>
 

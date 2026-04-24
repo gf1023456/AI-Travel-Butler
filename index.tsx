@@ -4,32 +4,48 @@
 */
 import L from 'leaflet';
 
+// 全局地图相关变量
+let map: L.Map;
+let tdtLayer: L.TileLayer | null = null;
+let tdtAnnoLayer: L.TileLayer | null = null;
+let mapLayers: L.Layer[] = [];
+
 // 前端配置（从后端获取）
 let FRONTEND_CONFIG = {
-  backendUrl: 'http://tonystark-ai.ccwu.cc/aiTraver',
-  tdtApiKey: '',
-  mapCenter: [30.5728, 104.0668] as [number, number],
+  backendUrl: 'http://localhost:8787',  // 本地调试默认值
+  tdtApiKey: '97f9870fb795ba80ef201d6edae71d73',
+  mapCenter: [34.3416, 108.9398] as [number, number],
   mapZoom: 12,
   defaultMapType: 'tdt_vec' as 'tdt_vec' | 'tdt_img'
 };
 
-// Application state
-let map: L.Map;
+// 全局状态变量
+let currentMapType: 'tdt_vec' | 'tdt_img' = 'tdt_vec';
+let activeSheet: string | null = null;
+
+// 行程数据
 let dayPlanItinerary: any[] = [];
 let socialRecommendations: any[] = [];
-let itinerarySummary = "";
+let itinerarySummary: string = '';
 let itineraryEvidence: any[] = [];
 let verifierWarnings: string[] = [];
-let mapLayers: L.Layer[] = []; // Store markers and polylines to clear them easily
-let tdtLayer: L.TileLayer;
-let tdtAnnoLayer: L.TileLayer;
-let currentMapType: 'tdt_vec' | 'tdt_img' = 'tdt_vec'; // Track map type
-let activeSheet: string | null = null; // Track currently open sheet
 
-// Constants
-const DAY_COLORS = ['#ff5722', '#2196f3', '#4caf50', '#9c27b0', '#ffeb3b', '#00bcd4', '#795548'];
-const STORAGE_KEY = 'travel_pro_history_v2';
-const BACKEND_BASE_URL = FRONTEND_CONFIG.backendUrl;
+// 颜色配置
+const DAY_COLORS = [
+  '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98FB98',
+  '#DDA0DD', '#F0E68C', '#FF6347', '#BA55D3', '#9ACD32'
+];
+
+// 存储键名
+const STORAGE_KEY = 'travel_history';
+
+// 检测是否是本地调试环境
+const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+// 本地调试直接用 localhost:8787，生产环境从配置读取
+const BACKEND_BASE_URL = isLocalDev 
+  ? 'http://localhost:8787' 
+  : FRONTEND_CONFIG.backendUrl;
 
 // 获取前端配置
 async function loadFrontendConfig(): Promise<void> {
@@ -59,9 +75,13 @@ function initApp() {
     attributionControl: false
   });
 
-  // Load saved keys
-  const savedTdtKey = localStorage.getItem('tdt_api_key') || FRONTEND_CONFIG.tdtApiKey;
-  (getEl('tdt-key-input') as HTMLInputElement).value = savedTdtKey;
+  // Load saved keys - 天地图 Key 从配置读取，不再允许用户输入
+  const savedTdtKey = FRONTEND_CONFIG.tdtApiKey || localStorage.getItem('tdt_api_key') || '';
+  // 输入框已禁用，仅显示提示信息
+  const tdtInput = getEl('tdt-key-input') as HTMLInputElement;
+  if (tdtInput) {
+    tdtInput.value = savedTdtKey ? '已配置' : '未配置';
+  }
 
   switchTDT(FRONTEND_CONFIG.defaultMapType, savedTdtKey);
   
@@ -185,7 +205,8 @@ function closeSheet(id: string) {
 
 async function handleRequest() {
   const userInput = (getEl('prompt-input') as HTMLTextAreaElement).value.trim();
-  const modelType = (getEl('model-selector') as HTMLSelectElement).value;
+  // 模型选择已禁用，由后端环境变量控制
+  const modelType = 'auto'; // 让后端根据 PRIMARY_PROVIDER 选择
   const isPlannerMode = (getEl('planner-mode-toggle') as HTMLInputElement).checked;
   const travelMode = (getEl('travel-mode-selector') as HTMLSelectElement).value;
 
@@ -243,16 +264,24 @@ function bindEvents() {
      }
   };
 
-  // Save all keys
-  getEl('save-settings').onclick = () => {
-    const tdtKey = (getEl('tdt-key-input') as HTMLInputElement).value;
-    if (tdtKey) localStorage.setItem('tdt_api_key', tdtKey);
-    
-    // Refresh map if key changed
-    switchTDT(currentMapType, tdtKey || FRONTEND_CONFIG.tdtApiKey);
-    getEl('settings-modal').classList.remove('active');
-    showToast("配置已保存", 'success');
-  };
+  // Save all keys - 已禁用用户输入，改为显示当前配置
+  getEl('save-settings')?.remove(); // 移除保存按钮
+  
+  // 显示当前配置信息
+  const configInfo = getEl('current-config-info');
+  if (configInfo) {
+    fetch(`${BACKEND_BASE_URL}/api/frontend-config`)
+      .then(res => res.json())
+      .then(data => {
+        configInfo.innerHTML = `
+          天地图 Key: ${data.tdtApiKey ? '已配置' : '未配置'}<br>
+          后端地址: ${data.backendUrl || '默认'}
+        `;
+      })
+      .catch(() => {
+        configInfo.innerHTML = '加载失败';
+      });
+  }
   
   getEl('generate').onclick = handleRequest;
   getEl('save-itinerary-btn').onclick = saveToHistory;
