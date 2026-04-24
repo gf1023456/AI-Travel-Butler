@@ -290,6 +290,67 @@ function bindEvents() {
 }
 
 async function tryBackendPlan(userInput: string, modelType: string, isPlannerMode: boolean, travelMode: string): Promise<boolean> {
+=======
+const GLOBAL_SYSTEM_PROMPT = `你是一位世界顶级的深度旅游规划专家。
+采用思维链(CoT)方法，逐步制定最优行程。
+思考步骤：
+1. 明确用户目标地点和时间约束
+2. 研究当地的交通连通性
+3. 考虑开放时间和其他限制因素
+4. 设计地理连贯的路线，优化空间连续性
+5. 合理分配时间，包含交通和游玩所需时间
+6. 最后输出结构化结果
+【关键逻辑 - 出发地与目的地】
+当用户输入"从 A 到 B"时，A 是出发地，B 是目的地；地点推荐与打点必须落在目的地 B，不得混淆。
+【必需包含的三大部分】
+1) 社交分析 (工具: get_social_recommendations)
+   - 必须调用一次，给出趋势与理由。
+2) 地图标注 (工具: location)
+   - 必须针对用户要求的每一天调用多次。
+   - 每天至少 3-4 个 location（早/中/晚/交通）。
+   - 合成社交推荐后必须继续进行地图打点。
+   - 推荐地点必须彼此地理接近，形成合理的游览路径。
+3) 文字总结
+   - 在工具调用后输出简短亮点。
+【严苛禁令】
+- 严禁只做其一：社交趋势与地图行程必须同时给出。
+- 严禁输出 逛 标签内容。
+- 严格按照指定城市的地理逻辑安排地点和路线，确保相邻推荐点彼此接近，最小化交通需求。`;
+
+/**
+ * Main Request Handler that dispatches to the correct AI provider
+ */
+async function handleRequest() {
+  const userInput = (getEl('prompt-input') as HTMLTextAreaElement).value.trim();
+  const modelType = (getEl('model-selector') as HTMLSelectElement).value;
+  const isPlannerMode = (getEl('planner-mode-toggle') as HTMLInputElement).checked;
+  const travelMode = (getEl('travel-mode-selector') as HTMLSelectElement).value;
+  
+  if (!userInput) {
+    showToast("请输入您的旅行想法", 'error');
+    return;
+  }
+
+  // API Key Validation
+  if (modelType.includes('deepseek')) {
+    if (!localStorage.getItem('deepseek_api_key')) {
+      showToast('请先在设置中配置 DeepSeek API Key', 'error', 4000);
+      setTimeout(() => getEl('settings-modal').classList.add('active'), 1000);
+      return;
+    }
+  } else if (modelType.includes('glm')) {
+    const hasKey = localStorage.getItem('zhipu_api_key') || ZHIPU_DEFAULT_KEY;
+    if (!hasKey) {
+       showToast('请先在设置中配置智谱 GLM API Key', 'error', 4000);
+       setTimeout(() => getEl('settings-modal').classList.add('active'), 1000);
+       return;
+    }
+  }
+
+  restart();
+  closeSheet('sheet-explore');
+  getEl('loading-overlay').classList.add('active');
+  
   try {
     const response = await fetch(`${BACKEND_BASE_URL}/api/plan`, {
       method: 'POST',

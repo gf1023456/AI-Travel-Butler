@@ -6,7 +6,7 @@
 
 本项目包含在本地运行 AI 旅行规划应用所需的一切。
 
-[English Version](./README.md)
+
 
 ## 本地运行
 
