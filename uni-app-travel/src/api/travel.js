@@ -1,0 +1,63 @@
+/**
+ * 旅行规划相关API
+ */
+
+import { post } from '@/utils/request.js'
+import { get } from '@/utils/request.js'
+
+/**
+ * 生成初始行程计划
+ * @param {Object} params - 行程参数
+ * @param {string} params.userInput - 用户输入（必需）
+ * @param {string} params.modelType - 模型类型（必需）
+ * @param {boolean} params.isPlannerMode - 是否为规划模式
+ * @param {string} params.travelMode - 旅行风格
+ * @returns {Promise}
+ */
+export const createPlan = (params) => {
+  return post('/plan', {
+    userInput: params.userInput,
+    modelType: params.modelType,
+    isPlannerMode: params.isPlannerMode || false,
+    travelMode: params.travelMode || 'deep'
+  })
+}
+
+/**
+ * 优化现有行程
+ * @param {Object} params - 优化参数
+ * @returns {Promise}
+ */
+export const refinePlan = (params) => {
+  return post('/plan/refine', {
+    userInput: params.userInput,
+    modelType: params.modelType,
+    isPlannerMode: params.isPlannerMode !== false,
+    travelMode: params.travelMode || 'deep',
+    refineInstruction: params.refineInstruction,
+    basePlan: params.basePlan
+  })
+}
+
+/**
+ * 获取前端配置
+ * @returns {Promise}
+ */
+export const getFrontendConfig = () => {
+  return post('/frontend-config', {})
+}
+
+/**
+ * 获取当前激活的AI模型名称
+ * @returns {Promise}
+ */
+export const getCurrentModel = () => {
+  return get('/getModel', {})
+}
+
+export default {
+  createPlan,
+  refinePlan,
+  getFrontendConfig,
+  getCurrentModel
+}
