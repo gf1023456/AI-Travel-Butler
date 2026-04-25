@@ -73,7 +73,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { wechatLogin } from '@/api/user.js'
 import { useUserStore } from '@/store/user.js'
 import { getQuota } from '@/api/quota.js'
@@ -82,6 +82,9 @@ const agreed = ref(false)
 const loading = ref(false)
 const nickname = ref('')
 const avatarUrl = ref('')
+
+// 安全区域顶部高度
+const safeAreaTop = ref(0)
 
 // 手机号相关信息（使用全局变量保存）
 let globalPhoneNumber = ''

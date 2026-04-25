@@ -1,6 +1,6 @@
 <template>
   <view class="page-container">
-    <view class="top-bar">
+    <view class="top-bar" :style="'padding-top:' + (safeAreaTop + 32) + 'px'">
       <view class="back-btn" @click="goBack">
         <text>←</text>
       </view>
@@ -70,17 +70,32 @@
           <view class="detail-section" v-if="selectedDetail.day_plan">
             <text class="detail-label">行程计划:</text>
             <view class="day-plan-container">
-              <view v-for="(locations, dayKey) in selectedDetail.day_plan" :key="dayKey">
-                <view v-if="Array.isArray(locations)" class="day-plan-group">
-                  <text class="day-title">Day {{ dayKey }}</text>
-                  <view class="location-list">
-                    <view class="location-item" v-for="(location, locIndex) in locations" :key="locIndex">
-                      <text class="location-name">{{ location.name || location.title || '未知地点' }}</text>
-                      <text class="location-time" v-if="location.time">⏰ {{ location.time }}</text>
-                      <text class="location-city" v-if="location.city">📍 {{ location.city }}</text>
-                      <text class="location-desc">{{ location.description }}</text>
-                      <view class="location-coords" v-if="location.lat && location.lng">
-                        坐标: {{ location.lat }}, {{ location.lng }}
+              <!-- 数组格式（扁平列表） -->
+              <view v-if="Array.isArray(selectedDetail.day_plan)">
+                <view v-for="(location, locIndex) in selectedDetail.day_plan" :key="locIndex" class="location-item">
+                  <text class="location-name">{{ location.name || location.title || '未知地点' }}</text>
+                  <text class="location-time" v-if="location.time">⏰ {{ location.time }}</text>
+                  <text class="location-city" v-if="location.city">📍 {{ location.city }}</text>
+                  <text class="location-desc">{{ location.description }}</text>
+                  <view class="location-coords" v-if="location.lat && location.lng">
+                    坐标: {{ location.lat }}, {{ location.lng }}
+                  </view>
+                </view>
+              </view>
+              <!-- 对象分组格式 { '1': [...], '2': [...] } -->
+              <view v-else>
+                <view v-for="(locations, dayKey) in selectedDetail.day_plan" :key="dayKey">
+                  <view v-if="Array.isArray(locations)" class="day-plan-group">
+                    <text class="day-title">Day {{ dayKey }}</text>
+                    <view class="location-list">
+                      <view class="location-item" v-for="(location, locIndex) in locations" :key="locIndex">
+                        <text class="location-name">{{ location.name || location.title || '未知地点' }}</text>
+                        <text class="location-time" v-if="location.time">⏰ {{ location.time }}</text>
+                        <text class="location-city" v-if="location.city">📍 {{ location.city }}</text>
+                        <text class="location-desc">{{ location.description }}</text>
+                        <view class="location-coords" v-if="location.lat && location.lng">
+                          坐标: {{ location.lat }}, {{ location.lng }}
+                        </view>
                       </view>
                     </view>
                   </view>
@@ -101,9 +116,14 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useTravelStore } from '@/store/travel.js'
+import { useUserStore } from '@/store/user.js'
 import { getHistoryList, deleteHistory as deleteHistoryApi, getHistoryDetail, toggleFavorite as toggleFavoriteApi } from '@/api/history.js'
 
 const travelStore = useTravelStore()
+const userStore = useUserStore()
+
+// 安全区域顶部高度
+const safeAreaTop = ref(0)
 
 const historyList = ref([])
 const showDetailPopup = ref(false)
@@ -115,18 +135,67 @@ const getPreviewText = (item) => {
 }
 
 const goBack = () => {
-  uni.navigateBack()
+  // 使用 reLaunch 重置页面栈并跳转到首页
+  uni.reLaunch({ url: '/pages/index/index' })
 }
 
-const loadHistory = (item) => {
+onMounted(() => {
+  // 获取安全区域
+  try {
+    const systemInfo = uni.getSystemInfoSync()
+    safeAreaTop.value = systemInfo.safeAreaInsets?.top || 0
+    console.log('[History] 安全区域顶部:', safeAreaTop.value)
+  } catch (e) {
+    console.error('[History] 获取安全区域失败:', e)
+    safeAreaTop.value = 0
+  }
+  
+  // 从本地存储恢复登录状态
+  userStore.restoreFromStorage()
+  
+  // 检查是否已登录
+  if (!userStore.hasToken) {
+    console.log('[History] 未登录，跳转到登录页')
+    uni.showToast({ title: '请先登录', icon: 'none' })
+    uni.redirectTo({ url: '/pages/login/index' })
+    return
+  }
+  
+  loadHistoryList()
+})
+
+const loadHistory = async (item) => {
   console.log('载入历史数据', { item })
+  uni.showLoading({ title: '加载中...' })
+
+  // 列表接口可能不返回完整 day_plan，需要获取详情
+  let sourceItem = item
+  if (!item.day_plan || (typeof item.day_plan === 'object' && !Array.isArray(item.day_plan) && Object.keys(item.day_plan).length === 0)) {
+    try {
+      const detail = await getHistoryDetail(item.id)
+      if (detail && detail.id) {
+        sourceItem = detail
+        console.log('从详情接口获取完整数据', detail)
+      }
+    } catch (e) {
+      console.error('获取详情失败，使用列表数据', e)
+    }
+  }
+
   // 从历史加载行程到store
   let dayPlanItinerary = []
 
-  // 处理 day_plan 数据（对象分组格式）
-  if (item.day_plan && typeof item.day_plan === 'object') {
-    for (const dayKey in item.day_plan) {
-      const dayItems = item.day_plan[dayKey]
+  // 优先处理数组格式（扁平列表）
+  if (Array.isArray(sourceItem.day_plan)) {
+    dayPlanItinerary = sourceItem.day_plan.map((location, index) => ({
+      ...location,
+      sequence: (location.sequence !== undefined) ? location.sequence : (index + 1),
+    }))
+  }
+  // 处理对象分组格式 { '1': [...], '2': [...] }
+  else if (sourceItem.day_plan && typeof sourceItem.day_plan === 'object' && !Array.isArray(sourceItem.day_plan)) {
+    for (const dayKey in sourceItem.day_plan) {
+      const dayItems = sourceItem.day_plan[dayKey]
       if (Array.isArray(dayItems)) {
         const dayNum = parseInt(dayKey)
         dayItems.forEach((location, index) => {
@@ -139,17 +208,22 @@ const loadHistory = (item) => {
       }
     }
   }
-  // 处理数组格式
-  else if (Array.isArray(item.dayPlan) || Array.isArray(item.itinerary)) {
-    dayPlanItinerary = item.itinerary || item.dayPlan || []
+  // 兼容其他字段名
+  else if (Array.isArray(sourceItem.dayPlan) || Array.isArray(sourceItem.itinerary)) {
+    dayPlanItinerary = (sourceItem.dayPlan || sourceItem.itinerary || []).map((location, index) => ({
+      ...location,
+      sequence: (location.sequence !== undefined) ? location.sequence : (index + 1),
+    }))
   }
 
+  uni.hideLoading()
+
   const planData = {
-    itinerarySummary: item.itinerary_summary || item.summary || item.user_input || '',
+    itinerarySummary: sourceItem.itinerary_summary || sourceItem.summary || sourceItem.user_input || '',
     dayPlanItinerary: dayPlanItinerary,
-    socialRecommendations: item.social_recommendations || item.recommendations || [],
-    evidence: item.evidence || [],
-    warnings: item.warnings || []
+    socialRecommendations: sourceItem.social_recommendations || sourceItem.recommendations || [],
+    evidence: sourceItem.evidence || [],
+    warnings: sourceItem.warnings || []
   }
 
   travelStore.currentPlan = planData
@@ -336,10 +410,6 @@ const loadHistoryList = async () => {
     }
   }
 }
-
-onMounted(() => {
-  loadHistoryList()
-})
 </script>
 
 <style scoped>
@@ -379,7 +449,7 @@ onMounted(() => {
 
 .content {
   padding: 32rpx;
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: 120rpx;
 }
 
 .empty-state {

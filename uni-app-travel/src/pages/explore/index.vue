@@ -1,7 +1,7 @@
 <template>
   <view class="page-container">
     <!-- 顶部导航 -->
-    <view class="top-bar">
+    <view class="top-bar" :style="'padding-top:' + (safeAreaTop + 32) + 'px'">
       <view class="back-btn" @click="goBack">
         <text>←</text>
       </view>
@@ -76,15 +76,20 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useTravelStore } from '@/store/travel.js'
+import { useUserStore } from '@/store/user.js'
 import { getCurrentModel } from '@/api/travel.js'
 import { saveHistory } from '@/api/history.js'
 
 const travelStore = useTravelStore()
+const userStore = useUserStore()
 
 const userInput = ref('')
 const isPlannerMode = ref(false)
 const travelModeIndex = ref(0)
 const currentModelName = ref('GPT-4o')
+
+// 安全区域顶部高度
+const safeAreaTop = ref(0)
 
 const travelModeOptions = [
   { label: '🏃 轻装上阵', value: 'light' },
@@ -104,6 +109,16 @@ const goBack = () => {
 }
 
 const handleGenerate = async () => {
+  // 检查登录状态
+  userStore.restoreFromStorage()
+  if (!userStore.hasToken) {
+    uni.showToast({ title: '请先登录', icon: 'none' })
+    setTimeout(() => {
+      uni.reLaunch({ url: '/pages/login/index' })
+    }, 1500)
+    return
+  }
+  
   if (!userInput.value.trim()) {
     uni.showToast({ title: '请输入旅行描述', icon: 'none' })
     return
@@ -135,6 +150,16 @@ const handleGenerate = async () => {
 }
 
 onMounted(async () => {
+  // 获取安全区域
+  try {
+    const systemInfo = uni.getSystemInfoSync()
+    safeAreaTop.value = systemInfo.safeAreaInsets?.top || 0
+    console.log('[Explore] 安全区域顶部:', safeAreaTop.value)
+  } catch (e) {
+    console.error('[Explore] 获取安全区域失败:', e)
+    safeAreaTop.value = 0
+  }
+  
   try {
     const result = await getCurrentModel()
     if (result?.modelName) {
