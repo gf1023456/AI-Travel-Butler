@@ -281,7 +281,7 @@ const showToast = (message, type = 'normal', duration = 3000) => {
   align-items: center;
   justify-content: space-between;
   padding: 36rpx 40rpx;
-  background: linear-gradient(135deg, #00288e 0%, #1e40af 100%);
+  background: linear-gradient(135deg, #4285F4 0%, #3367D6 100%);
   border-radius: 0 32rpx 0 0;
 }
 
@@ -377,7 +377,7 @@ const showToast = (message, type = 'normal', duration = 3000) => {
 
 .empty-desc {
   font-size: 28rpx;
-  color: #757684;
+  color: #80868B;
 }
 
 /* 行程内容 */
@@ -396,7 +396,7 @@ const showToast = (message, type = 'normal', duration = 3000) => {
 .summary-text {
   font-size: 30rpx;
   line-height: 1.6;
-  color: #1a1b22;
+  color: #202124;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
 }
 
@@ -411,7 +411,7 @@ const showToast = (message, type = 'normal', duration = 3000) => {
   background: #ffffff;
   border-radius: 24rpx;
   padding: 32rpx;
-  border-left: 8rpx solid #00288e;
+  border-left: 8rpx solid #4285F4;
   box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.04);
   transition: all 0.2s;
 }
@@ -433,7 +433,7 @@ const showToast = (message, type = 'normal', duration = 3000) => {
   align-items: center;
   padding: 12rpx 24rpx;
   border-radius: 24rpx;
-  background: linear-gradient(135deg, #00288e 0%, #1e40af 100%);
+  background: linear-gradient(135deg, #4285F4 0%, #3367D6 100%);
 }
 
 .day-label-text {
@@ -445,7 +445,7 @@ const showToast = (message, type = 'normal', duration = 3000) => {
 
 .time-label {
   font-size: 28rpx;
-  color: #444653;
+  color: #5F6368;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
 }
 
@@ -453,7 +453,7 @@ const showToast = (message, type = 'normal', duration = 3000) => {
   display: block;
   font-size: 34rpx;
   font-weight: 700;
-  color: #1a1b22;
+  color: #202124;
   margin-bottom: 16rpx;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
 }
@@ -461,7 +461,7 @@ const showToast = (message, type = 'normal', duration = 3000) => {
 .place-desc {
   display: block;
   font-size: 28rpx;
-  color: #444653;
+  color: #5F6368;
   line-height: 1.6;
   margin-bottom: 20rpx;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
@@ -475,7 +475,7 @@ const showToast = (message, type = 'normal', duration = 3000) => {
 
 .meta-item {
   font-size: 26rpx;
-  color: #444653;
+  color: #5F6368;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
 }
 

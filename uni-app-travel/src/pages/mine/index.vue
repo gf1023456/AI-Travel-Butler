@@ -221,7 +221,7 @@ const switchTab = (url) => {
 .mine-page {
   width: 100vw;
   min-height: 100vh;
-  background: #fbf8ff;
+  background: #F8F9FA;
   position: relative;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
 }
@@ -271,12 +271,12 @@ const switchTab = (url) => {
 .profile-name {
   font-size: 40rpx;
   font-weight: 700;
-  color: #1a1b22;
+  color: #202124;
 }
 
 .profile-verified {
   font-size: 32rpx;
-  color: #00288e;
+  color: #4285F4;
 }
 
 .profile-badge {
@@ -291,27 +291,27 @@ const switchTab = (url) => {
 
 .badge-icon {
   font-size: 28rpx;
-  color: #00288e;
+  color: #4285F4;
 }
 
 .badge-text {
   font-size: 24rpx;
   font-weight: 600;
-  color: #00288e;
+  color: #4285F4;
 }
 
 .edit-btn {
   background: #ffffff;
-  border: 1rpx solid #c4c5d5;
+  border: 1rpx solid #DADCE0;
   padding: 12rpx 32rpx;
   border-radius: 32rpx;
   font-size: 28rpx;
   font-weight: 500;
-  color: #1a1b22;
+  color: #202124;
 }
 
 .edit-btn:active {
-  background: #f4f2fc;
+  background: #F1F3F4;
 }
 
 /* 菜单卡片 */
@@ -336,7 +336,7 @@ const switchTab = (url) => {
 }
 
 .menu-item:active {
-  background: #f4f2fc;
+  background: #F1F3F4;
 }
 
 .menu-left {
@@ -372,7 +372,7 @@ const switchTab = (url) => {
 }
 
 .menu-icon-slate .menu-icon {
-  color: #64748b;
+  color: #5F6368;
 }
 
 .menu-icon-orange .menu-icon {
@@ -387,19 +387,19 @@ const switchTab = (url) => {
   display: block;
   font-size: 32rpx;
   font-weight: 600;
-  color: #1a1b22;
+  color: #202124;
   margin-bottom: 8rpx;
 }
 
 .menu-desc {
   display: block;
   font-size: 24rpx;
-  color: #444653;
+  color: #5F6368;
 }
 
 .menu-arrow {
   font-size: 40rpx;
-  color: #c4c5d5;
+  color: #DADCE0;
   opacity: 0.4;
 }
 
@@ -407,7 +407,7 @@ const switchTab = (url) => {
 .vip-card {
   margin-top: 64rpx;
   padding: 48rpx;
-  background: #00288e;
+  background: #4285F4;
   border-radius: 32rpx;
   position: relative;
   overflow: hidden;
@@ -466,7 +466,7 @@ const switchTab = (url) => {
 
 .version-info text {
   font-size: 24rpx;
-  color: #c4c5d5;
+  color: #DADCE0;
   opacity: 0.4;
 }
 
@@ -507,16 +507,16 @@ const switchTab = (url) => {
 .nav-label {
   font-size: 20rpx;
   font-weight: 500;
-  color: #94a3b8;
+  color: #9AA0A6;
 }
 
 .nav-item.active .nav-icon {
-  color: #00288e;
+  color: #4285F4;
   font-size: 56rpx;
 }
 
 .nav-item.active .nav-label {
-  color: #00288e;
+  color: #4285F4;
   font-weight: 700;
 }
 
