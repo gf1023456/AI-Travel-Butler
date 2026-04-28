@@ -32,7 +32,7 @@ class RolloutSettings(BaseModel):
 class PerformanceSettings(BaseModel):
     cache_ttl_ms: int = 120000
     cost_alert_threshold: float = 2.0
-    max_free_plans_per_day: int = 10  # 每日免费次数
+    max_free_plans_per_day: int = 3  # 每日免费次数
 
 
 class ProviderSettings(BaseModel):
