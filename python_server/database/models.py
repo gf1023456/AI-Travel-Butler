@@ -272,9 +272,13 @@ class Database:
         from datetime import date
         
         today = date.today()
-        max_free = int(settings.performance.max_free_plans_per_day or 10)
         
         with self.get_session() as session:
+            config = session.query(SystemConfig).filter(
+                SystemConfig.config_key == 'max_free_plans_per_day'
+            ).first()
+            max_free = int(config.config_value) if config and config.config_value else 10
+            
             usage = session.query(UserDailyUsage).filter(
                 UserDailyUsage.user_id == user_id,
                 UserDailyUsage.usage_date == today
@@ -289,15 +293,14 @@ class Database:
                     "remaining": max_free
                 }
             
-            total_available = usage.plan_count + usage.bonus_count
-            remaining = max(0, max_free - usage.plan_count + usage.bonus_count)
+            remaining = max(0, max_free - usage.plan_count)
             
             return {
-                "can_use": total_available < max_free or usage.bonus_count > 0,
+                "can_use": usage.plan_count < max_free or usage.bonus_count > 0,
                 "used": usage.plan_count,
                 "bonus": usage.bonus_count,
                 "max": max_free,
-                "remaining": remaining
+                "remaining": remaining + usage.bonus_count
             }
     
     def increment_usage(self, user_id: int) -> dict:
@@ -326,10 +329,15 @@ class Database:
             session.flush()
             session.refresh(usage)
             
+            config = session.query(SystemConfig).filter(
+                SystemConfig.config_key == 'max_free_plans_per_day'
+            ).first()
+            max_free = int(config.config_value) if config and config.config_value else 10
+            
             return {
                 "used": usage.plan_count,
                 "bonus": usage.bonus_count,
-                "max": int(settings.performance.max_free_plans_per_day or 10)
+                "max": max_free
             }
     
     def add_bonus(self, user_id: int, bonus_type: str = "share") -> bool:
