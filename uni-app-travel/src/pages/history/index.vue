@@ -33,8 +33,8 @@
           <text class="history-prompt">{{ getPreviewText(item) }}</text>
         </view>
         <view class="history-actions">
-          <view class="history-load" @click.stop="loadHistory(item)">载入</view>
-          <view class="history-delete" @click.stop="deleteHistory(item.id)">🗑️</view>
+          <view class="history-load btn-pill" @click.stop="loadHistory(item)">载入</view>
+          <view class="history-delete btn-pill" @click.stop="deleteHistory(item.id)">🗑️</view>
         </view>
       </view>
     </scroll-view>
@@ -105,8 +105,8 @@
           </view>
         </view>
         <view class="popup-actions">
-          <button class="action-btn load-btn" @click="loadDetailToPlan">载入此方案</button>
-          <button class="action-btn cancel-btn" @click="closeDetailPopup">关闭</button>
+          <button class="action-btn load-btn btn-pill" @click="loadDetailToPlan">载入此方案</button>
+          <button class="action-btn cancel-btn btn-pill" @click="closeDetailPopup">关闭</button>
         </view>
       </view>
     </view>
@@ -416,7 +416,7 @@ const loadHistoryList = async () => {
 /* 根据 design.md 应用统一样式 */
 .page-container {
   min-height: 100vh;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  background: var(--gradient-aurora);
 }
 
 .top-bar {
@@ -472,11 +472,14 @@ const loadHistoryList = async () => {
 }
 
 .history-item {
+  border: 1rpx solid rgba(255,255,255,.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 32rpx;
-  background: #ffffff;
+  background: rgba(255,255,255,.82);
   border-radius: 24rpx;
   margin-bottom: 24rpx;
   box-shadow: 0rpx 2rpx 4rpx 0px rgba(0,0,0,0.08);
@@ -578,7 +581,7 @@ const loadHistoryList = async () => {
 .popup-content {
   width: 92%;
   max-height: 85vh;
-  background: #ffffff;
+  background: rgba(255,255,255,.82);
   border-radius: 24rpx;
   display: flex;
   flex-direction: column;
@@ -666,7 +669,7 @@ const loadHistoryList = async () => {
   word-break: break-word;
   line-height: 1.5;
   padding: 12rpx;
-  background: #ffffff;
+  background: rgba(255,255,255,.82);
   border-radius: 12rpx;
   border: 1rpx solid #e9ecef;
   white-space: pre-wrap;
@@ -798,3 +801,29 @@ page {
   overflow: hidden;
 }
 </style>
+
+.btn-pill {
+  transition: transform .2s var(--ease-out), box-shadow .2s var(--ease-out);
+}
+.btn-pill:active {
+  transform: translateY(1rpx) scale(.97);
+}
+.history-load {
+  box-shadow: 0 10rpx 18rpx rgba(16,185,129,.24);
+}
+.history-delete {
+  box-shadow: 0 10rpx 18rpx rgba(234,67,53,.24);
+}
+.action-btn {
+  border-radius: 20rpx !important;
+  font-weight: 600;
+}
+.load-btn {
+  background: var(--gradient-primary) !important;
+  box-shadow: 0 12rpx 24rpx rgba(24,73,169,.24);
+}
+.cancel-btn {
+  background: rgba(255,255,255,.88) !important;
+  border: 1rpx solid rgba(255,255,255,.78);
+  color: #334155 !important;
+}

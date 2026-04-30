@@ -5,9 +5,9 @@
       <view class="panel-header">
         <text class="panel-title">行程方案</text>
         <view class="header-actions">
-          <view class="action-icon" @click="saveToHistory">💾</view>
-          <view class="action-icon" @click="copyToClipboard">📋</view>
-          <view class="action-icon" @click="exportToFile">📥</view>
+          <view class="action-icon action-pill" @click="saveToHistory">💾</view>
+          <view class="action-icon action-pill" @click="copyToClipboard">📋</view>
+          <view class="action-icon action-pill" @click="exportToFile">📥</view>
           <view class="close-btn" @click="goBack">✕</view>
         </view>
       </view>
@@ -256,7 +256,7 @@ const showToast = (message, type = 'normal', duration = 3000) => {
   width: 100%;
   height: 100vh;
   overflow: hidden;
-  background: #ffffff;
+  background: var(--gradient-aurora);
 }
 
 /* 行程面板通用 */
@@ -267,7 +267,7 @@ const showToast = (message, type = 'normal', duration = 3000) => {
   right: 0;
   width: 95%;
   max-width: 800rpx;
-  background: #ffffff;
+  background: var(--gradient-aurora);
   border-radius: 32rpx 0 0 32rpx;
   box-shadow: 0 16rpx 60rpx rgba(0, 40, 142, 0.15);
   transform: translateX(0);
@@ -277,6 +277,7 @@ const showToast = (message, type = 'normal', duration = 3000) => {
 }
 
 .panel-header {
+  border-bottom: 1rpx solid rgba(255,255,255,.2);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -317,7 +318,7 @@ const showToast = (message, type = 'normal', duration = 3000) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.18);
   border-radius: 50%;
   color: #ffffff;
   font-size: 32rpx;
@@ -334,12 +335,13 @@ const showToast = (message, type = 'normal', duration = 3000) => {
 }
 
 .action-icon {
+  border: 1rpx solid rgba(255,255,255,.24);
   width: 48rpx;
   height: 48rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.18);
   border-radius: 50%;
   font-size: 28rpx;
 }
@@ -408,7 +410,7 @@ const showToast = (message, type = 'normal', duration = 3000) => {
 }
 
 .day-card {
-  background: #ffffff;
+  background: var(--gradient-aurora);
   border-radius: 24rpx;
   padding: 32rpx;
   border-left: 8rpx solid #4285F4;
@@ -518,4 +520,7 @@ const showToast = (message, type = 'normal', duration = 3000) => {
 .toast.error {
   background: rgba(239,68,68,0.9);
 }
+
+.action-pill { transition: transform .2s var(--ease-out), box-shadow .2s var(--ease-out); }
+.action-pill:active { transform: translateY(1rpx) scale(.95); box-shadow: 0 8rpx 16rpx rgba(0,0,0,.2); }
 </style>
