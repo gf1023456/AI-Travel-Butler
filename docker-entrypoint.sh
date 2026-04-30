@@ -6,7 +6,7 @@ cd /app
 # 创建配置文件目录
 mkdir -p server
 
-# 生成后端配置文件（使用 printf 避免 sed 问题）
+# 生成后端配置文件
 cat > server/config.json << EOF
 {
   "server": {
@@ -21,8 +21,8 @@ cat > server/config.json << EOF
   "rollout": {
     "enableCanary": false,
     "canaryPercent": 10,
-    "primaryProvider": "gemini",
-    "canaryProvider": "dashscope",
+    "primaryProvider": "${PRIMARY_PROVIDER:-gemini}",
+    "canaryProvider": "${CANARY_PROVIDER:-dashscope}",
     "autoRollbackOnFailure": true
   },
   "performance": {
@@ -38,10 +38,10 @@ cat > server/config.json << EOF
     "deepseekApiKey": "${DEEPSEEK_API_KEY:-}",
     "zhipuApiKey": "${ZHIPU_API_KEY:-}",
     "dashscopeApiKey": "${DASHSCOPE_API_KEY:-}",
-    "defaultGeminiModel": "gemini-2.5-flash",
-    "defaultDeepseekModel": "deepseek-chat",
-    "defaultZhipuModel": "glm-4-flash",
-    "defaultDashscopeModel": "qwen3.5-plus"
+    "defaultGeminiModel": "${GEMINI_MODEL:-gemini-2.5-flash}",
+    "defaultDeepseekModel": "${DEEPSEEK_MODEL:-deepseek-chat}",
+    "defaultZhipuModel": "${ZHIPU_MODEL:-glm-4-flash}",
+    "defaultDashscopeModel": "${DASHSCOPE_MODEL:-qwen3.5-plus}"
   }
 }
 EOF
@@ -58,10 +58,11 @@ cat > server/frontend.config.json << EOF
 EOF
 
 echo "📝 配置已生成"
-echo "   GEMINI_API_KEY: ${GEMINI_API_KEY:-未设置}"
-echo "   DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-未设置}"
-echo "   ZHIPU_API_KEY: ${ZHIPU_API_KEY:-未设置}"
-echo "   DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-未设置}"
+echo "   主 Provider: ${PRIMARY_PROVIDER:-gemini}"
+echo "   Gemini 模型: ${GEMINI_MODEL:-gemini-2.5-flash}"
+echo "   DeepSeek 模型: ${DEEPSEEK_MODEL:-deepseek-chat}"
+echo "   智谱 模型: ${ZHIPU_MODEL:-glm-4-flash}"
+echo "   DashScope 模型: ${DASHSCOPE_MODEL:-qwen3.5-plus}"
 
 echo "🚀 启动后端服务..."
 node server/app.mjs &

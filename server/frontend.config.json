@@ -1,7 +1,7 @@
 {
-  "backendUrl": "http://tonystark-ai.ccwu.cc/aiTraver",
+  "backendUrl": "http://localhost:8787",
   "tdtApiKey": "97f9870fb795ba80ef201d6edae71d73",
-  "mapCenter": [30.5728, 104.0668],
+  "mapCenter": [34.3416, 108.9398],
   "mapZoom": 12,
   "defaultMapType": "tdt_vec"
 }
