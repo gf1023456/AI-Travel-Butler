@@ -4,13 +4,13 @@
  */
 
 // ==================== 环境配置 ====================
-const isDevelopment = process.env.NODE_ENV === 'production'
+const isDevelopment = process.env.NODE_ENV === 'development'
 
 // ==================== 后端服务配置 ====================
 export const API_CONFIG = {
   // 后端服务地址
   BASE_URL: isDevelopment 
-    ? 'https://tonystark-ai.ccwu.cc/travel/api'  // 开发环境
+    ? 'http://127.0.0.1:8787/api'  // 开发环境
     : 'https://tonystark-ai.ccwu.cc/travel/api', // 生产环境（需替换为实际域名）
   
   // 后端端口（仅用于显示和日志）
