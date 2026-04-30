@@ -265,10 +265,10 @@ const showToast = (message, type = 'normal', duration = 3000) => {
   top: 0;
   bottom: 0;
   right: 0;
-  width: 95%;
-  max-width: 800rpx;
+  width: 100%;
+  max-width: 100%;
   background: var(--gradient-aurora);
-  border-radius: 32rpx 0 0 32rpx;
+  border-radius: 0;
   box-shadow: 0 16rpx 60rpx rgba(0, 40, 142, 0.15);
   transform: translateX(0);
   z-index: 100;
@@ -283,13 +283,13 @@ const showToast = (message, type = 'normal', duration = 3000) => {
   justify-content: space-between;
   padding: 36rpx 40rpx;
   background: linear-gradient(135deg, #4285F4 0%, #3367D6 100%);
-  border-radius: 0 32rpx 0 0;
+  border-radius: 0;
 }
 
 .header-content {
   display: flex;
   align-items: center;
-  gap: 16rpx;
+  gap: 14rpx;
 }
 
 .panel-title {
@@ -329,12 +329,15 @@ const showToast = (message, type = 'normal', duration = 3000) => {
 }
 
 .header-actions {
+  flex-wrap: wrap;
   display: flex;
   align-items: center;
-  gap: 16rpx;
+  gap: 14rpx;
 }
 
 .action-icon {
+  min-width: 54rpx;
+  min-height: 54rpx;
   border: 1rpx solid rgba(255,255,255,.24);
   width: 48rpx;
   height: 48rpx;
