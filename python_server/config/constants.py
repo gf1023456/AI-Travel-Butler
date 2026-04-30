@@ -39,7 +39,8 @@ HARD_CONSTRAINTS = "硬性要求：必须输出与用户目标城市一致；若
 API_ENDPOINTS = {
     "deepseek": "https://api.deepseek.com/chat/completions",
     "zhipu": "https://open.bigmodel.cn/api/paas/v4/chat/completions",
-    "dashscope": "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
+    "dashscope": "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+    "mimo": "https://token-plan-cn.xiaomimimo.com/v1/completions"
 }
 
 # 默认城市坐标

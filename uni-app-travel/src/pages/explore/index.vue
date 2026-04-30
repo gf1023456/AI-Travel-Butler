@@ -6,7 +6,6 @@
         <text>←</text>
       </view>
       <text class="page-title">灵感探索</text>
-      <view class="model-tag">{{ currentModelName }}</view>
     </view>
 
     <scroll-view scroll-y class="content">
@@ -67,7 +66,7 @@
 
       <!-- 底部提示 -->
       <view class="section section-hint">
-        <text class="hint-text">💡 AI 将根据你的描述，智能推荐最佳行程方案</text>
+        <text class="hint-text">💡 慧游将根据你的描述，智能推荐最佳行程方案</text>
       </view>
     </scroll-view>
   </view>
@@ -125,7 +124,7 @@ const handleGenerate = async () => {
   }
 
   try {
-    uni.showLoading({ title: 'AI 思考中...' })
+    uni.showLoading({ title: '规划中...' })
     
     const result = await travelStore.createPlan({
       userInput: userInput.value,

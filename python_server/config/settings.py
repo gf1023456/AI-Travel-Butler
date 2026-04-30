@@ -24,7 +24,7 @@ class RagSettings(BaseModel):
 class RolloutSettings(BaseModel):
     enable_canary: bool = False
     canary_percent: int = 10
-    primary_provider: str = "dashscope"
+    primary_provider: str = "deepseek"
     canary_provider: str = "dashscope"
     auto_rollback_on_failure: bool = True
 
@@ -32,18 +32,20 @@ class RolloutSettings(BaseModel):
 class PerformanceSettings(BaseModel):
     cache_ttl_ms: int = 120000
     cost_alert_threshold: float = 2.0
-    max_free_plans_per_day: int = 10  # 每日免费次数
+    max_free_plans_per_day: int = 3  # 每日免费次数
 
 
 class ProviderSettings(BaseModel):
     gemini_api_key: str = ""
-    deepseek_api_key: str = ""
+    deepseek_api_key: str = "sk-a4383f605b3145e8bc002fec8065eeed"
     zhipu_api_key: str = ""
     dashscope_api_key: str = "sk-1501fc47ce7d466e949bff1a1dba9481"
+    mimo_api_key: str = "sk-cyfkjsjqshqxavbo6s1l7yefh1b3f588zcv1oicfufyrykfu"
     default_gemini_model: str = "gemini-2.5-flash"
-    default_deepseek_model: str = "deepseek-chat"
+    default_deepseek_model: str = "deepseek-v4-pro"
     default_zhipu_model: str = "glm-4-flash"
     default_dashscope_model: str = "qwen3.5-397b-a17b"
+    default_mimo_model: str = "MiMo-V2.5-Pro"
 
 
 class ExternalApiSettings(BaseModel):
