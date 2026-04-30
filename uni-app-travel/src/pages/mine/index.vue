@@ -2,7 +2,7 @@
   <view class="mine-page">
     <scroll-view scroll-y class="mine-content">
       <!-- 用户资料头部 -->
-      <view class="profile-header">
+      <view class="profile-header" :style="'padding-top:' + (safeAreaTop + 48) + 'px'">
         <view class="profile-info">
           <image class="profile-avatar" :src="userInfo.avatar || defaultAvatar" mode="aspectFill" />
           <view class="profile-details">
@@ -19,10 +19,36 @@
         <button class="edit-btn" @click="handleEdit">编辑</button>
       </view>
 
+      <!-- 今日配额卡片 -->
+      <view class="quota-card">
+        <view class="quota-header">
+          <text class="quota-title">📊 今日配额</text>
+        </view>
+        <view class="quota-content">
+          <view class="quota-stat">
+            <text class="quota-num">{{ quotaInfo.remaining }}</text>
+            <text class="quota-label">剩余次数</text>
+          </view>
+          <view class="quota-divider"></view>
+          <view class="quota-stat">
+            <text class="quota-num">{{ quotaInfo.used }}</text>
+            <text class="quota-label">已使用</text>
+          </view>
+          <view class="quota-divider"></view>
+          <view class="quota-stat">
+            <text class="quota-num">{{ quotaInfo.bonus }}</text>
+            <text class="quota-label">额外奖励</text>
+          </view>
+        </view>
+        <view class="quota-progress">
+          <view class="quota-progress-bar" :style="'width:' + Math.min(100, (quotaInfo.used / quotaInfo.max) * 100) + '%'"></view>
+        </view>
+      </view>
+
       <!-- 核心菜单列表 -->
       <view class="menu-card">
         <!-- 我的行程 -->
-        <view class="menu-item" @click="navigateTo('/pages/itinerary/index')">
+        <view class="menu-item" @click="reLaunchTo('/pages/history/index')">
           <view class="menu-left">
             <view class="menu-icon-wrapper menu-icon-blue">
               <text class="menu-icon">🧳</text>
@@ -87,19 +113,15 @@
 
     <!-- 底部导航栏 -->
     <view class="bottom-nav">
-      <view class="nav-item" @click="switchTab('/pages/index/index')">
+      <view class="nav-item" @click="reLaunchTo('/pages/index/index')">
         <text class="nav-icon">🗺️</text>
         <text class="nav-label">探索</text>
       </view>
-      <view class="nav-item" @click="switchTab('/pages/itinerary/index')">
+      <view class="nav-item" @click="reLaunchTo('/pages/plan/plan')">
         <text class="nav-icon">📅</text>
         <text class="nav-label">行程</text>
       </view>
-      <view class="nav-item" @click="switchTab('/pages/history/index')">
-        <text class="nav-icon">📜</text>
-        <text class="nav-label">历史</text>
-      </view>
-      <view class="nav-item active" @click="switchTab('/pages/mine/index')">
+      <view class="nav-item active" @click="reLaunchTo('/pages/mine/index')">
         <text class="nav-icon">👤</text>
         <text class="nav-label active-label">我的</text>
       </view>
@@ -130,18 +152,37 @@ const quotaInfo = ref({
   remaining: 10
 })
 
+// 安全区域顶部高度
+const safeAreaTop = ref(0)
+
 onMounted(async () => {
+  console.log('[Mine] onMounted 开始')
+  
+  // 获取安全区域
+  try {
+    const systemInfo = uni.getSystemInfoSync()
+    safeAreaTop.value = systemInfo.safeAreaInsets?.top || 0
+    console.log('[Mine] 安全区域顶部:', safeAreaTop.value)
+  } catch (e) {
+    console.error('[Mine] 获取安全区域失败:', e)
+    safeAreaTop.value = 0
+  }
+  
   // 从本地存储恢复登录状态
   userStore.restoreFromStorage()
-  console.log('[Mine] onMounted userStore:', {
+  console.log('[Mine] userStore 恢复后:', {
     nickname: userStore.nickname,
     avatarUrl: userStore.avatarUrl,
-    hasToken: userStore.hasToken
+    hasToken: userStore.hasToken,
+    accessToken: userStore.accessToken ? userStore.accessToken.substring(0, 20) + '...' : null
   })
   
   // 检查是否已登录
   if (!userStore.hasToken) {
-    uni.reLaunch({ url: '/pages/login/index' })
+    console.log('[Mine] 未登录，跳转到登录页')
+    uni.showToast({ title: '请先登录', icon: 'none' })
+    // 使用 redirectTo 替代 reLaunch，避免页面栈问题
+    uni.redirectTo({ url: '/pages/login/index' })
     return
   }
 
@@ -211,7 +252,7 @@ const navigateTo = (url) => {
   uni.showToast({ title: '页面开发中', icon: 'none' })
 }
 
-const switchTab = (url) => {
+const reLaunchTo = (url) => {
   uni.reLaunch({ url })
 }
 
@@ -221,7 +262,7 @@ const switchTab = (url) => {
 .mine-page {
   width: 100vw;
   min-height: 100vh;
-  background: #fbf8ff;
+  background: #F8F9FA;
   position: relative;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
 }
@@ -229,8 +270,8 @@ const switchTab = (url) => {
 .mine-content {
   height: calc(100vh - 160rpx);
   padding: 0 32rpx;
-  padding-top: 96rpx;
-  padding-bottom: 32rpx;
+  padding-top: 32rpx;
+  padding-bottom: 120rpx;
 }
 
 /* 用户资料头部 */
@@ -238,7 +279,6 @@ const switchTab = (url) => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-top: 96rpx;
   margin-bottom: 64rpx;
 }
 
@@ -271,12 +311,12 @@ const switchTab = (url) => {
 .profile-name {
   font-size: 40rpx;
   font-weight: 700;
-  color: #1a1b22;
+  color: #202124;
 }
 
 .profile-verified {
   font-size: 32rpx;
-  color: #00288e;
+  color: #4285F4;
 }
 
 .profile-badge {
@@ -291,27 +331,93 @@ const switchTab = (url) => {
 
 .badge-icon {
   font-size: 28rpx;
-  color: #00288e;
+  color: #4285F4;
 }
 
 .badge-text {
   font-size: 24rpx;
   font-weight: 600;
-  color: #00288e;
+  color: #4285F4;
 }
 
 .edit-btn {
   background: #ffffff;
-  border: 1rpx solid #c4c5d5;
+  border: 1rpx solid #DADCE0;
   padding: 12rpx 32rpx;
   border-radius: 32rpx;
   font-size: 28rpx;
   font-weight: 500;
-  color: #1a1b22;
+  color: #202124;
 }
 
 .edit-btn:active {
-  background: #f4f2fc;
+  background: #F1F3F4;
+}
+
+/* 今日配额卡片 */
+.quota-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 24rpx;
+  padding: 32rpx;
+  margin-bottom: 32rpx;
+  box-shadow: 0 8rpx 24rpx rgba(102, 126, 234, 0.3);
+}
+
+.quota-header {
+  margin-bottom: 24rpx;
+}
+
+.quota-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.quota-content {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  margin-bottom: 24rpx;
+}
+
+.quota-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+
+.quota-num {
+  font-size: 48rpx;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.2;
+}
+
+.quota-label {
+  font-size: 22rpx;
+  color: rgba(255, 255, 255, 0.7);
+  margin-top: 8rpx;
+}
+
+.quota-divider {
+  width: 1rpx;
+  height: 60rpx;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.quota-progress {
+  height: 8rpx;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4rpx;
+  overflow: hidden;
+}
+
+.quota-progress-bar {
+  height: 100%;
+  background: #ffffff;
+  border-radius: 4rpx;
+  transition: width 0.3s ease;
 }
 
 /* 菜单卡片 */
@@ -336,7 +442,7 @@ const switchTab = (url) => {
 }
 
 .menu-item:active {
-  background: #f4f2fc;
+  background: #F1F3F4;
 }
 
 .menu-left {
@@ -372,7 +478,7 @@ const switchTab = (url) => {
 }
 
 .menu-icon-slate .menu-icon {
-  color: #64748b;
+  color: #5F6368;
 }
 
 .menu-icon-orange .menu-icon {
@@ -387,19 +493,19 @@ const switchTab = (url) => {
   display: block;
   font-size: 32rpx;
   font-weight: 600;
-  color: #1a1b22;
+  color: #202124;
   margin-bottom: 8rpx;
 }
 
 .menu-desc {
   display: block;
   font-size: 24rpx;
-  color: #444653;
+  color: #5F6368;
 }
 
 .menu-arrow {
   font-size: 40rpx;
-  color: #c4c5d5;
+  color: #DADCE0;
   opacity: 0.4;
 }
 
@@ -407,7 +513,7 @@ const switchTab = (url) => {
 .vip-card {
   margin-top: 64rpx;
   padding: 48rpx;
-  background: #00288e;
+  background: #4285F4;
   border-radius: 32rpx;
   position: relative;
   overflow: hidden;
@@ -466,7 +572,7 @@ const switchTab = (url) => {
 
 .version-info text {
   font-size: 24rpx;
-  color: #c4c5d5;
+  color: #DADCE0;
   opacity: 0.4;
 }
 
@@ -481,13 +587,12 @@ const switchTab = (url) => {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 160rpx;
+  height: 120rpx;
   background: #ffffff;
   border-top: 1rpx solid rgba(0, 0, 0, 0.05);
   display: flex;
   justify-content: space-around;
   align-items: center;
-  padding-bottom: env(safe-area-inset-bottom);
   z-index: 100;
 }
 
@@ -507,16 +612,16 @@ const switchTab = (url) => {
 .nav-label {
   font-size: 20rpx;
   font-weight: 500;
-  color: #94a3b8;
+  color: #9AA0A6;
 }
 
 .nav-item.active .nav-icon {
-  color: #00288e;
+  color: #4285F4;
   font-size: 56rpx;
 }
 
 .nav-item.active .nav-label {
-  color: #00288e;
+  color: #4285F4;
   font-weight: 700;
 }
 

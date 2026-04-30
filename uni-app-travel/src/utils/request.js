@@ -101,6 +101,57 @@ export function request(options) {
             }, 1500)
           }
           reject(new Error('请先登录'))
+        } else if (res.statusCode === 422) {
+          // 422 可能是未登录、token 过期、或配额不足
+          console.log('检测到422验证错误:', res.data)
+          var responseData = res.data
+          var errorMsg = ''
+          
+          if (typeof responseData === 'object' && responseData.detail) {
+            // 尝试提取错误信息
+            if (typeof responseData.detail === 'string') {
+              errorMsg = responseData.detail
+            } else if (Array.isArray(responseData.detail)) {
+              errorMsg = responseData.detail.map(d => typeof d === 'object' ? d.msg || d.message || JSON.stringify(d) : d).join(', ')
+            } else if (typeof responseData.detail === 'object') {
+              errorMsg = responseData.detail.msg || responseData.detail.message || JSON.stringify(responseData.detail)
+            }
+            
+            // 检查是否是认证相关的错误
+            var detailStr = JSON.stringify(responseData.detail).toLowerCase()
+            var isAuthError = detailStr.includes('authorization') || detailStr.includes('token') || detailStr.includes('header') || detailStr.includes('credential')
+            
+            if (isAuthError) {
+              console.log('检测到422认证错误，准备跳转登录')
+              if (!isRedirecting) {
+                isRedirecting = true
+                uni.showToast({
+                  title: '请先登录',
+                  icon: 'none',
+                  duration: 2000
+                })
+                setTimeout(() => {
+                  try {
+                    uni.removeStorageSync('user_token')
+                    uni.removeStorageSync('user_refresh_token')
+                    uni.removeStorageSync('user_info')
+                  } catch (e) {
+                    console.log('清除本地存储完成')
+                  }
+                  uni.reLaunch({
+                    url: '/pages/login/index',
+                    complete: () => {
+                      isRedirecting = false
+                    }
+                  })
+                }, 1500)
+              }
+              reject(new Error('请先登录'))
+              return
+            }
+          }
+          // 422 错误但不是认证错误，传递详细错误信息
+          reject(new Error(errorMsg || '请求验证失败'))
         } else {
           reject(new Error('请求失败: ' + res.statusCode))
         }

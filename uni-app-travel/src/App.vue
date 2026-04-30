@@ -63,7 +63,7 @@ const checkAuth = () => {
 
 page {
   background-color: var(--bg-base);
-  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Alibaba PuHuiTi', 'Helvetica Neue', Arial, sans-serif;
+  font-family: 'PingFang SC', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

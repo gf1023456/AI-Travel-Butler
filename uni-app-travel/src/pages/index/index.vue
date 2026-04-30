@@ -10,6 +10,7 @@
       :enable-zoom="true"
       :enable-scroll="true"
       :enable-rotate="false"
+      :enable-satellite="mapType === 'satellite'"
       :polyline="polylines"
       :markers="markers"
       @markertap="onMarkerTap"

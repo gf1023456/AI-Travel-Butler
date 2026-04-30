@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  ai-travel-butler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ai-travel-butler:latest
+    container_name: ai-travel-butler
+    ports:
+      - "8787:8787"
+    environment:
+      # 数据库连接（PostgreSQL 在宿主机上，用 host.docker.internal 访问）
+      - DATABASE_URL=postgresql://postgres:postgres123@host.docker.internal:5432/ai_travel_butler
+      
+      # AI Provider API Keys
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - ZHIPU_API_KEY=${ZHIPU_API_KEY:-}
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY:-sk-1501fc47ce7d466e949bff1a1dba9481}
+      
+      # 其他配置
+      - CONFIG_FILE=${CONFIG_FILE:-config/server.json}
+      - PORT=8787
+      - REQUEST_TIMEOUT_MS=${REQUEST_TIMEOUT_MS:-120000}
+      - MAX_RETRIES=${MAX_RETRIES:-3}
+      
+      # 外部 API Keys
+      - AMAP_API_KEY=${AMAP_API_KEY:-}
+      - WEATHER_API_KEY=${WEATHER_API_KEY:-}
+      - TDT_API_KEY=${TDT_API_KEY:-97f9870fb795ba80ef201d6edae71d73}
+      
+      # 前端配置
+      - BACKEND_URL=${BACKEND_URL:-http://localhost:8787}
+    volumes:
+      # 配置文件挂载（外部可编辑）
+      - ./config:/app/config:ro
+      # 数据持久化
+      - ./data:/app/.data
+      # 知识库挂载
+      - ./knowledge:/app/knowledge:ro
+      - ./mcp-tools:/app/mcp-tools:ro
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8787/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

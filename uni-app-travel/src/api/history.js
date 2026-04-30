@@ -57,7 +57,8 @@ export async function saveHistory(planData) {
       model_type: planData.modelType || planData.model_type || 'auto',
       provider: planData.provider || 'unknown',
       itinerary_summary: planData.itinerarySummary || planData.itinerary_summary || '',
-      // day_plan字段支持对象格式和数组格式
+      // day_plan字段兼容对象格式(按天分组)和数组格式(扁平列表)
+      // 后端接受任意JSON格式，优先保持原有数据结构
       day_plan: planData.dayPlanItinerary || planData.day_plan || planData.dayPlan || [],
       // 社交推荐字段
       social_recommendations: planData.socialRecommendations || planData.social_recommendations,

@@ -104,7 +104,7 @@ const handleRefine = async () => {
 <style scoped>
 .page-container {
   min-height: 100vh;
-  background: linear-gradient(135deg, #f5f5f7 0%, #fafafa 100%);
+  background: linear-gradient(135deg, #F8F9FA 0%, #FAFBFC 100%);
   padding: 48rpx 40rpx;
 }
 
@@ -133,7 +133,7 @@ const handleRefine = async () => {
 .header-glow-1 {
   width: 280rpx;
   height: 280rpx;
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  background: linear-gradient(135deg, #4285F4 0%, #5E97F6 100%);
   top: -80rpx;
   right: -60rpx;
 }
@@ -141,7 +141,7 @@ const handleRefine = async () => {
 .header-glow-2 {
   width: 200rpx;
   height: 200rpx;
-  background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+  background: linear-gradient(135deg, #34A853 0%, #5E97F6 100%);
   bottom: -60rpx;
   left: -40rpx;
 }
@@ -150,7 +150,7 @@ const handleRefine = async () => {
   position: relative;
   font-size: 52rpx;
   font-weight: 700;
-  color: #171717;
+  color: #202124;
   display: block;
   margin-bottom: 16rpx;
   letter-spacing: 1px;
@@ -179,7 +179,7 @@ const handleRefine = async () => {
 
 .group-label {
   font-size: 30rpx;
-  color: #171717;
+  color: #202124;
   font-weight: 600;
 }
 
@@ -206,7 +206,7 @@ const handleRefine = async () => {
 
 .plan-dest {
   font-size: 30rpx;
-  color: #171717;
+  color: #202124;
   font-weight: 600;
 }
 
@@ -230,7 +230,7 @@ const handleRefine = async () => {
   border-radius: 18rpx;
   padding: 28rpx;
   font-size: 30rpx;
-  color: #171717;
+  color: #202124;
   line-height: 1.7;
   transition: all 0.2s;
 }

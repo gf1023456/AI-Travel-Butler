@@ -1,12 +1,11 @@
 <template>
   <view class="page-container">
     <!-- 顶部导航 -->
-    <view class="top-bar">
+    <view class="top-bar" :style="'padding-top:' + (safeAreaTop + 32) + 'px'">
       <view class="back-btn" @click="goBack">
         <text>←</text>
       </view>
       <text class="page-title">灵感探索</text>
-      <view class="model-tag">{{ currentModelName }}</view>
     </view>
 
     <scroll-view scroll-y class="content">
@@ -18,7 +17,7 @@
               <text class="mode-name">{{ isPlannerMode ? '深度排期' : '快速探索' }}</text>
               <text class="mode-hint">{{ isPlannerMode ? '完整行程规划 · 多日安排' : '景点发现 · 轻量推荐' }}</text>
             </view>
-            <switch :checked="isPlannerMode" @change="onModeToggle" color="#6366f1" />
+            <switch :checked="isPlannerMode" @change="onModeToggle" color="#4285F4" />
           </view>
         </view>
       </view>
@@ -67,7 +66,7 @@
 
       <!-- 底部提示 -->
       <view class="section section-hint">
-        <text class="hint-text">💡 AI 将根据你的描述，智能推荐最佳行程方案</text>
+        <text class="hint-text">💡 慧游将根据你的描述，智能推荐最佳行程方案</text>
       </view>
     </scroll-view>
   </view>
@@ -76,15 +75,20 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useTravelStore } from '@/store/travel.js'
+import { useUserStore } from '@/store/user.js'
 import { getCurrentModel } from '@/api/travel.js'
 import { saveHistory } from '@/api/history.js'
 
 const travelStore = useTravelStore()
+const userStore = useUserStore()
 
 const userInput = ref('')
 const isPlannerMode = ref(false)
 const travelModeIndex = ref(0)
 const currentModelName = ref('GPT-4o')
+
+// 安全区域顶部高度
+const safeAreaTop = ref(0)
 
 const travelModeOptions = [
   { label: '🏃 轻装上阵', value: 'light' },
@@ -104,13 +108,23 @@ const goBack = () => {
 }
 
 const handleGenerate = async () => {
+  // 检查登录状态
+  userStore.restoreFromStorage()
+  if (!userStore.hasToken) {
+    uni.showToast({ title: '请先登录', icon: 'none' })
+    setTimeout(() => {
+      uni.reLaunch({ url: '/pages/login/index' })
+    }, 1500)
+    return
+  }
+  
   if (!userInput.value.trim()) {
     uni.showToast({ title: '请输入旅行描述', icon: 'none' })
     return
   }
 
   try {
-    uni.showLoading({ title: 'AI 思考中...' })
+    uni.showLoading({ title: '规划中...' })
     
     const result = await travelStore.createPlan({
       userInput: userInput.value,
@@ -135,6 +149,16 @@ const handleGenerate = async () => {
 }
 
 onMounted(async () => {
+  // 获取安全区域
+  try {
+    const systemInfo = uni.getSystemInfoSync()
+    safeAreaTop.value = systemInfo.safeAreaInsets?.top || 0
+    console.log('[Explore] 安全区域顶部:', safeAreaTop.value)
+  } catch (e) {
+    console.error('[Explore] 获取安全区域失败:', e)
+    safeAreaTop.value = 0
+  }
+  
   try {
     const result = await getCurrentModel()
     if (result?.modelName) {
@@ -149,7 +173,7 @@ onMounted(async () => {
 <style scoped>
 .page-container {
   min-height: 100vh;
-  background: linear-gradient(135deg, #f5f5f7 0%, #fafafa 100%);
+  background: linear-gradient(135deg, #F8F9FA 0%, #FAFBFC 100%);
   display: flex;
   flex-direction: column;
 }
@@ -175,7 +199,7 @@ onMounted(async () => {
   flex: 1;
   font-size: 40rpx;
   font-weight: 700;
-  color: #171717;
+  color: #202124;
 }
 
 .model-tag {
@@ -183,7 +207,7 @@ onMounted(async () => {
   background: rgba(99, 102, 241, 0.1);
   border-radius: 16rpx;
   font-size: 24rpx;
-  color: #6366f1;
+  color: #4285F4;
   font-weight: 500;
 }
 
@@ -225,7 +249,7 @@ onMounted(async () => {
   display: block;
   font-size: 32rpx;
   font-weight: 600;
-  color: #171717;
+  color: #202124;
   margin-bottom: 8rpx;
 }
 
@@ -253,7 +277,7 @@ onMounted(async () => {
 }
 
 .style-active {
-  border-color: #6366f1;
+  border-color: #4285F4;
   background: rgba(99, 102, 241, 0.05);
 }
 
@@ -280,7 +304,7 @@ onMounted(async () => {
   min-height: 200rpx;
   font-size: 30rpx;
   line-height: 1.6;
-  color: #171717;
+  color: #202124;
 }
 
 .input-footer {
@@ -298,7 +322,7 @@ onMounted(async () => {
 .generate-btn {
   width: 100%;
   height: 96rpx;
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+  background: linear-gradient(135deg, #4285F4 0%, #5E97F6 50%, #7BAAF7 100%);
   border-radius: 24rpx;
   font-size: 32rpx;
   font-weight: 600;

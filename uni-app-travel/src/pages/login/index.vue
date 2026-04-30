@@ -52,7 +52,7 @@
       <view class="agreement-section">
         <checkbox-group @change="onAgreementChange">
           <label class="agreement-label">
-            <checkbox value="agree" :checked="agreed" color="#00288e" />
+            <checkbox value="agree" :checked="agreed" color="#4285F4" />
             <text class="agreement-text">
               我已阅读并同意
               <text class="agreement-link">《用户协议》</text>
@@ -73,7 +73,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { wechatLogin } from '@/api/user.js'
 import { useUserStore } from '@/store/user.js'
 import { getQuota } from '@/api/quota.js'
@@ -82,6 +82,9 @@ const agreed = ref(false)
 const loading = ref(false)
 const nickname = ref('')
 const avatarUrl = ref('')
+
+// 安全区域顶部高度
+const safeAreaTop = ref(0)
 
 // 手机号相关信息（使用全局变量保存）
 let globalPhoneNumber = ''
@@ -217,7 +220,7 @@ const handlePhoneLogin = () => {
   position: relative;
   width: 100vw;
   min-height: 100vh;
-  background: #fbf8ff;
+  background: #F8F9FA;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -231,13 +234,13 @@ const handlePhoneLogin = () => {
   justify-content: space-between;
   padding: 0 32rpx;
   height: 112rpx;
-  background: #fbf8ff;
-  border-bottom: 1rpx solid #e3e1eb;
+  background: #F8F9FA;
+  border-bottom: 1rpx solid #E8EAED;
 }
 
 .top-close {
   font-size: 40rpx;
-  color: #00288e;
+  color: #4285F4;
   width: 80rpx;
   height: 80rpx;
   display: flex;
@@ -248,7 +251,7 @@ const handlePhoneLogin = () => {
 .top-title {
   font-size: 32rpx;
   font-weight: 700;
-  color: #00288e;
+  color: #4285F4;
 }
 
 .top-spacer {
@@ -286,7 +289,7 @@ const handlePhoneLogin = () => {
   height: 160rpx;
   font-size: 100rpx;
   color: #ffffff;
-  background: #1e40af;
+  background: #3367D6;
   border-radius: 40rpx;
   display: flex;
   align-items: center;
@@ -300,12 +303,12 @@ const handlePhoneLogin = () => {
   right: -8rpx;
   width: 64rpx;
   height: 64rpx;
-  background: #64a8fe;
+  background: #8ab4f8;
   border-radius: 24rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 8rpx solid #fbf8ff;
+  border: 8rpx solid #F8F9FA;
 }
 
 .logo-badge-icon {
@@ -316,7 +319,7 @@ const handlePhoneLogin = () => {
 .brand-name {
   font-size: 48rpx;
   font-weight: 800;
-  color: #00288e;
+  color: #4285F4;
   margin-bottom: 16rpx;
   letter-spacing: -1rpx;
 }
@@ -324,7 +327,7 @@ const handlePhoneLogin = () => {
 .brand-subtitle {
   font-size: 28rpx;
   font-weight: 500;
-  color: #444653;
+  color: #5F6368;
   opacity: 0.8;
   letter-spacing: 8rpx;
 }
@@ -364,7 +367,7 @@ const handlePhoneLogin = () => {
   height: 160rpx;
   border-radius: 50%;
   background: #f0f0f0;
-  border: 4rpx solid #00288e;
+  border: 4rpx solid #4285F4;
 }
 
 .avatar-tip {
@@ -377,7 +380,7 @@ const handlePhoneLogin = () => {
   width: 100%;
   height: 96rpx;
   background: #ffffff;
-  border: 2rpx solid #e3e1eb;
+  border: 2rpx solid #E8EAED;
   border-radius: 24rpx;
   padding: 0 32rpx;
   font-size: 32rpx;
@@ -385,7 +388,7 @@ const handlePhoneLogin = () => {
 }
 
 .nickname-input:focus {
-  border-color: #00288e;
+  border-color: #4285F4;
 }
 
 .wechat-login-btn {
@@ -394,7 +397,7 @@ const handlePhoneLogin = () => {
   justify-content: center;
   gap: 24rpx;
   height: 112rpx;
-  background: #00288e;
+  background: #4285F4;
   color: #ffffff;
   border: none;
   border-radius: 24rpx;
@@ -417,14 +420,14 @@ const handlePhoneLogin = () => {
   justify-content: center;
   height: 96rpx;
   background: transparent;
-  color: #444653;
+  color: #5F6368;
   border: none;
   font-size: 28rpx;
   font-weight: 600;
 }
 
 .phone-login-btn:active {
-  color: #00288e;
+  color: #4285F4;
 }
 
 /* 协议区域 */
@@ -441,13 +444,13 @@ const handlePhoneLogin = () => {
 
 .agreement-text {
   font-size: 24rpx;
-  color: #444653;
+  color: #5F6368;
   line-height: 1.5;
   flex: 1;
 }
 
 .agreement-link {
-  color: #00288e;
+  color: #4285F4;
   font-weight: 600;
 }
 
