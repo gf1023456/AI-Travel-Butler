@@ -182,6 +182,8 @@ def choose_rollout_provider(payload: Dict) -> Dict:
             return {"provider": "zhipu", "modelType": payload.get("modelType"), "rollout": "fixed"}
         if "qwen" in requested:
             return {"provider": "dashscope", "modelType": payload.get("modelType"), "rollout": "fixed"}
+        if "mimo" in requested:
+            return {"provider": "mimo", "modelType": payload.get("modelType"), "rollout": "fixed"}
 
     bucket = stable_bucket(payload.get("userInput", ""))
     canary_hit = settings.rollout.enable_canary and bucket < settings.rollout.canary_percent
@@ -192,7 +194,8 @@ def choose_rollout_provider(payload: Dict) -> Dict:
         "gemini": settings.providers.default_gemini_model,
         "deepseek": settings.providers.default_deepseek_model,
         "zhipu": settings.providers.default_zhipu_model,
-        "dashscope": settings.providers.default_dashscope_model
+        "dashscope": settings.providers.default_dashscope_model,
+        "mimo": settings.providers.default_mimo_model
     }
 
     return {
@@ -235,6 +238,8 @@ def get_provider_from_model(model_type: str) -> str:
         return "zhipu"
     if "qwen" in model_type:
         return "dashscope"
+    if "mimo" in model_type:
+        return "mimo"
     return "unknown"
 
 
@@ -275,6 +280,8 @@ async def call_compatible_api(endpoint: str, api_key: str, model: str, messages:
         body["frequency_penalty"] = 0.1
         body["presence_penalty"] = 0.1
     elif provider == "dashscope":
+        body["top_p"] = 0.7
+    elif provider == "mimo":
         body["top_p"] = 0.7
 
     for attempt in range(max_retries + 1):
@@ -326,7 +333,8 @@ async def call_ai_model(provider: str, model: str, prompt: str, user_input: str,
         api_keys = {
             "deepseek": settings.providers.deepseek_api_key,
             "zhipu": settings.providers.zhipu_api_key,
-            "dashscope": settings.providers.dashscope_api_key
+            "dashscope": settings.providers.dashscope_api_key,
+            "mimo": settings.providers.mimo_api_key
         }
         api_key = api_keys.get(provider)
 
@@ -530,7 +538,8 @@ async def get_current_model():
         "gemini": "Gemini",
         "deepseek": "DeepSeek",
         "zhipu": "智谱GLM",
-        "dashscope": "通义千问"
+        "dashscope": "通义千问",
+        "mimo": "MImo"
     }
     return {
         "modelName": provider_names.get(primary_provider, "Gemini")

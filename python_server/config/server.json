@@ -13,7 +13,7 @@
     },
     "deepseek": {
       "enabled": false,
-      "model": "deepseek-chat",
+      "model": "deepseek-v4-pro",
       "temperature": 0.7
     },
     "zhipu": {
@@ -24,6 +24,11 @@
     "dashscope": {
       "enabled": true,
       "model": "qwen-max",
+      "temperature": 0.7
+    },
+    "mimo": {
+      "enabled": true,
+      "model": "MiMo-V2.5-Pro",
       "temperature": 0.7
     }
   },
