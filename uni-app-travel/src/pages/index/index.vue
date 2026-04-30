@@ -289,7 +289,7 @@ export default {
   flex: 1;
   flex-direction: column;
   height: 100vh;
-  background-color: #f5f5f5;
+  background: var(--gradient-aurora);
 }
 
 .map-container {
@@ -306,8 +306,11 @@ export default {
   display: flex;
   justify-content: space-around;
   align-items: center;
-  background-color: #fff;
-  border-top: 1px solid #eee;
+  background: rgba(255,255,255,.82);
+  border-top: 1rpx solid rgba(255,255,255,.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 -10rpx 28rpx rgba(22,32,58,.08);
   padding: 10rpx 0;
 }
 
@@ -326,7 +329,7 @@ export default {
 
 .nav-label {
   font-size: 24rpx;
-  color: #666;
+  color: #42507a;
 }
 
 .nav-item.active .nav-label,
@@ -340,7 +343,7 @@ export default {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgba(11, 19, 40, 0.52);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -348,7 +351,7 @@ export default {
 }
 
 .modal-content {
-  background-color: #fff;
+  background: rgba(255,255,255,.82);
   border-radius: 20rpx;
   margin: 20rpx;
   max-height: 80vh;
@@ -423,7 +426,7 @@ export default {
   display: inline-block;
   width: 120rpx;
   font-size: 28rpx;
-  color: #666;
+  color: #42507a;
 }
 
 .detail-value {

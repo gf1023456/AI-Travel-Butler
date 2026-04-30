@@ -259,12 +259,14 @@ const reLaunchTo = (url) => {
 </script>
 
 <style scoped>
+@keyframes floatIn { from { opacity: 0; transform: translateY(18rpx);} to { opacity: 1; transform: translateY(0);} }
+
 .mine-page {
   width: 100vw;
   min-height: 100vh;
-  background: #F8F9FA;
+  background: var(--gradient-aurora);
   position: relative;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+  font-family: var(--font-body);
 }
 
 .mine-content {
@@ -276,6 +278,11 @@ const reLaunchTo = (url) => {
 
 /* 用户资料头部 */
 .profile-header {
+  background: rgba(255,255,255,.72);
+  border: 1rpx solid rgba(255,255,255,.72);
+  box-shadow: 0 14rpx 36rpx rgba(37,75,156,.12);
+  border-radius: 32rpx;
+  padding: 24rpx 28rpx;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -309,7 +316,8 @@ const reLaunchTo = (url) => {
 }
 
 .profile-name {
-  font-size: 40rpx;
+  font-size: 42rpx;
+  font-family: var(--font-display);
   font-weight: 700;
   color: #202124;
 }
@@ -356,11 +364,12 @@ const reLaunchTo = (url) => {
 
 /* 今日配额卡片 */
 .quota-card {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  animation: floatIn .45s var(--ease-out);
+  background: var(--gradient-primary);
   border-radius: 24rpx;
   padding: 32rpx;
   margin-bottom: 32rpx;
-  box-shadow: 0 8rpx 24rpx rgba(102, 126, 234, 0.3);
+  box-shadow: 0 12rpx 30rpx rgba(24, 73, 169, 0.28);
 }
 
 .quota-header {
@@ -422,11 +431,11 @@ const reLaunchTo = (url) => {
 
 /* 菜单卡片 */
 .menu-card {
-  background: #ffffff;
+  background: rgba(255,255,255,.82);
   border-radius: 32rpx;
   overflow: hidden;
-  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.03);
-  border: 1rpx solid rgba(0, 0, 0, 0.03);
+  box-shadow: 0 14rpx 34rpx rgba(37,75,156,.1);
+  border: 1rpx solid rgba(255, 255, 255, 0.72);
 }
 
 .menu-item {
@@ -513,7 +522,7 @@ const reLaunchTo = (url) => {
 .vip-card {
   margin-top: 64rpx;
   padding: 48rpx;
-  background: #4285F4;
+  background: linear-gradient(140deg, #1b3f91 0%, #356cdd 65%, #7fb5ff 100%);
   border-radius: 32rpx;
   position: relative;
   overflow: hidden;
@@ -549,15 +558,17 @@ const reLaunchTo = (url) => {
 /* 退出登录按钮 */
 .logout-btn {
   margin-top: 64rpx;
+  background: rgba(255,255,255,.82);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   width: 100%;
   padding: 64rpx 0;
-  background: #ffffff;
-  border: 1rpx solid rgba(0, 0, 0, 0.03);
+  border: 1rpx solid rgba(255,255,255,.7);
   border-radius: 32rpx;
   font-size: 32rpx;
   font-weight: 600;
   color: #ba1a1a;
-  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.03);
+  box-shadow: 0 14rpx 34rpx rgba(37,75,156,.1);
 }
 
 .logout-btn:active {
@@ -584,12 +595,15 @@ const reLaunchTo = (url) => {
 /* 底部导航栏 */
 .bottom-nav {
   position: fixed;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   bottom: 0;
   left: 0;
   right: 0;
   height: 120rpx;
-  background: #ffffff;
-  border-top: 1rpx solid rgba(0, 0, 0, 0.05);
+  background: rgba(255,255,255,.82);
+  border-top: 1rpx solid rgba(255,255,255,.75);
+  box-shadow: 0 -10rpx 28rpx rgba(22,32,58,.08);
   display: flex;
   justify-content: space-around;
   align-items: center;
