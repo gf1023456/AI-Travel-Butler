@@ -24,7 +24,7 @@
       </view>
 
       <!-- 今日配额卡片 -->
-      <view class="quota-card">
+      <view class="quota-card" v-if="quotaInfo.max > 0">
         <view class="quota-header">
           <text class="quota-title">📊 今日配额</text>
         </view>
@@ -45,7 +45,7 @@
           </view>
         </view>
         <view class="quota-progress">
-          <view class="quota-progress-bar" :style="'width:' + Math.min(100, (quotaInfo.used / quotaInfo.max) * 100) + '%'"></view>
+          <view class="quota-progress-bar" :style="{ width: Math.min(100, (quotaInfo.used / quotaInfo.max) * 100) + '%' }"></view>
         </view>
       </view>
 
@@ -194,8 +194,9 @@ onMounted(async () => {
   await loadUserInfo()
   
   // 加载配额信息
+  console.log('[Mine] 开始加载配额信息')
   await loadQuotaInfo()
-  console.log('[Mine] loadQuotaInfo done:', quotaInfo.value)
+  console.log('[Mine] loadQuotaInfo done, quotaInfo:', JSON.stringify(quotaInfo.value))
 })
 
 const loadUserInfo = async () => {
@@ -218,20 +219,35 @@ const loadUserInfo = async () => {
 }
 
 const loadQuotaInfo = async () => {
+  console.log('[Mine] loadQuotaInfo 开始')
   try {
+    console.log('[Mine] 调用 getQuota()')
     const quota = await getQuota()
-    if (quota) {
+    console.log('[Mine] getQuota 返回结果:', JSON.stringify(quota))
+    console.log('[Mine] quota 类型:', typeof quota, quota === null ? 'null' : quota.constructor?.name)
+    
+    if (quota && typeof quota === 'object') {
       quotaInfo.value = {
-        used: quota.used || 0,
-        bonus: quota.bonus || 0,
-        max: quota.max || 10,
-        remaining: quota.remaining || 0
+        used: quota.used ?? 0,
+        bonus: quota.bonus ?? 0,
+        max: quota.max ?? 10,
+        remaining: quota.remaining ?? 0
+      }
+      console.log('[Mine] quotaInfo 已更新:', JSON.stringify(quotaInfo.value))
+    } else {
+      console.warn('[Mine] quota 数据无效，使用默认值')
+      quotaInfo.value = {
+        used: 0,
+        bonus: 0,
+        max: 10,
+        remaining: 10
       }
     }
   } catch (error) {
     console.error('[Mine] 加载配额失败:', error)
     // 使用本地存储的配额
     quotaInfo.value = userStore.quota
+    console.log('[Mine] 使用本地配额:', JSON.stringify(quotaInfo.value))
   }
 }
 
@@ -383,12 +399,12 @@ const reLaunchTo = (url) => {
 
 /* 今日配额卡片 */
 .quota-card {
-  animation: floatIn .45s var(--ease-out);
-  background: var(--gradient-primary);
+  background: linear-gradient(132deg, #1849a9 0%, #2f67d8 48%, #6cb6ff 100%);
   border-radius: 24rpx;
   padding: 32rpx;
   margin-bottom: 32rpx;
   box-shadow: 0 12rpx 30rpx rgba(24, 73, 169, 0.28);
+  opacity: 1;
 }
 
 .quota-header {
