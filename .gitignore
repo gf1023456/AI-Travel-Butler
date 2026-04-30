@@ -23,5 +23,11 @@ dist-ssr
 *.sln
 *.sw?
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+
 # Local server runtime config
 server/config.json
