@@ -1,5 +1,7 @@
 <template>
   <view class="page-container">
+    <view class="aurora-orb orb-a"></view>
+    <view class="aurora-orb orb-b"></view>
     <!-- 顶部导航 -->
     <view class="top-bar" :style="'padding-top:' + (safeAreaTop + 32) + 'px'">
       <view class="back-btn" @click="goBack">
@@ -12,7 +14,7 @@
     <scroll-view scroll-y class="content">
       <!-- 模式切换 -->
       <view class="section">
-        <view class="mode-card">
+        <view class="mode-card card-pop">
           <view class="mode-content">
             <view class="mode-info">
               <text class="mode-name">{{ isPlannerMode ? '深度排期' : '快速探索' }}</text>
@@ -41,7 +43,7 @@
 
       <!-- 输入区域 -->
       <view class="section section-main">
-        <view class="input-card">
+        <view class="input-card card-pop">
           <textarea
             class="main-input"
             v-model="userInput"
@@ -172,14 +174,21 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+@keyframes driftIn {
+  from { opacity: 0; transform: translateY(24rpx) scale(0.98);}
+  to { opacity: 1; transform: translateY(0) scale(1);}
+}
+
 .page-container {
   min-height: 100vh;
-  background: linear-gradient(135deg, #F8F9FA 0%, #FAFBFC 100%);
+  background: var(--gradient-aurora);
   display: flex;
   flex-direction: column;
 }
 
 .top-bar {
+  animation: driftIn .45s var(--ease-out);
+
   display: flex;
   align-items: center;
   padding: 32rpx 40rpx;
@@ -198,9 +207,11 @@ onMounted(async () => {
 
 .page-title {
   flex: 1;
-  font-size: 40rpx;
+  font-size: 44rpx;
   font-weight: 700;
-  color: #202124;
+  color: #16203a;
+  font-family: var(--font-display);
+  letter-spacing: 2rpx;
 }
 
 .model-tag {
@@ -217,6 +228,22 @@ onMounted(async () => {
   padding: 0 40rpx;
 }
 
+.aurora-orb {
+  position: fixed;
+  border-radius: 999rpx;
+  filter: blur(10px);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.orb-a { width: 360rpx; height: 360rpx; top: 90rpx; right: -120rpx; background: radial-gradient(circle, rgba(96,165,250,.45), rgba(96,165,250,0)); }
+.orb-b { width: 300rpx; height: 300rpx; bottom: 180rpx; left: -90rpx; background: radial-gradient(circle, rgba(139,92,246,.35), rgba(139,92,246,0)); }
+
+.content { position: relative; z-index: 2; }
+
+.card-pop { border-radius: 28rpx; transform: translateY(0); transition: transform .25s var(--ease-out), box-shadow .25s var(--ease-out); }
+.card-pop:active { transform: translateY(-4rpx) scale(.995); box-shadow: 0 20rpx 44rpx rgba(24,73,169,.16); }
+
 .section {
   margin-bottom: 40rpx;
 }
@@ -230,10 +257,13 @@ onMounted(async () => {
 }
 
 .mode-card {
-  background: #fff;
+  background: rgba(255,255,255,.82);
   border-radius: 24rpx;
   padding: 32rpx;
-  box-shadow: 0 4rpx 24rpx rgba(0, 0, 0, 0.04);
+  box-shadow: 0 16rpx 36rpx rgba(37, 75, 156, 0.1);
+  border: 1rpx solid rgba(255,255,255,.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 .mode-content {
@@ -271,10 +301,10 @@ onMounted(async () => {
   flex-direction: column;
   align-items: center;
   padding: 32rpx;
-  background: #fff;
+  background: rgba(255,255,255,.82);
   border-radius: 24rpx;
-  border: 2rpx solid transparent;
-  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.04);
+  border: 2rpx solid rgba(255,255,255,.7);
+  box-shadow: 0 16rpx 30rpx rgba(37,75,156,.08);
 }
 
 .style-active {
@@ -294,10 +324,13 @@ onMounted(async () => {
 }
 
 .input-card {
-  background: #fff;
+  background: rgba(255,255,255,.82);
   border-radius: 24rpx;
   padding: 32rpx;
-  box-shadow: 0 4rpx 24rpx rgba(0, 0, 0, 0.04);
+  box-shadow: 0 16rpx 36rpx rgba(37, 75, 156, 0.1);
+  border: 1rpx solid rgba(255,255,255,.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 .main-input {
@@ -323,7 +356,7 @@ onMounted(async () => {
 .generate-btn {
   width: 100%;
   height: 96rpx;
-  background: linear-gradient(135deg, #4285F4 0%, #5E97F6 50%, #7BAAF7 100%);
+  background: var(--gradient-primary);
   border-radius: 24rpx;
   font-size: 32rpx;
   font-weight: 600;
@@ -331,7 +364,7 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8rpx 24rpx rgba(99, 102, 241, 0.25);
+  box-shadow: 0 16rpx 34rpx rgba(24, 73, 169, 0.28);
 }
 
 .generate-btn[disabled] {

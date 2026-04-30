@@ -8,6 +8,8 @@
    ======================================== */
 
 :root {
+  --font-display: 'STZhongsong', 'FZYaoti', 'KaiTi', serif;
+  --font-body: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
   /* 颜色系统（design.md） */
   --color-primary: #4285F4;
   --color-success: #34A853;
@@ -20,8 +22,11 @@
   --color-surface-container-high: #F1F3F4;
 
   /* 渐变色 */
-  --gradient-primary: linear-gradient(135deg, #4285F4 0%, #3367D6 100%);
-  --gradient-accent: linear-gradient(135deg, #34A853 0%, #5E97F6 100%);
+  --gradient-primary: linear-gradient(132deg, #1849a9 0%, #2f67d8 48%, #6cb6ff 100%);
+  --gradient-accent: linear-gradient(140deg, #10b981 0%, #34d399 45%, #7c3aed 100%);
+  --gradient-aurora: radial-gradient(circle at 20% 20%, rgba(111, 176, 255, 0.26) 0, transparent 38%),
+    radial-gradient(circle at 80% 0%, rgba(124, 58, 237, 0.18) 0, transparent 42%),
+    linear-gradient(165deg, #f4f8ff 0%, #ebf1ff 50%, #f8fbff 100%);
 
   /* 文字颜色 */
   --text-primary: #202124;
@@ -31,7 +36,7 @@
   --text-brand: var(--color-primary);
 
   /* 背景 */
-  --bg-primary: #F8F9FA;
+  --bg-primary: #eef3ff;
   --bg-secondary: #FFFFFF;
   --bg-base: #F8F9FA;
   --bg-input: #FAFBFC;
@@ -103,12 +108,25 @@
    ======================================== */
 
 page {
-  background-color: var(--bg-primary);
-  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  background: var(--gradient-aurora);
+  font-family: var(--font-body);
   color: var(--text-primary);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+.title-display {
+  font-family: var(--font-display);
+  letter-spacing: 1rpx;
+}
+
+.card-elevated {
+  background: rgba(255, 255, 255, 0.78);
+  border: 1rpx solid rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 14rpx 40rpx rgba(46, 90, 180, 0.12);
 }
 
 view {
