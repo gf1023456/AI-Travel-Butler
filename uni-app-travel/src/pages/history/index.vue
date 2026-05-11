@@ -9,7 +9,7 @@
 
     <scroll-view scroll-y class="content">
       <view v-if="historyList.length === 0" class="empty-state">
-        <text class="empty-icon">📭</text>
+        <view class="empty-icon"></view>
         <text class="empty-text">暂无历史记录</text>
       </view>
 
@@ -34,7 +34,7 @@
         </view>
         <view class="history-actions">
           <view class="history-load btn-pill" @click.stop="loadHistory(item)">载入</view>
-          <view class="history-delete btn-pill" @click.stop="deleteHistory(item.id)">🗑️</view>
+          <view class="history-delete btn-pill" @click.stop="deleteHistory(item.id)">删除</view>
         </view>
       </view>
     </scroll-view>
@@ -74,8 +74,8 @@
               <view v-if="Array.isArray(selectedDetail.day_plan)">
                 <view v-for="(location, locIndex) in selectedDetail.day_plan" :key="locIndex" class="location-item">
                   <text class="location-name">{{ location.name || location.title || '未知地点' }}</text>
-                  <text class="location-time" v-if="location.time">⏰ {{ location.time }}</text>
-                  <text class="location-city" v-if="location.city">📍 {{ location.city }}</text>
+                  <text class="location-time" v-if="location.time">时间 {{ location.time }}</text>
+                  <text class="location-city" v-if="location.city">地点 {{ location.city }}</text>
                   <text class="location-desc">{{ location.description }}</text>
                   <view class="location-coords" v-if="location.lat && location.lng">
                     坐标: {{ location.lat }}, {{ location.lng }}
@@ -90,8 +90,8 @@
                     <view class="location-list">
                       <view class="location-item" v-for="(location, locIndex) in locations" :key="locIndex">
                         <text class="location-name">{{ location.name || location.title || '未知地点' }}</text>
-                        <text class="location-time" v-if="location.time">⏰ {{ location.time }}</text>
-                        <text class="location-city" v-if="location.city">📍 {{ location.city }}</text>
+                        <text class="location-time" v-if="location.time">时间 {{ location.time }}</text>
+                        <text class="location-city" v-if="location.city">地点 {{ location.city }}</text>
                         <text class="location-desc">{{ location.description }}</text>
                         <view class="location-coords" v-if="location.lat && location.lng">
                           坐标: {{ location.lat }}, {{ location.lng }}
@@ -422,29 +422,32 @@ const loadHistoryList = async () => {
 .top-bar {
   display: flex;
   align-items: center;
-  padding: 32rpx 40rpx;
-  background: linear-gradient(135deg, #4285f4 0%, #5e9ae4 100%);
-  color: white;
+  padding: 32rpx var(--page-padding-x);
+  background: var(--bg-topbar);
+  border-bottom: 1rpx solid var(--border-glass-soft);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
 .back-btn {
-  width: 72rpx;
-  height: 72rpx;
+  width: 68rpx;
+  height: 68rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 40rpx;
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.2);
+  color: #1f2937;
+  background: rgba(255, 255, 255, 0.66);
   border-radius: 50%;
 }
 
 .page-title {
   flex: 1;
-  font-size: 40rpx;
-  font-weight: 700;
-  color: #ffffff;
+  font-size: var(--text-xl);
+  font-weight: 600;
+  color: #16203a;
   text-align: center;
+  letter-spacing: var(--title-letter-spacing);
 }
 
 .content {
@@ -461,18 +464,20 @@ const loadHistoryList = async () => {
 }
 
 .empty-icon {
-  font-size: 80rpx;
-  opacity: 0.5;
-  color: #adb5bd;
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 50%;
+  border: 2rpx solid rgba(148, 163, 184, 0.55);
+  background: rgba(255, 255, 255, 0.45);
 }
 
 .empty-text {
-  font-size: 28rpx;
+  font-size: var(--text-base);
   color: #adb5bd;
 }
 
 .history-item {
-  border: 1rpx solid rgba(255,255,255,.7);
+  border: 1rpx solid var(--border-glass-strong);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   display: flex;
@@ -480,15 +485,15 @@ const loadHistoryList = async () => {
   justify-content: space-between;
   padding: 32rpx;
   background: rgba(255,255,255,.82);
-  border-radius: 24rpx;
+  border-radius: var(--radius-xl);
   margin-bottom: 24rpx;
-  box-shadow: 0rpx 2rpx 4rpx 0px rgba(0,0,0,0.08);
+  box-shadow: var(--shadow-card-soft);
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .history-item:active {
   transform: scale(0.98);
-  box-shadow: 0rpx 8rpx 16rpx 0px rgba(0,0,0,0.12);
+  box-shadow: var(--shadow-card-strong);
 }
 
 .history-info {
@@ -503,7 +508,7 @@ const loadHistoryList = async () => {
 }
 
 .history-time {
-  font-size: 24rpx;
+  font-size: var(--text-sm);
   color: #6c757d;
   display: block;
 }
@@ -522,7 +527,7 @@ const loadHistoryList = async () => {
 }
 
 .history-prompt {
-  font-size: 28rpx;
+  font-size: var(--text-base);
   color: #495057;
   display: block;
   line-height: 1.4;
@@ -536,24 +541,28 @@ const loadHistoryList = async () => {
 }
 
 .history-load {
-  padding: 16rpx 32rpx;
+  height: var(--btn-height);
+  padding: 0 32rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: linear-gradient(135deg, #34a853 0%, #2e8a49 100%);
   color: white;
-  border-radius: 50rpx;
-  font-size: 26rpx;
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
   font-weight: 500;
 }
 
 .history-delete {
-  width: 60rpx;
-  height: 60rpx;
+  width: var(--btn-height);
+  height: var(--btn-height);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, #ea4335 0%, #d62828 100%);
   color: white;
-  font-size: 28rpx;
+  font-size: var(--text-sm);
   padding: 0;
   margin-left: 10rpx;
 }

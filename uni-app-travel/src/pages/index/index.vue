@@ -19,23 +19,23 @@
     <!-- 底部导航 -->
     <view class="bottom-nav">
       <view class="nav-item" @click="goExplore">
-        <text class="nav-icon">🧭</text>
+        <image class="nav-icon-img" src="/static/tabbar/explore.png" mode="aspectFit" />
         <text class="nav-label">探索</text>
       </view>
       <view class="nav-item" @click="goPlan">
-        <text class="nav-icon">📅</text>
+        <text class="nav-icon nav-icon-text">日程</text>
         <text class="nav-label">行程</text>
       </view>
       <view class="nav-item" @click="toggleMapType">
-        <text class="nav-icon">{{ mapType === 'satellite' ? '🛰️' : '🗺️' }}</text>
+        <text class="nav-icon nav-icon-text">{{ mapType === 'satellite' ? '卫星' : '地图' }}</text>
         <text class="nav-label">{{ mapType === 'satellite' ? '卫星图' : '标准图' }}</text>
       </view>
       <view class="nav-item" @click="goHistory">
-        <text class="nav-icon">🕐</text>
+        <text class="nav-icon nav-icon-text">历史</text>
         <text class="nav-label">历史</text>
       </view>
       <view class="nav-item" @click="goMine">
-        <text class="nav-icon">👤</text>
+        <image class="nav-icon-img" src="/static/tabbar/mine.png" mode="aspectFit" />
         <text class="nav-label">我的</text>
       </view>
     </view>
@@ -53,23 +53,23 @@
         </view>
         <scroll-view scroll-y class="modal-body">
           <view class="detail-row">
-            <text class="detail-label">📅 时间</text>
+            <text class="detail-label">时间</text>
             <text class="detail-value">{{ selectedMarker.time }}</text>
           </view>
           <view v-if="selectedMarker.weather_icon && selectedMarker.temperature" class="detail-row">
-            <text class="detail-label">🌤️ 天气</text>
+            <text class="detail-label">天气</text>
             <text class="detail-value">{{ selectedMarker.weather_icon }} {{ selectedMarker.temperature }}</text>
           </view>
           <view v-if="selectedMarker.description" class="detail-row">
-            <text class="detail-label">📖 介绍</text>
+            <text class="detail-label">介绍</text>
             <text class="detail-value detail-desc">{{ selectedMarker.description }}</text>
           </view>
           <view v-if="selectedMarker.transit_hint" class="detail-row">
-            <text class="detail-label">🚗 交通</text>
+            <text class="detail-label">交通</text>
             <text class="detail-value">{{ selectedMarker.transit_hint }}</text>
           </view>
           <view v-if="selectedMarker.visit_duration" class="detail-row">
-            <text class="detail-label">⏱️ 游玩时长</text>
+            <text class="detail-label">游玩时长</text>
             <text class="detail-value">{{ selectedMarker.visit_duration }}</text>
           </view>
         </scroll-view>
@@ -354,6 +354,20 @@ export default {
 
 .nav-icon {
   font-size: 40rpx;
+  margin-bottom: 6rpx;
+}
+
+.nav-icon-img {
+  width: 34rpx;
+  height: 34rpx;
+  margin-bottom: 6rpx;
+  opacity: 0.85;
+}
+
+.nav-icon-text {
+  font-size: 22rpx;
+  font-weight: 600;
+  color: #4b5563;
   margin-bottom: 6rpx;
 }
 

@@ -1,7 +1,5 @@
 <template>
   <view class="page-container">
-    <view class="aurora-orb orb-a"></view>
-    <view class="aurora-orb orb-b"></view>
     <!-- 顶部导航 -->
     <view class="top-bar" :style="'padding-top:' + (safeAreaTop + 32) + 'px'">
       <view class="back-btn" @click="goBack">
@@ -34,8 +32,7 @@
             :class="['style-item', travelModeIndex === idx ? 'style-active' : '']"
             @click="travelModeIndex = idx"
           >
-            <text class="style-icon">{{ option.label.split(' ')[0] }}</text>
-            <text class="style-name">{{ option.label.split(' ').slice(1).join(' ') }}</text>
+            <text class="style-name">{{ option.label }}</text>
           </view>
         </view>
       </view>
@@ -68,7 +65,7 @@
 
       <!-- 底部提示 -->
       <view class="section section-hint">
-        <text class="hint-text">💡 慧游将根据你的描述，智能推荐最佳行程方案</text>
+        <text class="hint-text">慧游将根据你的描述，智能推荐最佳行程方案</text>
       </view>
     </scroll-view>
   </view>
@@ -93,10 +90,10 @@ const currentModelName = ref('GPT-4o')
 const safeAreaTop = ref(0)
 
 const travelModeOptions = [
-  { label: '🏃 轻装上阵', value: 'light' },
-  { label: '📸 深度打卡', value: 'deep' },
-  { label: '🍜 美食之旅', value: 'food' },
-  { label: '🏔️ 户外探索', value: 'outdoor' }
+  { label: '轻装上阵', value: 'light' },
+  { label: '深度打卡', value: 'deep' },
+  { label: '美食之旅', value: 'food' },
+  { label: '户外探索', value: 'outdoor' }
 ]
 
 const charCount = computed(() => userInput.value.length)
@@ -186,17 +183,21 @@ onMounted(async () => {
 }
 
 .top-bar {
-  animation: driftIn .45s var(--ease-out);
+  animation: driftIn var(--duration-slow) var(--ease-out);
 
   display: flex;
   align-items: center;
-  padding: 32rpx 40rpx;
+  padding: 32rpx var(--page-padding-x);
   gap: 20rpx;
+  background: var(--bg-topbar);
+  border-bottom: 1rpx solid var(--border-glass-soft);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
 .back-btn {
-  width: 72rpx;
-  height: 72rpx;
+  width: 68rpx;
+  height: 68rpx;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -206,11 +207,11 @@ onMounted(async () => {
 
 .page-title {
   flex: 1;
-  font-size: 44rpx;
-  font-weight: 700;
+  font-size: var(--text-xl);
+  font-weight: 600;
   color: #16203a;
   font-family: var(--font-display);
-  letter-spacing: 2rpx;
+  letter-spacing: var(--title-letter-spacing);
 }
 
 .model-tag {
@@ -244,23 +245,23 @@ onMounted(async () => {
 .card-pop:active { transform: translateY(-4rpx) scale(.995); box-shadow: 0 20rpx 44rpx rgba(24,73,169,.16); }
 
 .section {
-  margin-bottom: 40rpx;
+  margin-bottom: var(--section-gap);
 }
 
 .section-label {
   display: block;
-  font-size: 28rpx;
+  font-size: var(--text-base);
   font-weight: 600;
   color: #404040;
   margin-bottom: 24rpx;
 }
 
 .mode-card {
-  background: rgba(255,255,255,.82);
-  border-radius: 24rpx;
+  background: rgba(255,255,255,.94);
+  border-radius: var(--radius-xl);
   padding: 32rpx;
-  box-shadow: 0 16rpx 36rpx rgba(37, 75, 156, 0.1);
-  border: 1rpx solid rgba(255,255,255,.7);
+  box-shadow: var(--shadow-card-soft);
+  border: 1rpx solid var(--border-glass-strong);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
@@ -300,20 +301,15 @@ onMounted(async () => {
   flex-direction: column;
   align-items: center;
   padding: 32rpx;
-  background: rgba(255,255,255,.82);
-  border-radius: 24rpx;
-  border: 2rpx solid rgba(255,255,255,.7);
-  box-shadow: 0 16rpx 30rpx rgba(37,75,156,.08);
+  background: rgba(255,255,255,.94);
+  border-radius: var(--radius-xl);
+  border: 1rpx solid var(--border-glass-soft);
+  box-shadow: var(--shadow-card-soft);
 }
 
 .style-active {
   border-color: #4285F4;
   background: rgba(99, 102, 241, 0.05);
-}
-
-.style-icon {
-  font-size: 48rpx;
-  margin-bottom: 12rpx;
 }
 
 .style-name {
@@ -323,11 +319,11 @@ onMounted(async () => {
 }
 
 .input-card {
-  background: rgba(255,255,255,.82);
-  border-radius: 24rpx;
+  background: rgba(255,255,255,.94);
+  border-radius: var(--radius-xl);
   padding: 32rpx;
-  box-shadow: 0 16rpx 36rpx rgba(37, 75, 156, 0.1);
-  border: 1rpx solid rgba(255,255,255,.7);
+  box-shadow: var(--shadow-card-soft);
+  border: 1rpx solid var(--border-glass-strong);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
@@ -348,22 +344,22 @@ onMounted(async () => {
 }
 
 .char-count {
-  font-size: 24rpx;
+  font-size: var(--text-sm);
   color: #a1a1a1;
 }
 
 .generate-btn {
   width: 100%;
-  height: 96rpx;
+  height: var(--btn-height);
   background: var(--gradient-primary);
-  border-radius: 24rpx;
+  border-radius: var(--radius-xl);
   font-size: 32rpx;
   font-weight: 600;
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 16rpx 34rpx rgba(24, 73, 169, 0.28);
+  box-shadow: var(--shadow-card-strong);
 }
 
 .generate-btn[disabled] {
@@ -376,7 +372,7 @@ onMounted(async () => {
 }
 
 .hint-text {
-  font-size: 26rpx;
+  font-size: var(--text-sm);
   color: #a1a1aa;
 }
 </style>

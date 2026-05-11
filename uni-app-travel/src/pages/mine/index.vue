@@ -3,7 +3,7 @@
     <scroll-view scroll-y class="mine-content">
       <view class="hero-strip">
         <text class="hero-kicker">VOYAGE AI</text>
-        <text class="hero-sub">你的下一次旅行，应该像杂志封面一样被策划</text>
+        <text class="hero-sub">你的下一次旅行，由 AI 为你稳妥规划</text>
       </view>
       <!-- 用户资料头部 -->
       <view class="profile-header" :style="'padding-top:' + (safeAreaTop + 48) + 'px'">
@@ -15,7 +15,7 @@
               <text class="profile-verified">✓</text>
             </view>
             <view class="profile-badge">
-              <text class="badge-icon">⭐</text>
+              <text class="badge-icon">认证</text>
               <text class="badge-text">精英旅行者</text>
             </view>
           </view>
@@ -26,7 +26,7 @@
       <!-- 今日配额卡片 -->
       <view class="quota-card" v-if="quotaInfo.max > 0">
         <view class="quota-header">
-          <text class="quota-title">📊 今日配额</text>
+          <text class="quota-title">今日配额</text>
         </view>
         <view class="quota-content">
           <view class="quota-stat">
@@ -55,7 +55,7 @@
         <view class="menu-item" @click="reLaunchTo('/pages/history/index')">
           <view class="menu-left">
             <view class="menu-icon-wrapper menu-icon-blue">
-              <text class="menu-icon">🧳</text>
+              <text class="menu-icon">行程</text>
             </view>
             <view class="menu-content">
               <text class="menu-title">我的行程</text>
@@ -69,7 +69,7 @@
         <view class="menu-item" @click="navigateTo('/pages/settings/index')">
           <view class="menu-left">
             <view class="menu-icon-wrapper menu-icon-slate">
-              <text class="menu-icon">⚙️</text>
+              <text class="menu-icon">设置</text>
             </view>
             <view class="menu-content">
               <text class="menu-title">设置</text>
@@ -83,7 +83,7 @@
         <view class="menu-item" @click="navigateTo('/pages/feedback/index')">
           <view class="menu-left">
             <view class="menu-icon-wrapper menu-icon-orange">
-              <text class="menu-icon">💬</text>
+              <text class="menu-icon">反馈</text>
             </view>
             <view class="menu-content">
               <text class="menu-title">帮助与反馈</text>
@@ -100,7 +100,7 @@
           <text class="vip-title">Voyage AI 会员权益</text>
           <text class="vip-desc">享受专属定制行程与极速办理服务</text>
         </view>
-        <text class="vip-icon">👑</text>
+        <text class="vip-icon">VIP</text>
       </view>
 
       <!-- 退出登录 -->
@@ -118,15 +118,15 @@
     <!-- 底部导航栏 -->
     <view class="bottom-nav">
       <view class="nav-item" @click="reLaunchTo('/pages/index/index')">
-        <text class="nav-icon">🗺️</text>
+        <image class="nav-icon-img" src="/static/tabbar/explore.png" mode="aspectFit" />
         <text class="nav-label">探索</text>
       </view>
       <view class="nav-item" @click="reLaunchTo('/pages/plan/plan')">
-        <text class="nav-icon">📅</text>
+        <text class="nav-icon">行程</text>
         <text class="nav-label">行程</text>
       </view>
       <view class="nav-item active" @click="reLaunchTo('/pages/mine/index')">
-        <text class="nav-icon">👤</text>
+        <image class="nav-icon-img" src="/static/tabbar/mine-active.png" mode="aspectFit" />
         <text class="nav-label active-label">我的</text>
       </view>
     </view>
@@ -293,7 +293,7 @@ const reLaunchTo = (url) => {
   position: relative;
   z-index: 2;
   height: calc(100vh - 160rpx);
-  padding: 0 32rpx;
+  padding: 0 var(--page-padding-x);
   padding-top: 32rpx;
   padding-bottom: 120rpx;
 }
@@ -305,16 +305,16 @@ const reLaunchTo = (url) => {
   background: rgba(255,255,255,.66);
   border: 1rpx solid rgba(255,255,255,.72);
   border-radius: 24rpx;
-  box-shadow: 0 12rpx 26rpx rgba(24,73,169,.10);
+  box-shadow: var(--shadow-card-soft);
 }
 .hero-kicker { display:block; font-size: 22rpx; letter-spacing: 4rpx; color:#2f67d8; font-weight:700; }
-.hero-sub { display:block; margin-top: 8rpx; font-size: 24rpx; color:#334155; line-height:1.5; }
+.hero-sub { display:block; margin-top: 8rpx; font-size: var(--text-sm); color:#334155; line-height:1.5; }
 .card-stack { transform: rotate(-.25deg); }
 
 /* 用户资料头部 */
 .profile-header {
   background: rgba(255,255,255,.72);
-  border: 1rpx solid rgba(255,255,255,.72);
+  border: 1rpx solid var(--border-glass-strong);
   box-shadow: 0 14rpx 36rpx rgba(37,75,156,.12);
   border-radius: 32rpx;
   padding: 24rpx 28rpx;
@@ -469,8 +469,8 @@ const reLaunchTo = (url) => {
   background: rgba(255,255,255,.82);
   border-radius: 32rpx;
   overflow: hidden;
-  box-shadow: 0 14rpx 34rpx rgba(37,75,156,.1);
-  border: 1rpx solid rgba(255, 255, 255, 0.72);
+  box-shadow: var(--shadow-card-soft);
+  border: 1rpx solid var(--border-glass-strong);
 }
 
 .menu-item {
@@ -543,7 +543,7 @@ const reLaunchTo = (url) => {
 
 .menu-desc {
   display: block;
-  font-size: 24rpx;
+  font-size: var(--text-sm);
   color: #5F6368;
 }
 
@@ -597,13 +597,14 @@ const reLaunchTo = (url) => {
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   width: 100%;
-  padding: 64rpx 0;
-  border: 1rpx solid rgba(255,255,255,.7);
+  height: var(--btn-height);
+  padding: 0;
+  border: 1rpx solid var(--border-glass-strong);
   border-radius: 32rpx;
   font-size: 32rpx;
   font-weight: 600;
   color: #ba1a1a;
-  box-shadow: 0 14rpx 34rpx rgba(37,75,156,.1);
+  box-shadow: var(--shadow-card-soft);
 }
 
 .logout-btn:active {
@@ -659,7 +660,7 @@ const reLaunchTo = (url) => {
 }
 
 .nav-label {
-  font-size: 20rpx;
+  font-size: var(--text-xs);
   font-weight: 500;
   color: #9AA0A6;
 }
@@ -677,4 +678,6 @@ const reLaunchTo = (url) => {
 .filled {
   font-variation-settings: 'FILL' 1;
 }
+
+.nav-icon-img { width: 34rpx; height: 34rpx; margin-bottom: 6rpx; }
 </style>
