@@ -94,7 +94,9 @@ export default {
       polylines: [],
       // 弹窗状态
       showDetail: false,
-      selectedMarker: {}
+      selectedMarker: {},
+      // 用户真实定位
+      userLocation: null
     }
   },
   
@@ -105,6 +107,32 @@ export default {
   },
   
   methods: {
+    // 获取用户真实定位
+    getUserLocation() {
+      return new Promise((resolve) => {
+        uni.getLocation({
+          type: 'gcj02',
+          isHighAccuracy: true,
+          highAccuracyExpireTime: 4000,
+          success: (res) => {
+            console.log('[定位] 获取成功:', res.latitude, res.longitude)
+            this.userLocation = {
+              latitude: res.latitude,
+              longitude: res.longitude
+            }
+            // 更新地图中心到用户真实位置
+            this.center = [res.latitude, res.longitude]
+            resolve(true)
+          },
+          fail: (err) => {
+            console.error('[定位] 获取失败:', err)
+            // 未授权或失败时保持默认坐标，不做额外处理
+            resolve(false)
+          }
+        })
+      })
+    },
+    
     // 从store加载数据
     loadFromStore() {
       console.log('[地图] 检查store中的行程数据')
@@ -272,8 +300,10 @@ export default {
   // Uni-app 页面生命周期
   onLoad() {
     console.log('[地图页面] onLoad 生命周期')
-    // 初始化地图数据
-    this.loadFromStore()
+    // 初始化时先获取用户真实定位，再加载行程数据
+    this.getUserLocation().then(() => {
+      this.loadFromStore()
+    })
   },
   
   onShow() {
