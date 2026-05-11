@@ -292,10 +292,10 @@ const reLaunchTo = (url) => {
 .mine-content {
   position: relative;
   z-index: 2;
-  height: calc(100vh - 160rpx);
+  height: calc(100vh - var(--nav-height));
   padding: 0 var(--page-padding-x);
   padding-top: 32rpx;
-  padding-bottom: 120rpx;
+  padding-bottom: var(--nav-height);
 }
 
 
@@ -636,7 +636,7 @@ const reLaunchTo = (url) => {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 120rpx;
+  height: var(--nav-height);
   background: rgba(255,255,255,.82);
   border-top: 1rpx solid rgba(255,255,255,.75);
   box-shadow: 0 -10rpx 28rpx rgba(22,32,58,.08);

@@ -332,7 +332,7 @@ export default {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 120rpx;
+  height: var(--nav-height);
   display: flex;
   justify-content: space-around;
   align-items: center;
@@ -341,7 +341,7 @@ export default {
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   box-shadow: 0 -10rpx 28rpx rgba(22,32,58,.08);
-  padding: 10rpx 0;
+  padding: 8rpx 0;
 }
 
 .nav-item {

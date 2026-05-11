@@ -452,7 +452,7 @@ const loadHistoryList = async () => {
 
 .content {
   padding: 32rpx;
-  padding-bottom: 120rpx;
+  padding-bottom: var(--nav-height);
 }
 
 .empty-state {
