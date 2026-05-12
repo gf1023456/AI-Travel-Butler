@@ -5,16 +5,22 @@
       <view class="panel-header">
         <text class="panel-title">行程方案</text>
         <view class="header-actions">
-          <view class="action-icon action-pill" @click="saveToHistory">💾</view>
-          <view class="action-icon action-pill" @click="copyToClipboard">📋</view>
-          <view class="action-icon action-pill" @click="exportToFile">📥</view>
+          <view class="action-icon action-pill" @click="saveToHistory">
+            <text class="action-glyph">存</text>
+          </view>
+          <view class="action-icon action-pill" @click="copyToClipboard">
+            <text class="action-glyph">复</text>
+          </view>
+          <view class="action-icon action-pill" @click="exportToFile">
+            <text class="action-glyph">导</text>
+          </view>
           <view class="close-btn" @click="goBack">✕</view>
         </view>
       </view>
       
       <scroll-view scroll-y class="panel-body plan-body">
-        <view v-if="!travelStore.currentPlan" class="empty-state">
-          <view class="empty-icon">🗺️</view>
+          <view v-if="!travelStore.currentPlan" class="empty-state">
+            <view class="empty-icon"></view>
           <text class="empty-title">暂无行程</text>
           <text class="empty-desc">您还没有生成任何行程方案</text>
         </view>
@@ -43,8 +49,8 @@
               <text class="place-name">{{ item.name }}</text>
               <text class="place-desc">{{ item.description }}</text>
               <view v-if="item.city || (item.weather_icon && item.temperature)" class="place-meta">
-                <text v-if="item.city" class="meta-item">📍 {{ item.city }}</text>
-                <text v-if="item.weather_icon && item.temperature" class="meta-item">{{ item.weather_icon }} {{ item.temperature }}</text>
+                <text v-if="item.city" class="meta-item">地点 · {{ item.city }}</text>
+                <text v-if="item.weather_icon && item.temperature" class="meta-item">天气 · {{ item.weather_icon }} {{ item.temperature }}</text>
               </view>
             </view>
           </view>
@@ -277,12 +283,14 @@ const showToast = (message, type = 'normal', duration = 3000) => {
 }
 
 .panel-header {
-  border-bottom: 1rpx solid rgba(255,255,255,.2);
+  border-bottom: 1rpx solid var(--border-glass-soft);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 36rpx 40rpx;
-  background: linear-gradient(135deg, #4285F4 0%, #3367D6 100%);
+  padding: 36rpx var(--page-padding-x);
+  background: var(--bg-topbar);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   border-radius: 0;
 }
 
@@ -293,11 +301,11 @@ const showToast = (message, type = 'normal', duration = 3000) => {
 }
 
 .panel-title {
-  font-size: 38rpx;
-  font-weight: 700;
-  color: #ffffff;
-  letter-spacing: 1rpx;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+  font-size: var(--text-xl);
+  font-weight: 600;
+  color: #16203a;
+  letter-spacing: var(--title-letter-spacing);
+  font-family: var(--font-display);
 }
 
 .model-tag {
@@ -318,9 +326,9 @@ const showToast = (message, type = 'normal', duration = 3000) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.66);
   border-radius: 50%;
-  color: #ffffff;
+  color: #1f2937;
   font-size: 32rpx;
 }
 
@@ -344,9 +352,14 @@ const showToast = (message, type = 'normal', duration = 3000) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.66);
   border-radius: 50%;
-  font-size: 28rpx;
+  color: #1f2937;
+}
+
+.action-glyph {
+  font-size: 24rpx;
+  font-weight: 600;
 }
 
 .action-icon:active {
@@ -356,7 +369,7 @@ const showToast = (message, type = 'normal', duration = 3000) => {
 /* 行程主体 */
 .panel-body {
   flex: 1;
-  padding: 32rpx;
+  padding: 32rpx var(--page-padding-x);
   overflow-y: auto;
 }
 
@@ -370,8 +383,11 @@ const showToast = (message, type = 'normal', duration = 3000) => {
 }
 
 .empty-icon {
-  font-size: 120rpx;
-  opacity: 0.5;
+  width: 110rpx;
+  height: 110rpx;
+  border-radius: 50%;
+  border: 2rpx solid rgba(148, 163, 184, 0.55);
+  background: rgba(255, 255, 255, 0.45);
 }
 
 .empty-title {
