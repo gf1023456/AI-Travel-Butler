@@ -1,19 +1,17 @@
 <template>
-  <view class="page-container">
-    <view class="aurora-orb orb-a"></view>
-    <view class="aurora-orb orb-b"></view>
+  <view class="page-container app-shell">
     <!-- 顶部导航 -->
-    <view class="top-bar" :style="'padding-top:' + (safeAreaTop + 32) + 'px'">
-      <view class="back-btn" @click="goBack">
+    <view class="top-bar app-topbar" :style="'padding-top:' + (safeAreaTop + 32) + 'px'">
+      <view class="back-btn icon-btn" @click="goBack">
         <text>←</text>
       </view>
-      <text class="page-title">灵感探索</text>
+      <text class="page-title app-topbar-title">灵感探索</text>
     </view>
 
     <scroll-view scroll-y class="content">
       <!-- 模式切换 -->
       <view class="section">
-        <view class="mode-card card-pop">
+        <VanCell class="mode-card card-pop">
           <view class="mode-content">
             <view class="mode-info">
               <text class="mode-name">{{ isPlannerMode ? '深度排期' : '快速探索' }}</text>
@@ -21,28 +19,27 @@
             </view>
             <switch :checked="isPlannerMode" @change="onModeToggle" color="#4285F4" />
           </view>
-        </view>
+        </VanCell>
       </view>
 
       <!-- 旅行风格 -->
       <view class="section" v-if="isPlannerMode">
         <text class="section-label">旅行风格</text>
         <view class="style-grid">
-          <view
+          <VanCell
             v-for="(option, idx) in travelModeOptions"
             :key="idx"
             :class="['style-item', travelModeIndex === idx ? 'style-active' : '']"
             @click="travelModeIndex = idx"
           >
-            <text class="style-icon">{{ option.label.split(' ')[0] }}</text>
-            <text class="style-name">{{ option.label.split(' ').slice(1).join(' ') }}</text>
-          </view>
+            <text class="style-name">{{ option.label }}</text>
+          </VanCell>
         </view>
       </view>
 
       <!-- 输入区域 -->
       <view class="section section-main">
-        <view class="input-card card-pop">
+        <VanCell class="input-card card-pop">
           <textarea
             class="main-input"
             v-model="userInput"
@@ -53,22 +50,22 @@
           <view class="input-footer">
             <text class="char-count">{{ charCount }} / 500</text>
           </view>
-        </view>
+        </VanCell>
       </view>
 
       <!-- 生成按钮 -->
-      <button
-        class="generate-btn"
+      <VanButton
+        class="generate-btn cta-btn"
         :loading="travelStore.loading"
         :disabled="travelStore.loading || !userInput.trim()"
         @click="handleGenerate"
       >
         <text>{{ isPlannerMode ? '生成完整行程' : '开始探索' }}</text>
-      </button>
+      </VanButton>
 
       <!-- 底部提示 -->
       <view class="section section-hint">
-        <text class="hint-text">💡 慧游将根据你的描述，智能推荐最佳行程方案</text>
+        <text class="hint-text">慧游将根据你的描述，智能推荐最佳行程方案</text>
       </view>
     </scroll-view>
   </view>
@@ -80,6 +77,8 @@ import { useTravelStore } from '@/store/travel.js'
 import { useUserStore } from '@/store/user.js'
 import { getCurrentModel } from '@/api/travel.js'
 import { saveHistory } from '@/api/history.js'
+import VanCell from '@/components/weui/VanCell.vue'
+import VanButton from '@/components/weui/VanButton.vue'
 
 const travelStore = useTravelStore()
 const userStore = useUserStore()
@@ -93,10 +92,10 @@ const currentModelName = ref('GPT-4o')
 const safeAreaTop = ref(0)
 
 const travelModeOptions = [
-  { label: '🏃 轻装上阵', value: 'light' },
-  { label: '📸 深度打卡', value: 'deep' },
-  { label: '🍜 美食之旅', value: 'food' },
-  { label: '🏔️ 户外探索', value: 'outdoor' }
+  { label: '轻装上阵', value: 'light' },
+  { label: '深度打卡', value: 'deep' },
+  { label: '美食之旅', value: 'food' },
+  { label: '户外探索', value: 'outdoor' }
 ]
 
 const charCount = computed(() => userInput.value.length)
@@ -186,31 +185,15 @@ onMounted(async () => {
 }
 
 .top-bar {
-  animation: driftIn .45s var(--ease-out);
-
-  display: flex;
-  align-items: center;
-  padding: 32rpx 40rpx;
-  gap: 20rpx;
+  animation: driftIn var(--duration-slow) var(--ease-out);
 }
 
 .back-btn {
-  width: 72rpx;
-  height: 72rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   font-size: 40rpx;
-  color: #404040;
 }
 
 .page-title {
   flex: 1;
-  font-size: 44rpx;
-  font-weight: 700;
-  color: #16203a;
-  font-family: var(--font-display);
-  letter-spacing: 2rpx;
 }
 
 .model-tag {
@@ -224,19 +207,9 @@ onMounted(async () => {
 
 .content {
   flex: 1;
-  padding: 0 40rpx;
+  padding: 0 var(--page-padding-x);
+  padding-bottom: var(--nav-height);
 }
-
-.aurora-orb {
-  position: fixed;
-  border-radius: 999rpx;
-  filter: blur(10px);
-  z-index: 0;
-  pointer-events: none;
-}
-
-.orb-a { width: 360rpx; height: 360rpx; top: 90rpx; right: -120rpx; background: radial-gradient(circle, rgba(96,165,250,.45), rgba(96,165,250,0)); }
-.orb-b { width: 300rpx; height: 300rpx; bottom: 180rpx; left: -90rpx; background: radial-gradient(circle, rgba(139,92,246,.35), rgba(139,92,246,0)); }
 
 .content { position: relative; z-index: 2; }
 
@@ -244,25 +217,21 @@ onMounted(async () => {
 .card-pop:active { transform: translateY(-4rpx) scale(.995); box-shadow: 0 20rpx 44rpx rgba(24,73,169,.16); }
 
 .section {
-  margin-bottom: 40rpx;
+  margin-bottom: var(--section-gap);
 }
 
 .section-label {
   display: block;
-  font-size: 28rpx;
+  font-size: var(--text-base);
   font-weight: 600;
   color: #404040;
   margin-bottom: 24rpx;
 }
 
 .mode-card {
-  background: rgba(255,255,255,.82);
-  border-radius: 24rpx;
+  background: transparent;
+  border-radius: var(--radius-xl);
   padding: 32rpx;
-  box-shadow: 0 16rpx 36rpx rgba(37, 75, 156, 0.1);
-  border: 1rpx solid rgba(255,255,255,.7);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
 }
 
 .mode-content {
@@ -300,20 +269,13 @@ onMounted(async () => {
   flex-direction: column;
   align-items: center;
   padding: 32rpx;
-  background: rgba(255,255,255,.82);
-  border-radius: 24rpx;
-  border: 2rpx solid rgba(255,255,255,.7);
-  box-shadow: 0 16rpx 30rpx rgba(37,75,156,.08);
+  background: transparent;
+  border-radius: var(--radius-xl);
 }
 
 .style-active {
   border-color: #4285F4;
   background: rgba(99, 102, 241, 0.05);
-}
-
-.style-icon {
-  font-size: 48rpx;
-  margin-bottom: 12rpx;
 }
 
 .style-name {
@@ -323,13 +285,9 @@ onMounted(async () => {
 }
 
 .input-card {
-  background: rgba(255,255,255,.82);
-  border-radius: 24rpx;
+  background: transparent;
+  border-radius: var(--radius-xl);
   padding: 32rpx;
-  box-shadow: 0 16rpx 36rpx rgba(37, 75, 156, 0.1);
-  border: 1rpx solid rgba(255,255,255,.7);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
 }
 
 .main-input {
@@ -348,22 +306,13 @@ onMounted(async () => {
 }
 
 .char-count {
-  font-size: 24rpx;
+  font-size: var(--text-sm);
   color: #a1a1a1;
 }
 
 .generate-btn {
   width: 100%;
-  height: 96rpx;
-  background: var(--gradient-primary);
-  border-radius: 24rpx;
-  font-size: 32rpx;
-  font-weight: 600;
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 16rpx 34rpx rgba(24, 73, 169, 0.28);
+  border: none;
 }
 
 .generate-btn[disabled] {
@@ -376,7 +325,7 @@ onMounted(async () => {
 }
 
 .hint-text {
-  font-size: 26rpx;
+  font-size: var(--text-sm);
   color: #a1a1aa;
 }
 </style>

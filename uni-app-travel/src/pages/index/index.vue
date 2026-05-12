@@ -19,23 +19,23 @@
     <!-- 底部导航 -->
     <view class="bottom-nav">
       <view class="nav-item" @click="goExplore">
-        <text class="nav-icon">🧭</text>
+        <image class="nav-icon-img" src="/static/tabbar/explore.png" mode="aspectFit" />
         <text class="nav-label">探索</text>
       </view>
       <view class="nav-item" @click="goPlan">
-        <text class="nav-icon">📅</text>
+        <image class="nav-icon-img" src="/static/icons/schedule.svg" mode="aspectFit" />
         <text class="nav-label">行程</text>
       </view>
       <view class="nav-item" @click="toggleMapType">
-        <text class="nav-icon">{{ mapType === 'satellite' ? '🛰️' : '🗺️' }}</text>
+        <image class="nav-icon-img" src="/static/icons/map-switch.svg" mode="aspectFit" />
         <text class="nav-label">{{ mapType === 'satellite' ? '卫星图' : '标准图' }}</text>
       </view>
       <view class="nav-item" @click="goHistory">
-        <text class="nav-icon">🕐</text>
+        <image class="nav-icon-img" src="/static/icons/history.svg" mode="aspectFit" />
         <text class="nav-label">历史</text>
       </view>
       <view class="nav-item" @click="goMine">
-        <text class="nav-icon">👤</text>
+        <image class="nav-icon-img" src="/static/tabbar/mine.png" mode="aspectFit" />
         <text class="nav-label">我的</text>
       </view>
     </view>
@@ -52,26 +52,26 @@
           <view class="modal-close" @click="closeDetail">✕</view>
         </view>
         <scroll-view scroll-y class="modal-body">
-          <view class="detail-row">
-            <text class="detail-label">📅 时间</text>
+          <VanCell class="detail-row">
+            <VanTag class="detail-label">时间</VanTag>
             <text class="detail-value">{{ selectedMarker.time }}</text>
-          </view>
-          <view v-if="selectedMarker.weather_icon && selectedMarker.temperature" class="detail-row">
-            <text class="detail-label">🌤️ 天气</text>
+          </VanCell>
+          <VanCell v-if="selectedMarker.weather_icon && selectedMarker.temperature" class="detail-row">
+            <VanTag class="detail-label" type="success">天气</VanTag>
             <text class="detail-value">{{ selectedMarker.weather_icon }} {{ selectedMarker.temperature }}</text>
-          </view>
-          <view v-if="selectedMarker.description" class="detail-row">
-            <text class="detail-label">📖 介绍</text>
+          </VanCell>
+          <VanCell v-if="selectedMarker.description" class="detail-row">
+            <VanTag class="detail-label">介绍</VanTag>
             <text class="detail-value detail-desc">{{ selectedMarker.description }}</text>
-          </view>
-          <view v-if="selectedMarker.transit_hint" class="detail-row">
-            <text class="detail-label">🚗 交通</text>
+          </VanCell>
+          <VanCell v-if="selectedMarker.transit_hint" class="detail-row">
+            <VanTag class="detail-label">交通</VanTag>
             <text class="detail-value">{{ selectedMarker.transit_hint }}</text>
-          </view>
-          <view v-if="selectedMarker.visit_duration" class="detail-row">
-            <text class="detail-label">⏱️ 游玩时长</text>
+          </VanCell>
+          <VanCell v-if="selectedMarker.visit_duration" class="detail-row">
+            <VanTag class="detail-label">时长</VanTag>
             <text class="detail-value">{{ selectedMarker.visit_duration }}</text>
-          </view>
+          </VanCell>
         </scroll-view>
       </view>
     </view>
@@ -81,6 +81,8 @@
 <script>
 // 在 uni-app 传统 script 中定义页面级生命周期
 import { useTravelStore } from '@/store/travel.js'
+import VanTag from '@/components/weui/VanTag.vue'
+import VanCell from '@/components/weui/VanCell.vue'
 
 export default {
   data() {
@@ -332,7 +334,7 @@ export default {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 120rpx;
+  height: var(--nav-height);
   display: flex;
   justify-content: space-around;
   align-items: center;
@@ -341,7 +343,7 @@ export default {
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   box-shadow: 0 -10rpx 28rpx rgba(22,32,58,.08);
-  padding: 10rpx 0;
+  padding: 8rpx 0;
 }
 
 .nav-item {
@@ -355,6 +357,13 @@ export default {
 .nav-icon {
   font-size: 40rpx;
   margin-bottom: 6rpx;
+}
+
+.nav-icon-img {
+  width: 34rpx;
+  height: 34rpx;
+  margin-bottom: 6rpx;
+  opacity: 0.85;
 }
 
 .nav-label {
@@ -449,14 +458,15 @@ export default {
 }
 
 .detail-row {
-  margin-bottom: 20rpx;
+  margin-bottom: 16rpx;
+  padding: 18rpx 20rpx;
+  background: transparent;
 }
 
 .detail-label {
-  display: inline-block;
-  width: 120rpx;
-  font-size: 28rpx;
-  color: #42507a;
+  display: inline-flex;
+  margin-right: 14rpx;
+  vertical-align: top;
 }
 
 .detail-value {

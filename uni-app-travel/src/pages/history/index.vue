@@ -9,11 +9,11 @@
 
     <scroll-view scroll-y class="content">
       <view v-if="historyList.length === 0" class="empty-state">
-        <text class="empty-icon">📭</text>
+        <view class="empty-icon"></view>
         <text class="empty-text">暂无历史记录</text>
       </view>
 
-      <view
+      <VanCell
         v-for="item in historyList"
         :key="item.id"
         class="history-item"
@@ -27,16 +27,16 @@
               v-if="item.is_favorite" 
               class="history-favorite"
             >
-              ⭐
+              <image class="favorite-icon" src="/static/icons/star.svg" mode="aspectFit" />
             </view>
           </view>
           <text class="history-prompt">{{ getPreviewText(item) }}</text>
         </view>
         <view class="history-actions">
-          <view class="history-load btn-pill" @click.stop="loadHistory(item)">载入</view>
-          <view class="history-delete btn-pill" @click.stop="deleteHistory(item.id)">🗑️</view>
+          <VanButton class="history-load btn-pill" @click.stop="loadHistory(item)">载入</VanButton>
+          <VanButton type="danger" class="history-delete btn-pill" @click.stop="deleteHistory(item.id)">删</VanButton>
         </view>
-      </view>
+      </VanCell>
     </scroll-view>
 
     <!-- 详情弹窗 -->
@@ -74,8 +74,8 @@
               <view v-if="Array.isArray(selectedDetail.day_plan)">
                 <view v-for="(location, locIndex) in selectedDetail.day_plan" :key="locIndex" class="location-item">
                   <text class="location-name">{{ location.name || location.title || '未知地点' }}</text>
-                  <text class="location-time" v-if="location.time">⏰ {{ location.time }}</text>
-                  <text class="location-city" v-if="location.city">📍 {{ location.city }}</text>
+                  <text class="location-time" v-if="location.time">时间 {{ location.time }}</text>
+                  <text class="location-city" v-if="location.city">地点 {{ location.city }}</text>
                   <text class="location-desc">{{ location.description }}</text>
                   <view class="location-coords" v-if="location.lat && location.lng">
                     坐标: {{ location.lat }}, {{ location.lng }}
@@ -90,8 +90,8 @@
                     <view class="location-list">
                       <view class="location-item" v-for="(location, locIndex) in locations" :key="locIndex">
                         <text class="location-name">{{ location.name || location.title || '未知地点' }}</text>
-                        <text class="location-time" v-if="location.time">⏰ {{ location.time }}</text>
-                        <text class="location-city" v-if="location.city">📍 {{ location.city }}</text>
+                        <text class="location-time" v-if="location.time">时间 {{ location.time }}</text>
+                        <text class="location-city" v-if="location.city">地点 {{ location.city }}</text>
                         <text class="location-desc">{{ location.description }}</text>
                         <view class="location-coords" v-if="location.lat && location.lng">
                           坐标: {{ location.lat }}, {{ location.lng }}
@@ -118,6 +118,8 @@ import { ref, onMounted } from 'vue'
 import { useTravelStore } from '@/store/travel.js'
 import { useUserStore } from '@/store/user.js'
 import { getHistoryList, deleteHistory as deleteHistoryApi, getHistoryDetail, toggleFavorite as toggleFavoriteApi } from '@/api/history.js'
+import VanCell from '@/components/weui/VanCell.vue'
+import VanButton from '@/components/weui/VanButton.vue'
 
 const travelStore = useTravelStore()
 const userStore = useUserStore()
@@ -422,34 +424,43 @@ const loadHistoryList = async () => {
 .top-bar {
   display: flex;
   align-items: center;
-  padding: 32rpx 40rpx;
-  background: linear-gradient(135deg, #4285f4 0%, #5e9ae4 100%);
-  color: white;
+  padding: 32rpx var(--page-padding-x);
+  background: var(--bg-topbar);
+  border-bottom: 1rpx solid var(--border-glass-soft);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
 .back-btn {
-  width: 72rpx;
-  height: 72rpx;
+  width: 68rpx;
+  height: 68rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 40rpx;
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.2);
+  color: #1f2937;
+  background: rgba(255, 255, 255, 0.66);
   border-radius: 50%;
+  transition: transform var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out);
+}
+
+.back-btn:active {
+  transform: scale(0.96);
+  background: rgba(255, 255, 255, 0.78);
 }
 
 .page-title {
   flex: 1;
-  font-size: 40rpx;
-  font-weight: 700;
-  color: #ffffff;
+  font-size: var(--text-xl);
+  font-weight: 600;
+  color: #16203a;
   text-align: center;
+  letter-spacing: var(--title-letter-spacing);
 }
 
 .content {
-  padding: 32rpx;
-  padding-bottom: 120rpx;
+  padding: 32rpx var(--page-padding-x);
+  padding-bottom: var(--nav-height);
 }
 
 .empty-state {
@@ -461,34 +472,30 @@ const loadHistoryList = async () => {
 }
 
 .empty-icon {
-  font-size: 80rpx;
-  opacity: 0.5;
-  color: #adb5bd;
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 50%;
+  border: 2rpx solid rgba(148, 163, 184, 0.55);
+  background: rgba(255, 255, 255, 0.45);
 }
 
 .empty-text {
-  font-size: 28rpx;
+  font-size: var(--text-base);
   color: #adb5bd;
 }
 
 .history-item {
-  border: 1rpx solid rgba(255,255,255,.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 32rpx;
-  background: rgba(255,255,255,.82);
-  border-radius: 24rpx;
   margin-bottom: 24rpx;
-  box-shadow: 0rpx 2rpx 4rpx 0px rgba(0,0,0,0.08);
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .history-item:active {
   transform: scale(0.98);
-  box-shadow: 0rpx 8rpx 16rpx 0px rgba(0,0,0,0.12);
+  box-shadow: var(--shadow-card-strong);
 }
 
 .history-info {
@@ -503,7 +510,7 @@ const loadHistoryList = async () => {
 }
 
 .history-time {
-  font-size: 24rpx;
+  font-size: var(--text-sm);
   color: #6c757d;
   display: block;
 }
@@ -514,15 +521,18 @@ const loadHistoryList = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(45deg, #fbc02d, #f57f17);
-  color: white;
+  background: rgba(245, 158, 11, 0.12);
   border-radius: 50%;
-  font-size: 28rpx;
   flex-shrink: 0;
 }
 
+.favorite-icon {
+  width: 28rpx;
+  height: 28rpx;
+}
+
 .history-prompt {
-  font-size: 28rpx;
+  font-size: var(--text-base);
   color: #495057;
   display: block;
   line-height: 1.4;
@@ -536,25 +546,10 @@ const loadHistoryList = async () => {
 }
 
 .history-load {
-  padding: 16rpx 32rpx;
-  background: linear-gradient(135deg, #34a853 0%, #2e8a49 100%);
-  color: white;
-  border-radius: 50rpx;
-  font-size: 26rpx;
-  font-weight: 500;
+  min-width: 108rpx;
 }
 
 .history-delete {
-  width: 60rpx;
-  height: 60rpx;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #ea4335 0%, #d62828 100%);
-  color: white;
-  font-size: 28rpx;
-  padding: 0;
   margin-left: 10rpx;
 }
 

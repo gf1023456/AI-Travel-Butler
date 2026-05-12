@@ -3,7 +3,7 @@
     <scroll-view scroll-y class="mine-content">
       <view class="hero-strip">
         <text class="hero-kicker">VOYAGE AI</text>
-        <text class="hero-sub">你的下一次旅行，应该像杂志封面一样被策划</text>
+        <text class="hero-sub">你的下一次旅行，由 AI 为你稳妥规划</text>
       </view>
       <!-- 用户资料头部 -->
       <view class="profile-header" :style="'padding-top:' + (safeAreaTop + 48) + 'px'">
@@ -15,7 +15,7 @@
               <text class="profile-verified">✓</text>
             </view>
             <view class="profile-badge">
-              <text class="badge-icon">⭐</text>
+              <image class="badge-icon-svg" src="/static/icons/crown.svg" mode="aspectFit" />
               <text class="badge-text">精英旅行者</text>
             </view>
           </view>
@@ -26,7 +26,7 @@
       <!-- 今日配额卡片 -->
       <view class="quota-card" v-if="quotaInfo.max > 0">
         <view class="quota-header">
-          <text class="quota-title">📊 今日配额</text>
+          <text class="quota-title">今日配额</text>
         </view>
         <view class="quota-content">
           <view class="quota-stat">
@@ -52,10 +52,10 @@
       <!-- 核心菜单列表 -->
       <view class="menu-card card-stack">
         <!-- 我的行程 -->
-        <view class="menu-item" @click="reLaunchTo('/pages/history/index')">
+        <VanCell class="menu-item" @click="reLaunchTo('/pages/history/index')">
           <view class="menu-left">
             <view class="menu-icon-wrapper menu-icon-blue">
-              <text class="menu-icon">🧳</text>
+              <image class="menu-icon-svg" src="/static/icons/trip-bag.svg" mode="aspectFit" />
             </view>
             <view class="menu-content">
               <text class="menu-title">我的行程</text>
@@ -63,13 +63,13 @@
             </view>
           </view>
           <text class="menu-arrow">›</text>
-        </view>
+        </VanCell>
 
         <!-- 设置 -->
-        <view class="menu-item" @click="navigateTo('/pages/settings/index')">
+        <VanCell class="menu-item" @click="navigateTo('/pages/settings/index')">
           <view class="menu-left">
             <view class="menu-icon-wrapper menu-icon-slate">
-              <text class="menu-icon">⚙️</text>
+              <image class="menu-icon-svg" src="/static/icons/settings.svg" mode="aspectFit" />
             </view>
             <view class="menu-content">
               <text class="menu-title">设置</text>
@@ -77,13 +77,13 @@
             </view>
           </view>
           <text class="menu-arrow">›</text>
-        </view>
+        </VanCell>
 
         <!-- 帮助与反馈 -->
-        <view class="menu-item" @click="navigateTo('/pages/feedback/index')">
+        <VanCell class="menu-item" @click="navigateTo('/pages/feedback/index')">
           <view class="menu-left">
             <view class="menu-icon-wrapper menu-icon-orange">
-              <text class="menu-icon">💬</text>
+              <image class="menu-icon-svg" src="/static/icons/feedback.svg" mode="aspectFit" />
             </view>
             <view class="menu-content">
               <text class="menu-title">帮助与反馈</text>
@@ -91,7 +91,7 @@
             </view>
           </view>
           <text class="menu-arrow">›</text>
-        </view>
+        </VanCell>
       </view>
 
       <!-- 会员权益卡片 -->
@@ -100,11 +100,11 @@
           <text class="vip-title">Voyage AI 会员权益</text>
           <text class="vip-desc">享受专属定制行程与极速办理服务</text>
         </view>
-        <text class="vip-icon">👑</text>
+        <image class="vip-icon-svg" src="/static/icons/crown.svg" mode="aspectFit" />
       </view>
 
       <!-- 退出登录 -->
-      <button class="logout-btn" @click="handleLogout">退出登录</button>
+      <VanButton block type="danger" class="logout-btn" @click="handleLogout">退出登录</VanButton>
 
       <!-- 版本信息 -->
       <view class="version-info">
@@ -118,15 +118,15 @@
     <!-- 底部导航栏 -->
     <view class="bottom-nav">
       <view class="nav-item" @click="reLaunchTo('/pages/index/index')">
-        <text class="nav-icon">🗺️</text>
+        <image class="nav-icon-img" src="/static/tabbar/explore.png" mode="aspectFit" />
         <text class="nav-label">探索</text>
       </view>
       <view class="nav-item" @click="reLaunchTo('/pages/plan/plan')">
-        <text class="nav-icon">📅</text>
+        <image class="nav-icon-img" src="/static/icons/schedule.svg" mode="aspectFit" />
         <text class="nav-label">行程</text>
       </view>
       <view class="nav-item active" @click="reLaunchTo('/pages/mine/index')">
-        <text class="nav-icon">👤</text>
+        <image class="nav-icon-img" src="/static/tabbar/mine-active.png" mode="aspectFit" />
         <text class="nav-label active-label">我的</text>
       </view>
     </view>
@@ -138,6 +138,8 @@ import { ref, onMounted } from 'vue'
 import { useUserStore } from '@/store/user.js'
 import { getUserInfo } from '@/api/user.js'
 import { getQuota } from '@/api/quota.js'
+import VanCell from '@/components/weui/VanCell.vue'
+import VanButton from '@/components/weui/VanButton.vue'
 
 const userStore = useUserStore()
 
@@ -292,10 +294,10 @@ const reLaunchTo = (url) => {
 .mine-content {
   position: relative;
   z-index: 2;
-  height: calc(100vh - 160rpx);
-  padding: 0 32rpx;
+  height: calc(100vh - var(--nav-height));
+  padding: 0 var(--page-padding-x);
   padding-top: 32rpx;
-  padding-bottom: 120rpx;
+  padding-bottom: var(--nav-height);
 }
 
 
@@ -305,16 +307,16 @@ const reLaunchTo = (url) => {
   background: rgba(255,255,255,.66);
   border: 1rpx solid rgba(255,255,255,.72);
   border-radius: 24rpx;
-  box-shadow: 0 12rpx 26rpx rgba(24,73,169,.10);
+  box-shadow: var(--shadow-card-soft);
 }
 .hero-kicker { display:block; font-size: 22rpx; letter-spacing: 4rpx; color:#2f67d8; font-weight:700; }
-.hero-sub { display:block; margin-top: 8rpx; font-size: 24rpx; color:#334155; line-height:1.5; }
+.hero-sub { display:block; margin-top: 8rpx; font-size: var(--text-sm); color:#334155; line-height:1.5; }
 .card-stack { transform: rotate(-.25deg); }
 
 /* 用户资料头部 */
 .profile-header {
   background: rgba(255,255,255,.72);
-  border: 1rpx solid rgba(255,255,255,.72);
+  border: 1rpx solid var(--border-glass-strong);
   box-shadow: 0 14rpx 36rpx rgba(37,75,156,.12);
   border-radius: 32rpx;
   padding: 24rpx 28rpx;
@@ -375,6 +377,12 @@ const reLaunchTo = (url) => {
 .badge-icon {
   font-size: 28rpx;
   color: #4285F4;
+}
+
+.badge-icon-svg {
+  width: 24rpx;
+  height: 24rpx;
+  opacity: .95;
 }
 
 .badge-text {
@@ -466,11 +474,11 @@ const reLaunchTo = (url) => {
 
 /* 菜单卡片 */
 .menu-card {
-  background: rgba(255,255,255,.82);
-  border-radius: 32rpx;
-  overflow: hidden;
-  box-shadow: 0 14rpx 34rpx rgba(37,75,156,.1);
-  border: 1rpx solid rgba(255, 255, 255, 0.72);
+  background: transparent;
+  border-radius: 0;
+  overflow: visible;
+  box-shadow: none;
+  border: none;
 }
 
 .menu-item {
@@ -478,15 +486,7 @@ const reLaunchTo = (url) => {
   align-items: center;
   justify-content: space-between;
   padding: 32rpx;
-  border-bottom: 1rpx solid rgba(0, 0, 0, 0.05);
-}
-
-.menu-item:last-child {
-  border-bottom: none;
-}
-
-.menu-item:active {
-  background: #F1F3F4;
+  margin-bottom: 16rpx;
 }
 
 .menu-left {
@@ -521,6 +521,11 @@ const reLaunchTo = (url) => {
   font-size: 40rpx;
 }
 
+.menu-icon-svg {
+  width: 36rpx;
+  height: 36rpx;
+}
+
 .menu-icon-slate .menu-icon {
   color: #5F6368;
 }
@@ -543,7 +548,7 @@ const reLaunchTo = (url) => {
 
 .menu-desc {
   display: block;
-  font-size: 24rpx;
+  font-size: var(--text-sm);
   color: #5F6368;
 }
 
@@ -582,32 +587,25 @@ const reLaunchTo = (url) => {
   color: rgba(255, 255, 255, 0.8);
 }
 
-.vip-icon {
+.vip-icon-svg {
   position: absolute;
-  right: -32rpx;
-  bottom: -32rpx;
-  font-size: 256rpx;
-  color: rgba(255, 255, 255, 0.1);
+  right: 24rpx;
+  top: 24rpx;
+  width: 36rpx;
+  height: 36rpx;
+  opacity: 0.75;
 }
 
 /* 退出登录按钮 */
 .logout-btn {
   margin-top: 64rpx;
-  background: rgba(255,255,255,.82);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   width: 100%;
-  padding: 64rpx 0;
-  border: 1rpx solid rgba(255,255,255,.7);
-  border-radius: 32rpx;
-  font-size: 32rpx;
-  font-weight: 600;
-  color: #ba1a1a;
-  box-shadow: 0 14rpx 34rpx rgba(37,75,156,.1);
+  height: var(--btn-height);
+  box-shadow: var(--shadow-card-soft);
 }
 
 .logout-btn:active {
-  background: rgba(186, 26, 26, 0.1);
+  transform: translateY(1rpx);
 }
 
 /* 版本信息 */
@@ -635,7 +633,7 @@ const reLaunchTo = (url) => {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 120rpx;
+  height: var(--nav-height);
   background: rgba(255,255,255,.82);
   border-top: 1rpx solid rgba(255,255,255,.75);
   box-shadow: 0 -10rpx 28rpx rgba(22,32,58,.08);
@@ -659,7 +657,7 @@ const reLaunchTo = (url) => {
 }
 
 .nav-label {
-  font-size: 20rpx;
+  font-size: var(--text-xs);
   font-weight: 500;
   color: #9AA0A6;
 }
@@ -677,4 +675,6 @@ const reLaunchTo = (url) => {
 .filled {
   font-variation-settings: 'FILL' 1;
 }
+
+.nav-icon-img { width: 34rpx; height: 34rpx; margin-bottom: 6rpx; }
 </style>
