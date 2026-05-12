@@ -13,10 +13,10 @@
         <text class="empty-text">暂无历史记录</text>
       </view>
 
-      <view
+      <VanCell
         v-for="item in historyList"
         :key="item.id"
-        class="history-item ui-cell"
+        class="history-item"
         @click="showDetails(item)"
       >
         <view class="history-info">
@@ -33,10 +33,10 @@
           <text class="history-prompt">{{ getPreviewText(item) }}</text>
         </view>
         <view class="history-actions">
-          <view class="history-load btn-pill ui-btn-primary" @click.stop="loadHistory(item)">载入</view>
-          <view class="history-delete btn-pill ui-btn-danger" @click.stop="deleteHistory(item.id)">删</view>
+          <VanButton class="history-load btn-pill" @click.stop="loadHistory(item)">载入</VanButton>
+          <VanButton type="danger" class="history-delete btn-pill" @click.stop="deleteHistory(item.id)">删</VanButton>
         </view>
-      </view>
+      </VanCell>
     </scroll-view>
 
     <!-- 详情弹窗 -->
@@ -118,6 +118,8 @@ import { ref, onMounted } from 'vue'
 import { useTravelStore } from '@/store/travel.js'
 import { useUserStore } from '@/store/user.js'
 import { getHistoryList, deleteHistory as deleteHistoryApi, getHistoryDetail, toggleFavorite as toggleFavoriteApi } from '@/api/history.js'
+import VanCell from '@/components/weui/VanCell.vue'
+import VanButton from '@/components/weui/VanButton.vue'
 
 const travelStore = useTravelStore()
 const userStore = useUserStore()

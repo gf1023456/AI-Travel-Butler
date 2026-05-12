@@ -15,3 +15,9 @@ This project now aligns core styles with component semantics inspired by:
 2. Introduce icon+text button pattern for all secondary actions.
 3. Convert Mine/Plan action groups to unified cell and button primitives.
 4. If dependency policy allows, progressively adopt official Vant Weapp components (`van-cell`, `van-button`, `van-tag`).
+
+## Current environment note
+- Direct package install from npm/GitHub is currently blocked by network policy (403).
+- Temporary local adapter components are provided in `src/components/weui/`:
+  - `VanCell.vue`
+  - `VanButton.vue`
