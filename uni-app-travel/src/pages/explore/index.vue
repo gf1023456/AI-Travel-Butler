@@ -203,6 +203,12 @@ onMounted(async () => {
   justify-content: center;
   font-size: 40rpx;
   color: #404040;
+  transition: transform var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out);
+}
+
+.back-btn:active {
+  transform: scale(0.96);
+  background: rgba(255, 255, 255, 0.7);
 }
 
 .page-title {
@@ -225,19 +231,9 @@ onMounted(async () => {
 
 .content {
   flex: 1;
-  padding: 0 40rpx;
+  padding: 0 var(--page-padding-x);
+  padding-bottom: var(--nav-height);
 }
-
-.aurora-orb {
-  position: fixed;
-  border-radius: 999rpx;
-  filter: blur(10px);
-  z-index: 0;
-  pointer-events: none;
-}
-
-.orb-a { width: 360rpx; height: 360rpx; top: 90rpx; right: -120rpx; background: radial-gradient(circle, rgba(96,165,250,.45), rgba(96,165,250,0)); }
-.orb-b { width: 300rpx; height: 300rpx; bottom: 180rpx; left: -90rpx; background: radial-gradient(circle, rgba(139,92,246,.35), rgba(139,92,246,0)); }
 
 .content { position: relative; z-index: 2; }
 
@@ -360,10 +356,16 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   box-shadow: var(--shadow-card-strong);
+  transition: transform var(--duration-fast) var(--ease-out), opacity var(--duration-fast) var(--ease-out);
+}
+
+.generate-btn:active {
+  transform: translateY(1rpx);
 }
 
 .generate-btn[disabled] {
   opacity: 0.6;
+  box-shadow: var(--shadow-card-soft);
 }
 
 .section-hint {

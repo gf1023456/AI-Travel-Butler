@@ -439,6 +439,12 @@ const loadHistoryList = async () => {
   color: #1f2937;
   background: rgba(255, 255, 255, 0.66);
   border-radius: 50%;
+  transition: transform var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out);
+}
+
+.back-btn:active {
+  transform: scale(0.96);
+  background: rgba(255, 255, 255, 0.78);
 }
 
 .page-title {
@@ -451,7 +457,7 @@ const loadHistoryList = async () => {
 }
 
 .content {
-  padding: 32rpx;
+  padding: 32rpx var(--page-padding-x);
   padding-bottom: var(--nav-height);
 }
 

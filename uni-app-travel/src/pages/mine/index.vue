@@ -605,9 +605,11 @@ const reLaunchTo = (url) => {
   font-weight: 600;
   color: #ba1a1a;
   box-shadow: var(--shadow-card-soft);
+  transition: transform var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out);
 }
 
 .logout-btn:active {
+  transform: translateY(1rpx);
   background: rgba(186, 26, 26, 0.1);
 }
 
