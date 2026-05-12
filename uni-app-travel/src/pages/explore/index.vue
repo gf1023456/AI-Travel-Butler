@@ -1,11 +1,11 @@
 <template>
-  <view class="page-container">
+  <view class="page-container app-shell">
     <!-- 顶部导航 -->
-    <view class="top-bar" :style="'padding-top:' + (safeAreaTop + 32) + 'px'">
-      <view class="back-btn" @click="goBack">
+    <view class="top-bar app-topbar" :style="'padding-top:' + (safeAreaTop + 32) + 'px'">
+      <view class="back-btn icon-btn" @click="goBack">
         <text>←</text>
       </view>
-      <text class="page-title">灵感探索</text>
+      <text class="page-title app-topbar-title">灵感探索</text>
     </view>
 
     <scroll-view scroll-y class="content">
@@ -55,7 +55,7 @@
 
       <!-- 生成按钮 -->
       <button
-        class="generate-btn"
+        class="generate-btn cta-btn"
         :loading="travelStore.loading"
         :disabled="travelStore.loading || !userInput.trim()"
         @click="handleGenerate"
@@ -184,40 +184,14 @@ onMounted(async () => {
 
 .top-bar {
   animation: driftIn var(--duration-slow) var(--ease-out);
-
-  display: flex;
-  align-items: center;
-  padding: 32rpx var(--page-padding-x);
-  gap: 20rpx;
-  background: var(--bg-topbar);
-  border-bottom: 1rpx solid var(--border-glass-soft);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
 }
 
 .back-btn {
-  width: 68rpx;
-  height: 68rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   font-size: 40rpx;
-  color: #404040;
-  transition: transform var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out);
-}
-
-.back-btn:active {
-  transform: scale(0.96);
-  background: rgba(255, 255, 255, 0.7);
 }
 
 .page-title {
   flex: 1;
-  font-size: var(--text-xl);
-  font-weight: 600;
-  color: #16203a;
-  font-family: var(--font-display);
-  letter-spacing: var(--title-letter-spacing);
 }
 
 .model-tag {
@@ -346,26 +320,10 @@ onMounted(async () => {
 
 .generate-btn {
   width: 100%;
-  height: var(--btn-height);
-  background: var(--gradient-primary);
-  border-radius: var(--radius-xl);
-  font-size: 32rpx;
-  font-weight: 600;
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: var(--shadow-card-strong);
-  transition: transform var(--duration-fast) var(--ease-out), opacity var(--duration-fast) var(--ease-out);
-}
-
-.generate-btn:active {
-  transform: translateY(1rpx);
 }
 
 .generate-btn[disabled] {
   opacity: 0.6;
-  box-shadow: var(--shadow-card-soft);
 }
 
 .section-hint {

@@ -2,19 +2,19 @@
   <view class="page-container">
     <!-- 行程面板 -->
     <view class="side-panel plan-panel panel-active">
-      <view class="panel-header">
-        <text class="panel-title">行程方案</text>
+      <view class="panel-header app-topbar">
+        <text class="panel-title app-topbar-title">行程方案</text>
         <view class="header-actions">
-          <view class="action-icon action-pill" @click="saveToHistory">
+          <view class="action-icon action-pill icon-btn" @click="saveToHistory">
             <text class="action-glyph">存</text>
           </view>
-          <view class="action-icon action-pill" @click="copyToClipboard">
+          <view class="action-icon action-pill icon-btn" @click="copyToClipboard">
             <text class="action-glyph">复</text>
           </view>
-          <view class="action-icon action-pill" @click="exportToFile">
+          <view class="action-icon action-pill icon-btn" @click="exportToFile">
             <text class="action-glyph">导</text>
           </view>
-          <view class="close-btn" @click="goBack">✕</view>
+          <view class="close-btn icon-btn" @click="goBack">✕</view>
         </view>
       </view>
       
