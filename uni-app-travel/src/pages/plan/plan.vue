@@ -33,7 +33,7 @@
           
           <!-- 每日行程 -->
           <view class="days-container">
-            <view
+            <VanCell
               v-for="(item, index) in sortedItinerary"
               :key="index"
               class="day-card"
@@ -49,10 +49,10 @@
               <text class="place-name">{{ item.name }}</text>
               <text class="place-desc">{{ item.description }}</text>
               <view v-if="item.city || (item.weather_icon && item.temperature)" class="place-meta">
-                <text v-if="item.city" class="meta-item">地点 · {{ item.city }}</text>
-                <text v-if="item.weather_icon && item.temperature" class="meta-item">天气 · {{ item.weather_icon }} {{ item.temperature }}</text>
+                <VanTag v-if="item.city" class="meta-item">地点 · {{ item.city }}</VanTag>
+                <VanTag v-if="item.weather_icon && item.temperature" type="success" class="meta-item">天气 · {{ item.weather_icon }} {{ item.temperature }}</VanTag>
               </view>
-            </view>
+            </VanCell>
           </view>
         </view>
       </scroll-view>
@@ -64,6 +64,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { useTravelStore } from '@/store/travel.js'
 import { saveHistory } from '@/api/history.js'
+import VanCell from '@/components/weui/VanCell.vue'
+import VanTag from '@/components/weui/VanTag.vue'
 
 const travelStore = useTravelStore()
 

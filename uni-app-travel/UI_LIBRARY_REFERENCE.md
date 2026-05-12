@@ -21,3 +21,4 @@ This project now aligns core styles with component semantics inspired by:
 - Temporary local adapter components are provided in `src/components/weui/`:
   - `VanCell.vue`
   - `VanButton.vue`
+  - `VanTag.vue`
