@@ -6,13 +6,13 @@
         <text class="panel-title app-topbar-title">行程方案</text>
         <view class="header-actions">
           <view class="action-icon action-pill icon-btn" @click="saveToHistory">
-            <text class="action-glyph">存</text>
+            <image class="action-svg" src="/static/icons/save.svg" mode="aspectFit" />
           </view>
           <view class="action-icon action-pill icon-btn" @click="copyToClipboard">
-            <text class="action-glyph">复</text>
+            <image class="action-svg" src="/static/icons/copy.svg" mode="aspectFit" />
           </view>
           <view class="action-icon action-pill icon-btn" @click="exportToFile">
-            <text class="action-glyph">导</text>
+            <image class="action-svg" src="/static/icons/export.svg" mode="aspectFit" />
           </view>
           <view class="close-btn icon-btn" @click="goBack">✕</view>
         </view>
@@ -360,6 +360,12 @@ const showToast = (message, type = 'normal', duration = 3000) => {
 .action-glyph {
   font-size: 24rpx;
   font-weight: 600;
+}
+
+.action-svg {
+  width: 26rpx;
+  height: 26rpx;
+  opacity: 0.92;
 }
 
 .action-icon:active {
