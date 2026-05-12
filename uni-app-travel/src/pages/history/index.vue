@@ -16,7 +16,7 @@
       <view
         v-for="item in historyList"
         :key="item.id"
-        class="history-item"
+        class="history-item ui-cell"
         @click="showDetails(item)"
       >
         <view class="history-info">
@@ -33,8 +33,8 @@
           <text class="history-prompt">{{ getPreviewText(item) }}</text>
         </view>
         <view class="history-actions">
-          <view class="history-load btn-pill" @click.stop="loadHistory(item)">载入</view>
-          <view class="history-delete btn-pill" @click.stop="deleteHistory(item.id)">删除</view>
+          <view class="history-load btn-pill ui-btn-primary" @click.stop="loadHistory(item)">载入</view>
+          <view class="history-delete btn-pill ui-btn-danger" @click.stop="deleteHistory(item.id)">删</view>
         </view>
       </view>
     </scroll-view>
@@ -483,17 +483,11 @@ const loadHistoryList = async () => {
 }
 
 .history-item {
-  border: 1rpx solid var(--border-glass-strong);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 32rpx;
-  background: rgba(255,255,255,.82);
-  border-radius: var(--radius-xl);
   margin-bottom: 24rpx;
-  box-shadow: var(--shadow-card-soft);
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
@@ -547,29 +541,10 @@ const loadHistoryList = async () => {
 }
 
 .history-load {
-  height: var(--btn-height);
-  padding: 0 32rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #34a853 0%, #2e8a49 100%);
-  color: white;
-  border-radius: var(--radius-full);
-  font-size: var(--text-sm);
-  font-weight: 500;
+  min-width: 108rpx;
 }
 
 .history-delete {
-  width: var(--btn-height);
-  height: var(--btn-height);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #ea4335 0%, #d62828 100%);
-  color: white;
-  font-size: var(--text-sm);
-  padding: 0;
   margin-left: 10rpx;
 }
 
