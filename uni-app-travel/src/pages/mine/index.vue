@@ -52,7 +52,7 @@
       <!-- 核心菜单列表 -->
       <view class="menu-card card-stack">
         <!-- 我的行程 -->
-        <view class="menu-item" @click="reLaunchTo('/pages/history/index')">
+        <VanCell class="menu-item" @click="reLaunchTo('/pages/history/index')">
           <view class="menu-left">
             <view class="menu-icon-wrapper menu-icon-blue">
               <text class="menu-icon">行程</text>
@@ -63,10 +63,10 @@
             </view>
           </view>
           <text class="menu-arrow">›</text>
-        </view>
+        </VanCell>
 
         <!-- 设置 -->
-        <view class="menu-item" @click="navigateTo('/pages/settings/index')">
+        <VanCell class="menu-item" @click="navigateTo('/pages/settings/index')">
           <view class="menu-left">
             <view class="menu-icon-wrapper menu-icon-slate">
               <text class="menu-icon">设置</text>
@@ -77,10 +77,10 @@
             </view>
           </view>
           <text class="menu-arrow">›</text>
-        </view>
+        </VanCell>
 
         <!-- 帮助与反馈 -->
-        <view class="menu-item" @click="navigateTo('/pages/feedback/index')">
+        <VanCell class="menu-item" @click="navigateTo('/pages/feedback/index')">
           <view class="menu-left">
             <view class="menu-icon-wrapper menu-icon-orange">
               <text class="menu-icon">反馈</text>
@@ -91,7 +91,7 @@
             </view>
           </view>
           <text class="menu-arrow">›</text>
-        </view>
+        </VanCell>
       </view>
 
       <!-- 会员权益卡片 -->
@@ -104,7 +104,7 @@
       </view>
 
       <!-- 退出登录 -->
-      <button class="logout-btn" @click="handleLogout">退出登录</button>
+      <VanButton block type="danger" class="logout-btn" @click="handleLogout">退出登录</VanButton>
 
       <!-- 版本信息 -->
       <view class="version-info">
@@ -138,6 +138,8 @@ import { ref, onMounted } from 'vue'
 import { useUserStore } from '@/store/user.js'
 import { getUserInfo } from '@/api/user.js'
 import { getQuota } from '@/api/quota.js'
+import VanCell from '@/components/weui/VanCell.vue'
+import VanButton from '@/components/weui/VanButton.vue'
 
 const userStore = useUserStore()
 
@@ -466,11 +468,11 @@ const reLaunchTo = (url) => {
 
 /* 菜单卡片 */
 .menu-card {
-  background: rgba(255,255,255,.82);
-  border-radius: 32rpx;
-  overflow: hidden;
-  box-shadow: var(--shadow-card-soft);
-  border: 1rpx solid var(--border-glass-strong);
+  background: transparent;
+  border-radius: 0;
+  overflow: visible;
+  box-shadow: none;
+  border: none;
 }
 
 .menu-item {
@@ -478,15 +480,7 @@ const reLaunchTo = (url) => {
   align-items: center;
   justify-content: space-between;
   padding: 32rpx;
-  border-bottom: 1rpx solid rgba(0, 0, 0, 0.05);
-}
-
-.menu-item:last-child {
-  border-bottom: none;
-}
-
-.menu-item:active {
-  background: #F1F3F4;
+  margin-bottom: 16rpx;
 }
 
 .menu-left {
@@ -593,24 +587,13 @@ const reLaunchTo = (url) => {
 /* 退出登录按钮 */
 .logout-btn {
   margin-top: 64rpx;
-  background: rgba(255,255,255,.82);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   width: 100%;
   height: var(--btn-height);
-  padding: 0;
-  border: 1rpx solid var(--border-glass-strong);
-  border-radius: 32rpx;
-  font-size: 32rpx;
-  font-weight: 600;
-  color: #ba1a1a;
   box-shadow: var(--shadow-card-soft);
-  transition: transform var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out);
 }
 
 .logout-btn:active {
   transform: translateY(1rpx);
-  background: rgba(186, 26, 26, 0.1);
 }
 
 /* 版本信息 */
