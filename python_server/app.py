@@ -35,7 +35,7 @@ from modules.post_processor import (
     enrich_with_mcp_signals
 )
 from modules.verifier import verify_plan
-from modules.mcp_enhancements import enrich_with_mcp_data, incorporate_mcp_results
+from modules.image_fetcher import enrich_images
 
 
 app = FastAPI(
@@ -52,10 +52,14 @@ app.add_middleware(
 )
 
 # 注册路由
-from routes import user_router, history_router, quota_router
+from routes import user_router, history_router, quota_router, weather_router, location_router
+from routes.plan_v2 import router as plan_v2_router
 app.include_router(user_router)
 app.include_router(history_router)
 app.include_router(quota_router)
+app.include_router(weather_router)
+app.include_router(location_router)
+app.include_router(plan_v2_router)
 
 knowledge_cache = None
 execution_log_store: Dict[str, Dict] = {}
@@ -352,10 +356,14 @@ async def call_ai_model(provider: str, model: str, prompt: str, user_input: str,
             mcp_trace.append(f"tool_round:{round_idx}:no_more_calls")
             break
 
+        mapped = map_tool_calls(tool_calls, mcp_trace, provider)
+        day_plan_itinerary.extend(mapped.get("dayPlanItinerary", []))
+        if mapped.get("socialRecommendations") and not social_recommendations:
+            social_recommendations = mapped["socialRecommendations"]
+
         for tc in tool_calls:
             fn_name = tc.get("function", {}).get("name")
             raw_args = tc.get("function", {}).get("arguments", "{}")
-
             try:
                 args = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
             except:
@@ -363,11 +371,17 @@ async def call_ai_model(provider: str, model: str, prompt: str, user_input: str,
 
             print(f"[TOOL_CALL] {fn_name}:", args)
 
-            tool_result = "[]"
             if fn_name == "get_social_recommendations":
                 mcp_trace.append(f"tool:{provider}:get_social_recommendations:executed")
+                recs = social_recommendations or []
+                tool_result = json.dumps({"status": "ok", "count": len(recs), "recommendations": [r.get("title", "") for r in recs]}, ensure_ascii=False)
             elif fn_name == "location":
                 mcp_trace.append(f"tool:{provider}:location:executed")
+                name = args.get("name", "")
+                item = next((i for i in mapped.get("dayPlanItinerary", []) if i.get("name") == name), None)
+                tool_result = json.dumps({"status": "ok", "name": name, "city": args.get("city", ""), "lat": item.get("lat") if item else args.get("lat"), "lng": item.get("lng") if item else args.get("lng")}, ensure_ascii=False)
+            else:
+                tool_result = "[]"
 
             messages.append({
                 "role": "tool",
@@ -375,17 +389,10 @@ async def call_ai_model(provider: str, model: str, prompt: str, user_input: str,
                 "content": tool_result
             })
 
-        mapped = map_tool_calls(tool_calls, mcp_trace, provider)
-        day_plan_itinerary.extend(mapped.get("dayPlanItinerary", []))
-        if mapped.get("socialRecommendations") and not social_recommendations:
-            social_recommendations = mapped["socialRecommendations"]
-
         mcp_trace.append(f"tool_round:{round_idx}:completed:{len(tool_calls)}_calls")
 
     if not day_plan_itinerary and social_recommendations:
         day_plan_itinerary = synthesize_locations_from_social(user_input, social_recommendations, provider, mcp_trace)
-
-    mcp_results = await enrich_with_mcp_data(day_plan_itinerary, mcp_trace)
 
     return {
         "provider": provider,
@@ -393,8 +400,41 @@ async def call_ai_model(provider: str, model: str, prompt: str, user_input: str,
         "dayPlanItinerary": day_plan_itinerary,
         "socialRecommendations": social_recommendations,
         "mcpTrace": mcp_trace,
-        "mcpResults": mcp_results
     }
+
+
+async def fetch_real_weather(itinerary: List[Dict], mcp_trace: List[str]) -> Dict:
+    """Use Hefeng API to fetch real weather for the first valid location in itinerary."""
+    if not itinerary:
+        return {}
+    for item in itinerary:
+        try:
+            lat = float(item.get("lat", 0))
+            lng = float(item.get("lng", 0))
+            if lat and lng:
+                QWEATHER_BASE_URL = "https://devapi.qweather.com/v7"
+                QWEATHER_API_KEY = "8b8a55610b67456091a21ea4cdc870ba"
+                url = f"{QWEATHER_BASE_URL}/weather/now"
+                async with httpx.AsyncClient(timeout=8) as client:
+                    resp = await client.get(url, params={"location": f"{lng},{lat}", "key": QWEATHER_API_KEY})
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        if data.get("code") == "200":
+                            now = data["now"]
+                            mcp_trace.append("weather:realtime_api:success")
+                            return {
+                                "temp": now["temp"],
+                                "icon": now["icon"],
+                                "text": now["text"],
+                                "obsTime": now["obsTime"],
+                                "windDir": now["windDir"],
+                                "windScale": now["windScale"],
+                                "humidity": now["humidity"],
+                            }
+        except Exception as e:
+            mcp_trace.append(f"weather:realtime_api:error:{e}")
+            continue
+    return {}
 
 
 async def generate_plan(payload: Dict, request_id: str) -> Dict:
@@ -447,15 +487,15 @@ async def generate_plan(payload: Dict, request_id: str) -> Dict:
         mcp_trace
     )
 
-    plan["dayPlanItinerary"] = enrich_with_mcp_signals(plan.get("dayPlanItinerary", []), mcp_trace)
+    real_weather = await fetch_real_weather(plan.get("dayPlanItinerary", []), mcp_trace)
+    plan["dayPlanItinerary"] = enrich_with_mcp_signals(plan.get("dayPlanItinerary", []), mcp_trace, real_weather)
+
+    plan["dayPlanItinerary"] = await enrich_images(plan.get("dayPlanItinerary", []), mcp_trace)
 
     warnings = verify_plan(plan.get("dayPlanItinerary", []), mcp_trace)
     plan["warnings"] = warnings
 
     plan["evidence"] = evidence
-
-    if plan.get("mcpResults"):
-        plan = incorporate_mcp_results(plan, plan["mcpResults"])
 
     response_cache[cache_key] = {
         "value": plan,

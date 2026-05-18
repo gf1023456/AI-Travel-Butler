@@ -12,22 +12,51 @@ def extract_expected_city_from_input(user_input: str, social_recommendations: Li
     return infer_city_from_request(user_input, social_recommendations) or ""
 
 
+def _geo_distance_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    """Approximate distance in km using equirectangular projection."""
+    import math
+    dlat = math.radians(lat2 - lat1)
+    dlng = math.radians(lng2 - lng1)
+    lat1_rad = math.radians(lat1)
+    lat2_rad = math.radians(lat2)
+    a = math.sin(dlat / 2) ** 2 + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(dlng / 2) ** 2
+    return 2 * 6371 * math.asin(math.sqrt(a))
+
+
 def harmonize_itinerary_city(items: List[Dict], expected_city: str, mcp_trace: List[str]) -> List[Dict]:
-    """Ensure all locations are in the expected city."""
+    """Ensure all locations are in the expected city, with geo-distance validation."""
     if not expected_city:
         return items
 
+    center = get_city_center(expected_city)
+    max_dist_km = 100  # ~1 degree threshold
+
     replaced = 0
+    skipped = 0
     normalized = []
     for item in items:
         if item.get("city") == expected_city:
             normalized.append(item)
         else:
+            item_lat = item.get("lat")
+            item_lng = item.get("lng")
+            if item_lat and item_lng:
+                try:
+                    dist = _geo_distance_km(float(item_lat), float(item_lng), center["lat"], center["lng"])
+                    if dist > max_dist_km:
+                        skipped += 1
+                        mcp_trace.append(f"postprocess:city_skip_geo:{item.get('name')}:{item.get('city')}->{expected_city}:{dist:.0f}km")
+                        normalized.append(item)
+                        continue
+                except (ValueError, TypeError):
+                    pass
             replaced += 1
             normalized.append({**item, "city": expected_city})
 
     if replaced > 0:
         mcp_trace.append(f"postprocess:city_aligned:{expected_city}:count:{replaced}")
+    if skipped > 0:
+        mcp_trace.append(f"postprocess:city_geo_skipped:{expected_city}:count:{skipped}")
 
     return normalized
 
@@ -111,8 +140,8 @@ def ensure_minimum_items_by_requested_days(items: List[Dict], user_input: str, s
     return merged
 
 
-def enrich_with_mcp_signals(items: List[Dict], mcp_trace: List[str]) -> List[Dict]:
-    """Enrich itinerary with MCP signals."""
+def enrich_with_mcp_signals(items: List[Dict], mcp_trace: List[str], real_weather: Dict = None) -> List[Dict]:
+    """Enrich itinerary with MCP signals. Pass real_weather={\"temp\":...,\"icon\":...,\"text\":...,\"obsTime\":...} from external API."""
     import math
 
     sorted_items = sorted(items, key=lambda x: (x.get("day", 1), x.get("sequence", 1)))
@@ -151,17 +180,27 @@ def enrich_with_mcp_signals(items: List[Dict], mcp_trace: List[str]) -> List[Dic
                 next_transit = f"建议从 {item.get('name')} 前往下一站"
                 mcp_trace.append("mcp:route:error_calculating")
 
-        time_str = item.get("time", "")
-        first_hour = int(time_str.split(":")[0]) if ":" in time_str else 12
-        if first_hour <= 8:
-            weather = {"weather_icon": "🌤️", "weather_condition": "清晨晴朗", "temperature": "18°C"}
-        elif first_hour <= 16:
-            weather = {"weather_icon": "☀️", "weather_condition": "白天晴朗", "temperature": "25°C"}
+        if real_weather:
+            text = real_weather.get("text", "晴")
+            icon_map = {"晴": "☀️", "多云": "⛅", "阴": "☁️", "雨": "🌧️", "雪": "❄️", "雾": "🌫️", "霾": "😶‍🌫️"}
+            icon_emoji = next((v for k, v in icon_map.items() if k in text), "🌤️")
+            weather = {
+                "weather_icon": icon_emoji,
+                "weather_condition": text,
+                "temperature": f"{real_weather.get('temp', '25')}°C"
+            }
+            mcp_trace.append("mcp:weather:realtime_api")
         else:
-            weather = {"weather_icon": "🌙", "weather_condition": "夜间微风", "temperature": "20°C"}
-
-        if not item.get("weather_icon"):
-            mcp_trace.append("mcp:weather:estimated_point_forecast")
+            time_str = item.get("time", "")
+            first_hour = int(time_str.split(":")[0]) if ":" in time_str else 12
+            if first_hour <= 8:
+                weather = {"weather_icon": "🌤️", "weather_condition": "清晨晴朗", "temperature": "18°C"}
+            elif first_hour <= 16:
+                weather = {"weather_icon": "☀️", "weather_condition": "白天晴朗", "temperature": "25°C"}
+            else:
+                weather = {"weather_icon": "🌙", "weather_condition": "夜间微风", "temperature": "20°C"}
+            if not item.get("weather_icon"):
+                mcp_trace.append("mcp:weather:estimated_point_forecast")
 
         description = item.get("description", "")
         if not description or len(description) < 20:
