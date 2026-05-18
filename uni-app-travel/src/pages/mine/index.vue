@@ -1,5 +1,6 @@
 <template>
   <view class="mine-page">
+    <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <header class="top-bar">
       <view class="top-left">
         <image class="top-avatar" :src="userAvatar" mode="aspectFill" />
@@ -97,7 +98,7 @@
     </scroll-view>
 
     <!-- Bottom Navigation -->
-    <nav class="bottom-nav">
+    <nav class="bottom-nav" :style="{ bottom: (24 + safeAreaBottom) + 'px' }">
       <button class="nav-item" @click="reLaunch('/pages/index/index')">
         <text class="nav-item-icon">🧭</text>
         <text class="nav-item-label">探索</text>
@@ -119,6 +120,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useUserStore } from '@/store/user.js'
 import { getUserInfo } from '@/api/user.js'
 import { getQuota } from '@/api/quota.js'
+import { useSafeArea } from '@/utils/safeArea.js'
 
 const userStore = useUserStore()
 const defaultAvatar = 'https://ui-avatars.com/api/?name=慧游&background=1a237e&color=fff&size=256'
@@ -126,6 +128,7 @@ const userAvatar = computed(() => userStore.avatarUrl || defaultAvatar)
 
 const userInfo = ref({ nickname: '', avatar: '', id: '' })
 const quotaInfo = ref({ used: 0, bonus: 0, max: 10, remaining: 10 })
+const { statusBarHeight, safeAreaBottom } = useSafeArea()
 
 onMounted(async () => {
   userStore.restoreFromStorage()
@@ -189,7 +192,7 @@ const showDevToast = () => uni.showToast({ title: '页面开发中', icon: 'none
 
 .top-bar {
   display: flex; align-items: center; justify-content: space-between;
-  padding: calc(12px + var(--status-bar-height)) 20px 12px;
+  padding: 12px 20px 12px;
   background: rgba(255,255,255,0.7); backdrop-filter: blur(40px);
   -webkit-backdrop-filter: blur(40px);
   border-bottom: 1px solid rgba(255,255,255,0.2);
@@ -315,7 +318,7 @@ const showDevToast = () => uni.showToast({ title: '页面开发中', icon: 'none
 .logout-icon { font-size: 20px; }
 
 .bottom-nav {
-  position: fixed; bottom: 24px; left: 20px; right: 20px; z-index: 10;
+  position: fixed; left: 20px; right: 20px; z-index: 10;
   display: flex; align-items: center; justify-content: space-around;
   height: 80px; padding: 0 8px;
   background: rgba(255,255,255,0.85); backdrop-filter: blur(40px);

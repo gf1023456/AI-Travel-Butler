@@ -1,5 +1,6 @@
 <template>
   <view class="history-page">
+    <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <header class="top-bar">
       <button class="back-btn" @click="goBack"><text>←</text></button>
       <text class="top-brand">慧游</text>
@@ -110,9 +111,11 @@ import { ref, onMounted } from 'vue'
 import { useTravelStore } from '@/store/travel.js'
 import { useUserStore } from '@/store/user.js'
 import { getHistoryList, deleteHistory as deleteHistoryApi, getHistoryDetail } from '@/api/history.js'
+import { useSafeArea } from '@/utils/safeArea.js'
 
 const travelStore = useTravelStore()
 const userStore = useUserStore()
+const { statusBarHeight } = useSafeArea()
 
 const historyList = ref([])
 const showDetailPopup = ref(false)
@@ -261,7 +264,7 @@ const loadHistoryList = async () => {
 .history-page { min-height: 100vh; background: var(--color-surface); }
 .top-bar {
   display: flex; align-items: center; justify-content: space-between;
-  padding: calc(12px + var(--status-bar-height)) 20px 8px;
+  padding: 12px 20px 8px;
   background: rgba(248,249,250,0.8); backdrop-filter: blur(40px);
   -webkit-backdrop-filter: blur(40px);
   border-bottom: 1px solid rgba(198,197,212,0.3);

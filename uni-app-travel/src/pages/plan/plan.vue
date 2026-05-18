@@ -1,6 +1,6 @@
 <template>
   <view class="plan-page">
-    <header class="top-bar">
+    <header class="top-bar" :style="{ paddingTop: (12 + statusBarHeight) + 'px' }">
       <view class="top-left">
         <button class="back-btn" @click="goBack">
           <text>←</text>
@@ -12,9 +12,9 @@
       </button>
     </header>
 
-    <scroll-view scroll-y class="content">
+    <scroll-view scroll-y class="content" :style="{ paddingTop: (80 + statusBarHeight) + 'px' }">
       <section class="hero-card" v-if="travelStore.currentPlan">
-        <image class="hero-img" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA02IZ_Cr-4sufxcvHZE8BU-38VV750iCYCWUNAwyxlCSLM0AjHjpLAhgQRLRXHRHbXoirHSD1z_1rNdMbasVr_jytZZbzzrdl2hnY71--UeKVV3Hdz4bystRXxSG5qzhpJ3APxP4J6AxfOIImSrnJqnP5Ln1SB6Tr-1uIFhp3Nl1SiR56udEqhJYI7BtB92gIKbmACxLNZB7As774DxNGWsoJOszF7XWoB-hu0sTorTf2jEN5xipAxGw32wLlBCLeC-ZIwBXLUhDs" mode="aspectFill" />
+        <image class="hero-img" src="https://tonystark-ai.ccwu.cc/png/fed79683-fbb6-44ac-9327-44c2f269cc47.png" mode="aspectFill" />
         <view class="hero-overlay"></view>
         <view class="hero-content">
           <text class="hero-title">{{ itinerarySummary || '行程方案' }}</text>
@@ -67,7 +67,7 @@
     </scroll-view>
 
     <!-- Bottom Action Bar -->
-    <view class="action-bar">
+    <view class="action-bar" :style="{ bottom: safeAreaBottom + 'px' }">
       <button class="action-btn action-outline" @click="copyToClipboard">
         <text>📋</text>
         <text>复制</text>
@@ -83,7 +83,7 @@
     </view>
 
     <!-- Floating AI Bubble -->
-    <button class="ai-bubble" @click="goRefine">
+    <button class="ai-bubble" @click="goRefine" :style="{ bottom: (112 + safeAreaBottom) + 'px' }">
       <text>🤖</text>
     </button>
   </view>
@@ -94,10 +94,12 @@ import { ref, computed, onMounted } from 'vue'
 import { useTravelStore } from '@/store/travel.js'
 import { useUserStore } from '@/store/user.js'
 import { saveHistory } from '@/api/history.js'
+import { useSafeArea } from '@/utils/safeArea.js'
 
 const travelStore = useTravelStore()
 const userStore = useUserStore()
 const userAvatar = computed(() => userStore.avatarUrl || 'https://ui-avatars.com/api/?name=慧游&background=1a237e&color=fff&size=64')
+const { statusBarHeight, safeAreaBottom } = useSafeArea()
 
 const dayPlanItinerary = ref([])
 const itinerarySummary = ref('')
@@ -253,7 +255,7 @@ const generateText = () => {
 .top-bar {
   position: fixed; top: 0; left: 0; right: 0; z-index: 10;
   display: flex; align-items: center; justify-content: space-between;
-  padding: calc(12px + var(--status-bar-height)) 20px 12px;
+  padding: 12px 20px 12px;
   background: rgba(255,255,255,0.7); backdrop-filter: blur(40px);
   -webkit-backdrop-filter: blur(40px);
   border-bottom: 1px solid rgba(255,255,255,0.2);
@@ -266,7 +268,7 @@ const generateText = () => {
 .top-title { font-size: 24px; font-weight: 700; color: var(--color-primary); letter-spacing: -0.01em; line-height: 32px; }
 .top-avatar { width: 32px; height: 32px; border-radius: 50%; }
 
-.content { padding: calc(80px + var(--status-bar-height)) 20px 140px; }
+.content { padding: 80px 20px 140px; }
 
 .hero-card {
   position: relative; overflow: hidden; border-radius: 16px;
@@ -340,7 +342,7 @@ const generateText = () => {
 .item-desc { font-size: 13px; color: var(--color-on-surface-variant); margin-top: 8px; line-height: 1.5; }
 
 .action-bar {
-  position: fixed; bottom: 0; left: 0; right: 0; z-index: 10;
+  position: fixed; left: 0; right: 0; z-index: 10;
   display: flex; gap: 12px; padding: 20px;
   background: rgba(255,255,255,0.85); backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
@@ -361,7 +363,7 @@ const generateText = () => {
 }
 
 .ai-bubble {
-  position: fixed; bottom: 112px; right: 24px; z-index: 10;
+  position: fixed; right: 24px; z-index: 10;
   width: 56px; height: 56px; border-radius: 50%;
   background: linear-gradient(135deg, #000666 0%, #343d96 100%);
   display: flex; align-items: center; justify-content: center;

@@ -19,7 +19,7 @@
     <view class="map-overlay"></view>
 
     <!-- Glass Top Bar -->
-    <header class="top-nav">
+    <header class="top-nav" :style="{ paddingTop: (12 + statusBarHeight) + 'px' }">
       <view class="nav-left">
         <image class="nav-avatar" :src="userAvatar" mode="aspectFill" />
         <view class="nav-location">
@@ -57,7 +57,7 @@
     </view>
 
     <!-- Itinerary Quick Card -->
-    <view class="quick-card" v-if="hasPlan">
+    <view class="quick-card" v-if="hasPlan" :style="{ bottom: (180 + safeAreaBottom) + 'px' }">
       <view class="quick-card-inner">
         <image class="quick-img" :src="planImage" mode="aspectFill" />
         <view class="quick-info">
@@ -75,13 +75,13 @@
     </view>
 
     <!-- Floating AI Butler -->
-    <button class="ai-butler" @click="goExplore">
+    <button class="ai-butler" @click="goExplore" :style="{ bottom: (136 + safeAreaBottom) + 'px' }">
       <text class="ai-icon">✨</text>
       <text class="ai-text">为您推荐附近的百年书屋</text>
     </button>
 
     <!-- Bottom Navigation -->
-    <nav class="bottom-nav">
+    <nav class="bottom-nav" :style="{ bottom: (32 + safeAreaBottom) + 'px' }">
       <button :class="['nav-item', 'nav-active']" @click="goExplore">
         <text class="nav-item-icon">🧭</text>
         <text class="nav-item-label">探索</text>
@@ -161,6 +161,7 @@ import { useTravelStore } from '@/store/travel.js'
 import { useUserStore } from '@/store/user.js'
 import { computed } from 'vue'
 import { getWeatherNow } from '@/api/weather.js'
+import { useSafeArea } from '@/utils/safeArea.js'
 
 export default {
   data() {
@@ -175,7 +176,9 @@ export default {
       userLocation: null,
       locationName: '获取位置中...',
       weather: null,
-      _locating: false
+      _locating: false,
+      statusBarHeight: 0,
+      safeAreaBottom: 0
     }
   },
   computed: {
@@ -393,6 +396,9 @@ export default {
     }
   },
   onLoad() {
+    const { statusBarHeight, safeAreaBottom } = useSafeArea()
+    this.statusBarHeight = statusBarHeight
+    this.safeAreaBottom = safeAreaBottom
     this.userStore.restoreFromStorage()
     this.getUserLocation().then(() => this.loadFromStore())
   },
@@ -418,7 +424,7 @@ export default {
 .top-nav {
   position: fixed; top: 0; left: 0; right: 0; z-index: 10;
   display: flex; align-items: center; justify-content: space-between;
-  padding: calc(12px + var(--status-bar-height)) 24px 12px;
+  padding: 12px 24px 12px;
   background: rgba(255,255,255,0.85); backdrop-filter: blur(32px) saturate(200%);
   -webkit-backdrop-filter: blur(32px) saturate(200%);
   border-bottom: 1px solid rgba(255,255,255,0.5);
@@ -514,7 +520,7 @@ export default {
 .ai-text { font-size: 14px; font-weight: 600; line-height: 22px; white-space: nowrap; }
 
 .bottom-nav {
-  position: fixed; bottom: 32px; left: 24px; right: 24px; z-index: 10;
+  position: fixed; left: 24px; right: 24px; z-index: 10;
   display: flex; align-items: center; justify-content: space-around;
   height: 72px; padding: 0 8px;
   background: rgba(255,255,255,0.85); backdrop-filter: blur(32px) saturate(200%);

@@ -57,7 +57,10 @@
     "navigationBarTextStyle": "black",
     "navigationBarTitleText": "慧游",
     "navigationBarBackgroundColor": "#F8F9FA",
-    "backgroundColor": "#F8F9FA"
+    "backgroundColor": "#F8F9FA",
+    "app-plus": {
+      "safeArea": "auto"
+    }
   },
   "uniIdRouter": {}
 }

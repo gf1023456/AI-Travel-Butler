@@ -1,6 +1,6 @@
 <template>
   <view class="refine-page">
-    <header class="top-bar">
+    <header class="top-bar" :style="{ paddingTop: (12 + statusBarHeight) + 'px' }">
       <view class="top-left">
         <button class="back-btn" @click="goBack"><text>←</text></button>
         <text class="top-title">行程优化</text>
@@ -8,7 +8,7 @@
       <button class="more-btn"><text>⋯</text></button>
     </header>
 
-    <scroll-view scroll-y class="content">
+    <scroll-view scroll-y class="content" :style="{ paddingTop: (80 + statusBarHeight) + 'px' }">
       <!-- Trip Summary -->
       <section class="section">
         <view class="section-header">
@@ -86,8 +86,10 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useTravelStore } from '@/store/travel.js'
+import { useSafeArea } from '@/utils/safeArea.js'
 
 const travelStore = useTravelStore()
+const { statusBarHeight } = useSafeArea()
 const refineRequest = ref('')
 const charCount = computed(() => refineRequest.value.length)
 
@@ -146,7 +148,7 @@ const handleRefine = async () => {
 .top-bar {
   position: fixed; top: 0; left: 0; right: 0; z-index: 10;
   display: flex; align-items: center; justify-content: space-between;
-  padding: calc(12px + var(--status-bar-height)) 20px 12px;
+  padding: 12px 20px 12px;
   background: var(--color-surface); opacity: 0.95;
   backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid rgba(255,255,255,0.2);
@@ -156,7 +158,7 @@ const handleRefine = async () => {
 .top-title { font-size: 20px; font-weight: 600; color: var(--color-primary); line-height: 28px; }
 .more-btn { font-size: 24px; color: var(--color-on-surface-variant); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
 
-.content { padding: calc(80px + var(--status-bar-height)) 20px 32px; }
+.content { padding: 80px 20px 32px; }
 
 .section { margin-bottom: 40px; }
 .section-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }

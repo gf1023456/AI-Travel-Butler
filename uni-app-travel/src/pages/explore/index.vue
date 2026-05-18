@@ -1,5 +1,6 @@
 <template>
   <view class="explore-page">
+    <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <header class="top-bar">
       <view class="top-left">
         <button class="top-back" @click="goBack">
@@ -78,10 +79,12 @@ import { ref, computed, onMounted } from 'vue'
 import { useTravelStore } from '@/store/travel.js'
 import { useUserStore } from '@/store/user.js'
 import { getCurrentModel } from '@/api/travel.js'
+import { useSafeArea } from '@/utils/safeArea.js'
 
 const travelStore = useTravelStore()
 const userStore = useUserStore()
 const userAvatar = computed(() => userStore.avatarUrl || 'https://ui-avatars.com/api/?name=慧游&background=1a237e&color=fff&size=64')
+const { statusBarHeight } = useSafeArea()
 
 onMounted(() => { userStore.restoreFromStorage() })
 
@@ -137,7 +140,7 @@ const handleGenerate = async () => {
 }
 .top-bar {
   display: flex; align-items: center; justify-content: space-between;
-  padding: calc(12px + var(--status-bar-height)) 20px 8px;
+  padding: 12px 20px 8px;
   background: rgba(248,249,250,0.8);
   backdrop-filter: blur(40px);
   -webkit-backdrop-filter: blur(40px);

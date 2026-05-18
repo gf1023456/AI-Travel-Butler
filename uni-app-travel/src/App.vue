@@ -15,12 +15,17 @@ const whiteList = [
 ]
 
 onLaunch(() => {
-  const { statusBarHeight } = uni.getSystemInfoSync()
+  const systemInfo = uni.getSystemInfoSync()
+  uni.$systemInfo = systemInfo
+  // #ifdef H5
   try {
     if (typeof document !== 'undefined' && document.documentElement) {
-      document.documentElement.style.setProperty('--status-bar-height', statusBarHeight + 'px')
+      const safeAreaBottom = Math.max(0, systemInfo.screenHeight - (systemInfo.safeArea?.bottom || systemInfo.screenHeight))
+      document.documentElement.style.setProperty('--status-bar-height', systemInfo.statusBarHeight + 'px')
+      document.documentElement.style.setProperty('--safe-area-bottom', safeAreaBottom + 'px')
     }
-  } catch (e) { /* MP 无 document */ }
+  } catch (e) { /* ignore */ }
+  // #endif
 })
 
 onShow(() => {
