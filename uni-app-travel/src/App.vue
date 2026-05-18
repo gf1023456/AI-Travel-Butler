@@ -15,7 +15,12 @@ const whiteList = [
 ]
 
 onLaunch(() => {
-  console.log('App Launch')
+  const { statusBarHeight } = uni.getSystemInfoSync()
+  try {
+    if (typeof document !== 'undefined' && document.documentElement) {
+      document.documentElement.style.setProperty('--status-bar-height', statusBarHeight + 'px')
+    }
+  } catch (e) { /* MP 无 document */ }
 })
 
 onShow(() => {
@@ -62,8 +67,8 @@ const checkAuth = () => {
 }
 
 page {
-  background-color: var(--bg-base);
-  font-family: 'PingFang SC', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+  background-color: var(--color-surface);
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

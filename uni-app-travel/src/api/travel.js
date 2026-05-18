@@ -23,6 +23,14 @@ export const createPlan = (params) => {
   })
 }
 
+export const createPlanV2 = (params) => {
+  return post('/plan/v2', {
+    userInput: params.userInput,
+    modelType: params.modelType || 'auto',
+    travelMode: params.travelMode || 'deep'
+  })
+}
+
 /**
  * 优化现有行程
  * @param {Object} params - 优化参数

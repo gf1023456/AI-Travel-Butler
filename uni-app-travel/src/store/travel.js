@@ -134,6 +134,32 @@ export const useTravelStore = defineStore('travel', {
     },
 
     /**
+     * 创建行程（V2 单轮 JSON 方案）
+     */
+    async createPlanV2(params) {
+      this.loading = true
+      this.error = null
+      try {
+        if (!params.userInput || typeof params.userInput !== 'string') {
+          throw new Error('请输入旅行需求')
+        }
+        const result = await travelApi.createPlanV2({
+          userInput: params.userInput,
+          modelType: params.modelType || 'auto',
+          travelMode: params.travelMode || 'deep'
+        })
+        this.currentPlan = result
+        this.planHistory.push(result)
+        return result
+      } catch (error) {
+        this.error = error.message || '创建行程失败'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    /**
      * 优化行程
      */
     async refinePlan(params) {

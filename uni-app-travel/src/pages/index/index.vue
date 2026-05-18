@@ -1,6 +1,6 @@
 <template>
-  <view class="container">
-    <!-- 地图 -->
+  <view class="map-page">
+    <!-- Fullscreen Map -->
     <map
       class="map-container"
       :longitude="center[1]"
@@ -9,464 +9,598 @@
       :show-location="true"
       :enable-zoom="true"
       :enable-scroll="true"
-      :enable-rotate="false"
       :enable-satellite="mapType === 'satellite'"
       :polyline="polylines"
       :markers="markers"
       @markertap="onMarkerTap"
     />
 
-    <!-- 底部导航 -->
-    <view class="bottom-nav">
-      <view class="nav-item" @click="goExplore">
-        <text class="nav-icon">🧭</text>
-        <text class="nav-label">探索</text>
+    <!-- Map Overlay Gradient -->
+    <view class="map-overlay"></view>
+
+    <!-- Glass Top Bar -->
+    <header class="top-nav">
+      <view class="nav-left">
+        <image class="nav-avatar" :src="userAvatar" mode="aspectFill" />
+        <view class="nav-location">
+          <text class="nav-brand">慧游</text>
+          <view class="location-row">
+            <text class="loc-icon">📍</text>
+            <text class="loc-text">{{ locationName }}</text>
+          </view>
+          <view class="weather-row" v-if="weather">
+            <image class="weather-icon" :src="`https://a.hecdn.net/img/common/icon/202406d/${weather.icon}.png`" mode="widthFix" />
+            <text class="weather-text">{{ weather.temp }}°C {{ weather.text }}</text>
+          </view>
+        </view>
       </view>
-      <view class="nav-item" @click="goPlan">
-        <text class="nav-icon">📅</text>
-        <text class="nav-label">行程</text>
+      <view class="nav-actions">
+        <button class="nav-btn"><text>🔍</text></button>
+        <button class="nav-btn"><text>🔔</text></button>
       </view>
-      <view class="nav-item" @click="toggleMapType">
-        <text class="nav-icon">{{ mapType === 'satellite' ? '🛰️' : '🗺️' }}</text>
-        <text class="nav-label">{{ mapType === 'satellite' ? '卫星图' : '标准图' }}</text>
+    </header>
+
+    <!-- Right Side Map Controls -->
+    <view class="map-controls">
+      <view class="ctrl-group">
+        <button :class="['ctrl-btn', mapType === 'standard' ? 'ctrl-active' : '']" @click="mapType = 'standard'">
+          <text>🗺️</text>
+        </button>
+        <view class="ctrl-divider"></view>
+        <button :class="['ctrl-btn', mapType === 'satellite' ? 'ctrl-active' : '']" @click="mapType = 'satellite'">
+          <text>🛰️</text>
+        </button>
       </view>
-      <view class="nav-item" @click="goHistory">
-        <text class="nav-icon">🕐</text>
-        <text class="nav-label">历史</text>
-      </view>
-      <view class="nav-item" @click="goMine">
-        <text class="nav-icon">👤</text>
-        <text class="nav-label">我的</text>
+      <button class="ctrl-btn ctrl-locate" @click="getUserLocation">
+        <text>📍</text>
+      </button>
+    </view>
+
+    <!-- Itinerary Quick Card -->
+    <view class="quick-card" v-if="hasPlan">
+      <view class="quick-card-inner">
+        <image class="quick-img" :src="planImage" mode="aspectFill" />
+        <view class="quick-info">
+          <view class="quick-tags">
+            <text class="quick-tag">{{ planStatus }}</text>
+            <text class="quick-day">Day {{ currentDay }} / {{ totalDays }}</text>
+          </view>
+          <text class="quick-title">{{ planTitle }}</text>
+          <text class="quick-next">下一个：{{ nextStop }} · {{ nextDist }}</text>
+        </view>
+        <button class="quick-arrow" @click="goPlan">
+          <text>→</text>
+        </button>
       </view>
     </view>
 
-    <!-- 详情弹窗 -->
-    <view v-if="showDetail" class="detail-modal" @click="closeDetail">
-      <view class="modal-content" @click.stop>
-        <view class="modal-header" :style="{ background: `linear-gradient(135deg, ${selectedMarker.dayColor}, ${selectedMarker.dayColor}cc)` }">
-          <view class="header-content">
-            <view class="day-tag">Day {{ selectedMarker.day }}</view>
-            <text class="detail-title">{{ selectedMarker.name }}</text>
-            <text v-if="selectedMarker.city" class="city-tag">{{ selectedMarker.city }}</text>
-          </view>
-          <view class="modal-close" @click="closeDetail">✕</view>
+    <!-- Floating AI Butler -->
+    <button class="ai-butler" @click="goExplore">
+      <text class="ai-icon">✨</text>
+      <text class="ai-text">为您推荐附近的百年书屋</text>
+    </button>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+      <button :class="['nav-item', 'nav-active']" @click="goExplore">
+        <text class="nav-item-icon">🧭</text>
+        <text class="nav-item-label">探索</text>
+      </button>
+      <button class="nav-item" @click="goPlan">
+        <text class="nav-item-icon">📅</text>
+        <text class="nav-item-label">行程</text>
+      </button>
+      <button class="nav-item" @click="goMine">
+        <text class="nav-item-icon">👤</text>
+        <text class="nav-item-label">我的</text>
+      </button>
+    </nav>
+
+    <!-- Detail Bottom Sheet -->
+    <view v-if="showDetail" class="sheet-overlay" @click="closeDetail">
+      <view class="sheet-container" @click.stop>
+        <view class="sheet-handle"></view>
+        <view class="sheet-header" :style="{ background: `linear-gradient(135deg, ${selectedMarker.dayColor || '#000666'}, ${selectedMarker.dayColor ? selectedMarker.dayColor + 'cc' : '#1a237e'})` }">
+          <view class="sheet-day-badge">Day {{ selectedMarker.day }}</view>
+          <text class="sheet-title">{{ selectedMarker.name }}</text>
         </view>
-        <scroll-view scroll-y class="modal-body">
-          <view class="detail-row">
-            <text class="detail-label">📅 时间</text>
-            <text class="detail-value">{{ selectedMarker.time }}</text>
+        <scroll-view scroll-y class="sheet-body">
+          <view class="sheet-row">
+            <view class="sheet-icon-wrap"><text class="sheet-icon">📅</text></view>
+            <view class="sheet-info">
+              <text class="sheet-label">时间</text>
+              <text class="sheet-value">{{ selectedMarker.time || '待定' }}</text>
+            </view>
           </view>
-          <view v-if="selectedMarker.weather_icon && selectedMarker.temperature" class="detail-row">
-            <text class="detail-label">🌤️ 天气</text>
-            <text class="detail-value">{{ selectedMarker.weather_icon }} {{ selectedMarker.temperature }}</text>
+          <view v-if="selectedMarker.city" class="sheet-row">
+            <view class="sheet-icon-wrap"><text class="sheet-icon">📍</text></view>
+            <view class="sheet-info">
+              <text class="sheet-label">位置</text>
+              <text class="sheet-value">{{ selectedMarker.city }}</text>
+            </view>
           </view>
-          <view v-if="selectedMarker.description" class="detail-row">
-            <text class="detail-label">📖 介绍</text>
-            <text class="detail-value detail-desc">{{ selectedMarker.description }}</text>
+          <view v-if="selectedMarker.weather_icon" class="sheet-row">
+            <view class="sheet-icon-wrap"><text class="sheet-icon">🌤️</text></view>
+            <view class="sheet-info">
+              <text class="sheet-label">天气</text>
+              <text class="sheet-value">{{ selectedMarker.weather_icon }} {{ selectedMarker.temperature }}</text>
+            </view>
           </view>
-          <view v-if="selectedMarker.transit_hint" class="detail-row">
-            <text class="detail-label">🚗 交通</text>
-            <text class="detail-value">{{ selectedMarker.transit_hint }}</text>
+          <view v-if="selectedMarker.description" class="sheet-row sheet-desc">
+            <view class="sheet-icon-wrap"><text class="sheet-icon">📖</text></view>
+            <view class="sheet-info">
+              <text class="sheet-label">介绍</text>
+              <text class="sheet-value sheet-desc-text">{{ selectedMarker.description }}</text>
+            </view>
           </view>
-          <view v-if="selectedMarker.visit_duration" class="detail-row">
-            <text class="detail-label">⏱️ 游玩时长</text>
-            <text class="detail-value">{{ selectedMarker.visit_duration }}</text>
+          <view v-if="selectedMarker.transit_hint" class="sheet-row">
+            <view class="sheet-icon-wrap"><text class="sheet-icon">🚗</text></view>
+            <view class="sheet-info">
+              <text class="sheet-label">交通建议</text>
+              <text class="sheet-value">{{ selectedMarker.transit_hint }}</text>
+            </view>
+          </view>
+          <view v-if="selectedMarker.visit_duration" class="sheet-row">
+            <view class="sheet-icon-wrap"><text class="sheet-icon">⏱️</text></view>
+            <view class="sheet-info">
+              <text class="sheet-label">游玩时长</text>
+              <text class="sheet-value">{{ selectedMarker.visit_duration }}</text>
+            </view>
           </view>
         </scroll-view>
+        <view class="sheet-footer">
+          <button class="sheet-btn sheet-btn-primary" @click="closeDetail">关闭</button>
+        </view>
       </view>
     </view>
   </view>
 </template>
 
 <script>
-// 在 uni-app 传统 script 中定义页面级生命周期
 import { useTravelStore } from '@/store/travel.js'
+import { useUserStore } from '@/store/user.js'
+import { computed } from 'vue'
+import { getWeatherNow } from '@/api/weather.js'
 
 export default {
   data() {
     return {
-      // 地图状态
       center: [34.3416, 108.9398],
       zoom: 12,
-      mapType: 'satellite',
-      // 标记和路径  
+      mapType: 'standard',
       markers: [],
       polylines: [],
-      // 弹窗状态
       showDetail: false,
       selectedMarker: {},
-      // 用户真实定位
-      userLocation: null
+      userLocation: null,
+      locationName: '获取位置中...',
+      weather: null,
+      _locating: false
     }
   },
-  
   computed: {
-    travelStore() {
-      return useTravelStore()
+    travelStore() { return useTravelStore() },
+    userStore() { return useUserStore() },
+    userAvatar() {
+      return this.userStore.avatarUrl || 'https://ui-avatars.com/api/?name=慧游&background=1a237e&color=fff&size=64'
+    },
+    hasPlan() {
+      return !!(this.travelStore.currentPlan && this.travelStore.currentPlan.dayPlanItinerary?.length)
+    },
+    planTitle() {
+      const plan = this.travelStore.currentPlan
+      return plan?.itinerarySummary?.substring(0, 20) || '深度探索'
+    },
+    planStatus() { return '进行中' },
+    totalDays() {
+      const plan = this.travelStore.currentPlan
+      if (!plan?.dayPlanItinerary) return 3
+      const days = new Set(plan.dayPlanItinerary.map(i => i.day))
+      return days.size || 3
+    },
+    currentDay() { return 1 },
+    nextStop() {
+      const items = this.travelStore.currentPlan?.dayPlanItinerary
+      if (items?.length > 1) return items[1]?.name || '下一站'
+      return '目的地'
+    },
+    nextDist() { return '1.2km' },
+    planImage() {
+      return 'https://tonystark-ai.ccwu.cc/png/8c8c5e70-c661-4658-a1cf-a732fec20c4f.png'
     }
   },
-  
   methods: {
-    // 获取用户真实定位
-    getUserLocation() {
+    checkLocationAuth() {
       return new Promise((resolve) => {
-        uni.getLocation({
-          type: 'gcj02',
-          isHighAccuracy: true,
-          highAccuracyExpireTime: 4000,
+        uni.getSetting({
           success: (res) => {
-            console.log('[定位] 获取成功:', res.latitude, res.longitude)
-            this.userLocation = {
-              latitude: res.latitude,
-              longitude: res.longitude
+            if (res.authSetting['scope.userLocation']) {
+              resolve(true)
+            } else {
+              uni.authorize({
+                scope: 'scope.userLocation',
+                success: () => resolve(true),
+                fail: () => {
+                  uni.showModal({
+                    title: '需要位置权限',
+                    content: '慧游需要获取您的位置信息来在地图上展示附近景点和导航路线',
+                    confirmText: '去设置',
+                    success: (modal) => {
+                      if (modal.confirm) {
+                        uni.openSetting({
+                          success: (s) => resolve(!!s.authSetting['scope.userLocation'])
+                        })
+                      } else {
+                        resolve(false)
+                      }
+                    }
+                  })
+                }
+              })
             }
-            // 更新地图中心到用户真实位置
-            this.center = [res.latitude, res.longitude]
-            resolve(true)
           },
-          fail: (err) => {
-            console.error('[定位] 获取失败:', err)
-            // 未授权或失败时保持默认坐标，不做额外处理
-            resolve(false)
-          }
+          fail: () => resolve(false)
         })
       })
     },
-    
-    // 从store加载数据
+    getUserLocation() {
+      return new Promise((resolve) => {
+        if (!this._locating) {
+          this._locating = true
+          this.checkLocationAuth().then((authorized) => {
+            if (!authorized) {
+              this._locating = false
+              uni.showToast({ title: '定位未授权，显示默认地图', icon: 'none' })
+              resolve(false)
+              return
+            }
+            uni.getLocation({
+              type: 'gcj02', isHighAccuracy: true, highAccuracyExpireTime: 4000,
+              success: (res) => {
+                this._locating = false
+                this.userLocation = { latitude: res.latitude, longitude: res.longitude }
+                this.center = [res.latitude, res.longitude]
+                this.zoom = 15
+                this.fetchWeather(res.latitude, res.longitude)
+                if (res.address) {
+                  this.locationName = res.address.replace(/^中国/, '').trim()
+                } else {
+                  this.reverseGeocode(res.latitude, res.longitude)
+                }
+                resolve(true)
+              },
+              fail: (err) => {
+                this._locating = false
+                console.error('getLocation失败:', err)
+                uni.showToast({ title: '定位失败，使用默认位置', icon: 'none' })
+                resolve(false)
+              }
+            })
+          })
+        }
+      })
+    },
+    reverseGeocode(lat, lng) {
+      this.locationName = `${lat.toFixed(4)}, ${lng.toFixed(4)}`
+      uni.request({
+        url: `https://5555api.com/data/api/reverseGeocoder?longitude=${lng}&latitude=${lat}&apikey=test_app_key_5555api.com`,
+        success: (res) => {
+          const body = res.data
+          console.log('[Geo] 5555api 响应:', JSON.stringify(body))
+          const inner = body?.data?.data?.data
+          if (inner && inner.city) {
+            const city = inner.city || ''
+            const district = inner.district || ''
+            this.locationName = district ? `${city} · ${district}` : (city || inner.formatted_address || `${lat.toFixed(4)}, ${lng.toFixed(4)}`)
+            console.log('[Geo] ✅ 5555api 解析成功:', this.locationName)
+          } else {
+            console.warn('[Geo] 5555api 解析失败，body:', JSON.stringify(body), 'inner:', inner)
+          }
+        },
+        fail: (err) => {
+          console.error('[Geo] 5555api 请求失败:', err)
+        }
+      })
+    },
     loadFromStore() {
-      console.log('[地图] 检查store中的行程数据')
       const plan = this.travelStore.currentPlan
-      if (!plan || !plan.dayPlanItinerary || !Array.isArray(plan.dayPlanItinerary)) {
-        console.log('[地图] 没有有效行程数据:', !!plan, plan && 'dayPlanItinerary' in plan ? plan.dayPlanItinerary.length : 'N/A')
-        return
-      }
-      
-      console.log('[地图] 发现行程数据，开始处理', plan.dayPlanItinerary.length)
+      if (!plan?.dayPlanItinerary?.length) return
       const itinerary = plan.dayPlanItinerary
+      const DAY_CODES = ['#6366f1', '#4ECDC4', '#45B7D1', '#FFA07A', '#98FB98', '#DDA0DD']
+      const getDayColor = (day) => DAY_CODES[(day - 1) % DAY_CODES.length]
       const newMarkers = []
       const pointsByDay = {}
-      
-      const DAY_CODES = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98FB98', '#DDA0DD', '#F0E68C', '#FF6347', '#BA55D3', '#9ACD32']
-      const getDayColor = (day) => DAY_CODES[(day - 1) % DAY_CODES.length]
 
       itinerary.forEach((item, index) => {
         if (item.lat && item.lng) {
-          const lat = parseFloat(item.lat)
-          const lng = parseFloat(item.lng)
-          if (!isNaN(lat) && !isNaN(lng)) {
-            const dayColor = getDayColor(item.day || 1)
-
-            // 为每个项目创建地图标记
-            newMarkers.push({
-              id: index,
-              latitude: lat,
-              longitude: lng,
-              title: item.name || '未知地点',
-              iconPath: '/static/images/marker-icon.png',  // 确保图标存在
-              width: 32,
-              height: 32,
-              anchor: { x: 0.5, y: 1 },
-              callout: {
-                content: item.name || '未知地点',
-                display: 'BYCLICK',
-                padding: 8,
-                borderRadius: 10,
-                fontSize: 12,
-                bgColor: dayColor,
-                color: '#ffffff',
-                textAlign: 'center',
-                borderWidth: 2,
-                borderColor: '#ffffff'
-              },
-              label: {
-                content: `Day ${(item.day === undefined || item.day === null) ? 1 : item.day}`,
-                color: dayColor,
-                fontSize: 12,
-                fontWeight: 'bold',
-                borderRadius: 5,
-                bgColor: '#ffffff',
-                padding: 3,
-                anchorX: 0,
-                anchorY: -40,
-                display: 'ALWAYS'
-              },
-              detail: { // 存储详细信息到标记中
-                day: (item.day === undefined || item.day === null) ? 1 : item.day,
-                dayColor: dayColor,
-                name: item.name || '未知地点',
-                time: item.time,
-                city: item.city,
-                description: item.description,
-                transit_hint: item.transit_hint,
-                visit_duration: item.visit_duration,
-                weather_icon: item.weather_icon,
-                temperature: item.temperature,
-                lat: lat,
-                lng: lng
-              }
-            })
-            
-            // 按天分组坐标点
-            const day = (item.day === undefined || item.day === null) ? 1 : item.day
-            if (!pointsByDay[day]) {
-              pointsByDay[day] = []
+          const lat = parseFloat(item.lat); const lng = parseFloat(item.lng)
+          if (isNaN(lat) || isNaN(lng)) return
+          const dayColor = getDayColor(item.day || 1)
+          newMarkers.push({
+            id: index, latitude: lat, longitude: lng,
+            title: item.name || '未知地点',
+            iconPath: '/static/images/marker-icon.png',
+            width: 36, height: 36, anchor: { x: 0.5, y: 1 },
+            callout: {
+              content: item.name || '', display: 'BYCLICK',
+              padding: 10, borderRadius: 12, fontSize: 13,
+              bgColor: dayColor, color: '#ffffff', borderWidth: 2, borderColor: '#ffffff'
+            },
+            label: {
+              content: `Day ${item.day || 1}`, color: dayColor,
+              fontSize: 11, fontWeight: 'bold', bgColor: '#ffffff',
+              padding: 4, anchorX: 0, anchorY: -40, display: 'ALWAYS'
+            },
+            detail: {
+              day: item.day || 1, dayColor, name: item.name, time: item.time,
+              city: item.city, description: item.description,
+              transit_hint: item.transit_hint, visit_duration: item.visit_duration,
+              weather_icon: item.weather_icon, temperature: item.temperature
             }
-            pointsByDay[day].push({
-              latitude: lat,
-              longitude: lng
-            })
-          }
+          })
+          const day = item.day || 1
+          if (!pointsByDay[day]) pointsByDay[day] = []
+          pointsByDay[day].push({ latitude: lat, longitude: lng })
         }
       })
 
-      // 更新地图标记
       if (newMarkers.length > 0) {
         this.markers = newMarkers
-        
-        // 创建每日路径连接线
         const newPolylines = []
         Object.keys(pointsByDay).forEach(day => {
           if (pointsByDay[day].length > 1) {
-            const dayColor = getDayColor(parseInt(day))
             newPolylines.push({
               points: pointsByDay[day],
-              color: dayColor,
-              width: 5,
-              dottedLine: false,
-              arrowLine: false,
-              borderColor: '#ffffff',
-              borderWidth: 2
+              color: getDayColor(parseInt(day)), width: 5
             })
           }
         })
         this.polylines = newPolylines
-        
-        // 更新地图中心和缩放级别到第一个标记点
         this.center = [newMarkers[0].latitude, newMarkers[0].longitude]
         this.zoom = 14
-        
-        console.log(`[地图] 成功加载 ${newMarkers.length} 个标记点和 ${newPolylines.length} 条路线`)
-      } else {
-        console.log('[地图] 未找到需要渲染的标记点')
-        this.markers = []
-        this.polylines = []
       }
     },
-    
-    // 页面导航函数
-    goExplore() {
-      uni.navigateTo({ url: '/pages/explore/index' })
-    },
-
-    goPlan() {
-      uni.navigateTo({ url: '/pages/plan/plan' })
-    },
-
-    goHistory() {
-      uni.navigateTo({ url: '/pages/history/index' })
-    },
-
-    goMine() {
-      uni.navigateTo({ url: '/pages/mine/index' })
-    },
-    
-    toggleMapType() {
-      this.mapType = this.mapType === 'satellite' ? 'standard' : 'satellite'
-      uni.showToast({
-        title: this.mapType === 'satellite' ? '已切换卫星地图' : '已切换普通地图',
-        icon: 'none'
-      })
-    },
-    
-    // 处理标记点击
+    goExplore() { uni.navigateTo({ url: '/pages/explore/index' }) },
+    goPlan() { uni.navigateTo({ url: '/pages/plan/plan' }) },
+    goMine() { uni.navigateTo({ url: '/pages/mine/index' }) },
     onMarkerTap(e) {
-      const markerId = e.detail.markerId
-      console.log(`标记被点击: ${markerId}`)
-      const marker = this.markers.find(m => m.id === markerId)
-      if (marker && marker.detail) {
-        this.selectedMarker = marker.detail
-        this.showDetail = true
-        console.log(`显示标记详情: ${marker.title}`)
-      }
+      const marker = this.markers.find(m => m.id === e.detail.markerId)
+      if (marker?.detail) { this.selectedMarker = marker.detail; this.showDetail = true }
     },
-    
-    // 关闭详情弹窗
-    closeDetail() {
-      this.showDetail = false
+    closeDetail() { this.showDetail = false },
+    async fetchWeather(lat, lng) {
+      const CACHE_KEY = 'weather_cache'
+      const CACHE_TTL = 30 * 60 * 1000
+      const cached = uni.getStorageSync(CACHE_KEY)
+      if (cached) {
+        try {
+          const parsed = typeof cached === 'string' ? JSON.parse(cached) : cached
+          if (parsed.lat === lat && parsed.lng === lng && Date.now() - parsed.timestamp < CACHE_TTL) {
+            this.weather = parsed.data
+            return
+          }
+        } catch (e) {}
+      }
+      try {
+        const res = await getWeatherNow(lng, lat)
+        if (res.code === 0) {
+          this.weather = res.data
+          uni.setStorageSync(CACHE_KEY, { data: res.data, lat, lng, timestamp: Date.now() })
+        }
+      } catch (e) {
+        console.error('获取天气失败:', e)
+      }
     }
   },
-  
-  // Uni-app 页面生命周期
   onLoad() {
-    console.log('[地图页面] onLoad 生命周期')
-    // 初始化时先获取用户真实定位，再加载行程数据
-    this.getUserLocation().then(() => {
-      this.loadFromStore()
-    })
+    this.userStore.restoreFromStorage()
+    this.getUserLocation().then(() => this.loadFromStore())
   },
-  
   onShow() {
-    console.log('[地图页面] onShow 生命周期，重新加载数据')
-    // 在每次页面显示时重新加载数据
+    this.userStore.restoreFromStorage()
     this.loadFromStore()
+    if (this.userLocation) {
+      this.fetchWeather(this.userLocation.latitude, this.userLocation.longitude)
+    }
   }
 }
 </script>
 
-<style>
-.container {
-  flex: 1;
-  flex-direction: column;
-  height: 100vh;
-  background: var(--gradient-aurora);
+<style scoped>
+.map-page { flex: 1; height: 100vh; position: relative; background: var(--color-surface); }
+.map-container { width: 100%; height: 100%; }
+.map-overlay {
+  position: absolute; inset: 0;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.05), transparent, rgba(0,0,0,0.1));
+  pointer-events: none; z-index: 1;
 }
 
-.map-container {
-  width: 100%;
-  height: calc(100vh - 120rpx);
+.top-nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: calc(12px + var(--status-bar-height)) 24px 12px;
+  background: rgba(255,255,255,0.85); backdrop-filter: blur(32px) saturate(200%);
+  -webkit-backdrop-filter: blur(32px) saturate(200%);
+  border-bottom: 1px solid rgba(255,255,255,0.5);
 }
+.nav-left { display: flex; align-items: center; gap: 16px; }
+.nav-avatar { width: 44px; height: 44px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.nav-brand { font-size: 24px; font-weight: 700; color: var(--color-primary); letter-spacing: -0.01em; line-height: 32px; }
+.location-row { display: flex; align-items: center; gap: 4px; margin-top: 0; }
+.loc-icon { font-size: 14px; }
+.loc-text { font-size: 12px; font-weight: 500; letter-spacing: 0.05em; color: var(--color-on-surface-variant); }
+.weather-row { display: flex; align-items: center; gap: 4px; margin-top: 2px; }
+.weather-icon { width: 18px; height: 18px; }
+.weather-text { font-size: 12px; font-weight: 500; color: var(--color-on-surface-variant); }
+.nav-actions { display: flex; gap: 12px; }
+.nav-btn {
+  width: 44px; height: 44px; border-radius: 50%;
+  background: rgba(255,255,255,0.75); backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+
+.map-controls {
+  position: fixed; right: 24px; top: 112px; z-index: 10;
+  display: flex; flex-direction: column; gap: 24px;
+}
+.ctrl-group {
+  display: flex; flex-direction: column;
+  background: rgba(255,255,255,0.75); backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border-radius: 20px; padding: 6px; overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+}
+.ctrl-btn {
+  width: 48px; height: 48px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; border-radius: 14px;
+  color: var(--color-on-surface-variant);
+}
+.ctrl-active { background: var(--color-primary-container); color: var(--color-on-primary-container); }
+.ctrl-divider { width: 32px; height: 1px; margin: 4px auto; background: var(--color-outline-variant); opacity: 0.3; }
+.ctrl-locate {
+  background: rgba(255,255,255,0.75); backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border-radius: 50%; box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+}
+
+.quick-card {
+  position: fixed; left: 24px; right: 24px; bottom: 180px; z-index: 10;
+  max-width: 360px; margin: 0 auto;
+}
+.quick-card-inner {
+  background: rgba(255,255,255,0.75); backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255,255,255,0.4);
+  border-radius: 28px; padding: 20px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.08);
+  display: flex; align-items: center; gap: 20px;
+}
+.quick-img {
+  width: 96px; height: 96px; border-radius: 16px; flex-shrink: 0;
+}
+.quick-info { flex: 1; }
+.quick-tags { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.quick-tag {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.05em;
+  color: var(--color-primary);
+  background: rgba(0,6,102,0.1); padding: 2px 10px; border-radius: 999px;
+}
+.quick-day { font-size: 12px; font-weight: 500; letter-spacing: 0.05em; color: var(--color-on-surface-variant); }
+.quick-title {
+  font-size: 20px; font-weight: 700; color: var(--color-primary);
+  line-height: 28px; margin-bottom: 4px;
+}
+.quick-next { font-size: 14px; color: var(--color-on-surface-variant); font-weight: 500; }
+.quick-arrow {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: linear-gradient(135deg, #1a237e 0%, #4c56af 50%, #6366f1 100%);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 20px; font-weight: 700;
+}
+
+.ai-butler {
+  position: fixed; right: 24px; bottom: 136px; z-index: 10;
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #1a237e 0%, #4c56af 50%, #6366f1 100%);
+  border-radius: 22px 22px 22px 4px;
+  box-shadow: 0 8px 24px rgba(0,6,102,0.2);
+  color: #fff; border: 1px solid rgba(255,255,255,0.2);
+}
+.ai-icon { font-size: 22px; }
+.ai-text { font-size: 14px; font-weight: 600; line-height: 22px; white-space: nowrap; }
 
 .bottom-nav {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 120rpx;
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
-  background: rgba(255,255,255,.82);
-  border-top: 1rpx solid rgba(255,255,255,.75);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  box-shadow: 0 -10rpx 28rpx rgba(22,32,58,.08);
-  padding: 10rpx 0;
+  position: fixed; bottom: 32px; left: 24px; right: 24px; z-index: 10;
+  display: flex; align-items: center; justify-content: space-around;
+  height: 72px; padding: 0 8px;
+  background: rgba(255,255,255,0.85); backdrop-filter: blur(32px) saturate(200%);
+  -webkit-backdrop-filter: blur(32px) saturate(200%);
+  border: 1px solid rgba(255,255,255,0.5);
+  border-radius: 999px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.1);
 }
-
 .nav-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  flex: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 8px 24px; border-radius: 999px;
+  color: var(--color-on-surface-variant); opacity: 0.6;
 }
-
-.nav-icon {
-  font-size: 40rpx;
-  margin-bottom: 6rpx;
+.nav-active {
+  background: var(--color-primary-container);
+  color: var(--color-on-primary-container); opacity: 1;
+  box-shadow: 0 4px 12px rgba(0,6,102,0.15);
 }
+.nav-item-icon { font-size: 22px; margin-bottom: 2px; }
+.nav-item-label { font-size: 10px; font-weight: 700; letter-spacing: 0.02em; }
 
-.nav-label {
-  font-size: 24rpx;
-  color: #42507a;
+.sheet-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(0,0,0,0.3); backdrop-filter: blur(6px);
+  display: flex; align-items: flex-end;
 }
-
-.nav-item.active .nav-label,
-.nav-item.active .nav-icon {
-  color: #46bd87;
-}
-
-.detail-modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(11, 19, 40, 0.52);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-content {
-  background: rgba(255,255,255,.82);
-  border-radius: 20rpx;
-  margin: 20rpx;
-  max-height: 80vh;
-  width: 90%;
+.sheet-container {
+  width: 100%; max-height: 78vh;
+  background: rgba(255,255,255,0.85); backdrop-filter: blur(24px) saturate(200%);
+  -webkit-backdrop-filter: blur(24px) saturate(200%);
+  border-radius: 32px 32px 0 0;
+  box-shadow: 0 -8px 40px rgba(0,0,0,0.08);
+  display: flex; flex-direction: column;
   overflow: hidden;
 }
-
-.modal-header {
-  padding: 30rpx;
-  color: white;
+.sheet-handle {
+  width: 36px; height: 5px; border-radius: 999px;
+  background: var(--color-outline-variant); opacity: 0.5;
+  align-self: center; margin: 12px auto 4px;
 }
-
-.header-content {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
+.sheet-header {
+  padding: 24px 24px 20px; color: #fff; position: relative;
+  display: flex; flex-direction: column; gap: 12px;
 }
-
-.day-tag {
-  background-color: rgba(255, 255, 255, 0.3);
-  color: white;
-  padding: 6rpx 16rpx;
-  border-radius: 30rpx;
-  font-size: 24rpx;
-  margin-right: 16rpx;
-  margin-bottom: 10rpx;
+.sheet-day-badge {
+  align-self: flex-start;
+  background: rgba(255,255,255,0.25); backdrop-filter: blur(8px);
+  padding: 4px 14px; border-radius: 999px;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.05em;
 }
-
-.detail-title {
-  font-size: 36rpx;
-  font-weight: bold;
-  display: block;
-  color: white;
-  margin-bottom: 10rpx;
-  flex: 1;
+.sheet-title {
+  font-size: 24px; font-weight: 700; line-height: 32px;
+  letter-spacing: -0.01em;
 }
-
-.city-tag {
-  background-color: rgba(255, 255, 255, 0.3);
-  color: white;
-  padding: 6rpx 16rpx;
-  border-radius: 30rpx;
-  font-size: 24rpx;
-  display: inline-block;
+.sheet-body { flex: 1; overflow-y: auto; padding: 16px 24px; }
+.sheet-row {
+  display: flex; gap: 16px; padding: 14px 0;
+  border-bottom: 1px solid rgba(198,197,212,0.15);
 }
-
-.modal-close {
-  position: absolute;
-  top: 30rpx;
-  right: 30rpx;
-  font-size: 36rpx;
-  color: white;
-  width: 50rpx;
-  height: 50rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background-color: rgba(255, 255, 255, 0.2);
+.sheet-row:last-child { border-bottom: none; }
+.sheet-icon-wrap {
+  width: 40px; height: 40px; border-radius: 12px;
+  background: var(--color-surface-container-low);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
-
-.modal-body {
-  padding: 20rpx 30rpx 30rpx;
-  max-height: 50vh;
+.sheet-icon { font-size: 18px; }
+.sheet-info { flex: 1; display: flex; flex-direction: column; gap: 4px; justify-content: center; }
+.sheet-label {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.05em;
+  color: var(--color-outline); text-transform: uppercase;
 }
-
-.detail-row {
-  margin-bottom: 20rpx;
+.sheet-value { font-size: 14px; font-weight: 500; color: var(--color-on-surface); line-height: 1.5; }
+.sheet-desc { align-items: flex-start; }
+.sheet-desc-text { line-height: 1.6; }
+.sheet-footer {
+  padding: 16px 24px 28px;
+  border-top: 1px solid rgba(198,197,212,0.1);
 }
-
-.detail-label {
-  display: inline-block;
-  width: 120rpx;
-  font-size: 28rpx;
-  color: #42507a;
+.sheet-btn {
+  width: 100%; height: 52px; border-radius: 16px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 600;
 }
-
-.detail-value {
-  font-size: 28rpx;
-  color: #333;
-  line-height: 1.5;
+.sheet-btn-primary {
+  background: linear-gradient(135deg, #000666 0%, #1a237e 100%);
+  color: #fff; box-shadow: 0 8px 24px rgba(0,6,102,0.2);
 }
-
-.detail-desc {
-  display: block;
-  margin-top: 8rpx;
-}
+.sheet-btn-primary:active { transform: scale(0.97); }
 </style>

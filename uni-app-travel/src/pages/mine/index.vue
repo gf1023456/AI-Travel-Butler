@@ -1,258 +1,169 @@
 <template>
   <view class="mine-page">
-    <scroll-view scroll-y class="mine-content">
-      <view class="hero-strip">
-        <text class="hero-kicker">VOYAGE AI</text>
-        <text class="hero-sub">你的下一次旅行，应该像杂志封面一样被策划</text>
+    <header class="top-bar">
+      <view class="top-left">
+        <image class="top-avatar" :src="userAvatar" mode="aspectFill" />
+        <text class="top-brand">慧游</text>
       </view>
-      <!-- 用户资料头部 -->
-      <view class="profile-header" :style="'padding-top:' + (safeAreaTop + 48) + 'px'">
-        <view class="profile-info">
-          <image class="profile-avatar" :src="userInfo.avatar || defaultAvatar" mode="aspectFill" />
+      <button class="top-notif">
+        <text>🔔</text>
+      </button>
+    </header>
+
+    <scroll-view scroll-y class="content" show-scrollbar="false">
+      <!-- Profile Header -->
+      <section class="profile-section">
+        <view class="profile-row">
+          <view class="avatar-wrap">
+            <view class="avatar-glow"></view>
+            <image class="profile-avatar" :src="userInfo.avatar || defaultAvatar" mode="aspectFill" />
+            <view class="verified-badge">
+              <text>✓</text>
+            </view>
+          </view>
           <view class="profile-details">
-            <view class="profile-name-row">
-              <text class="profile-name">{{ userInfo.nickname || '微信用户' }}</text>
-              <text class="profile-verified">✓</text>
-            </view>
+            <text class="profile-name">{{ userInfo.nickname || '微信用户' }}</text>
             <view class="profile-badge">
-              <text class="badge-icon">⭐</text>
-              <text class="badge-text">精英旅行者</text>
+              <text>⭐</text>
+              <text>精英旅行者</text>
             </view>
           </view>
         </view>
-        <button class="edit-btn" @click="handleEdit">编辑</button>
-      </view>
+      </section>
 
-      <!-- 今日配额卡片 -->
-      <view class="quota-card" v-if="quotaInfo.max > 0">
+      <!-- Quota Card -->
+      <section class="quota-card">
         <view class="quota-header">
-          <text class="quota-title">📊 今日配额</text>
+          <text class="quota-label">旅行规划配额</text>
+          <view class="quota-bonus">含 2 次额外奖励</view>
         </view>
-        <view class="quota-content">
-          <view class="quota-stat">
-            <text class="quota-num">{{ quotaInfo.remaining }}</text>
-            <text class="quota-label">剩余次数</text>
-          </view>
-          <view class="quota-divider"></view>
-          <view class="quota-stat">
-            <text class="quota-num">{{ quotaInfo.used }}</text>
-            <text class="quota-label">已使用</text>
-          </view>
-          <view class="quota-divider"></view>
-          <view class="quota-stat">
-            <text class="quota-num">{{ quotaInfo.bonus }}</text>
-            <text class="quota-label">额外奖励</text>
+        <view class="quota-numbers">
+          <text class="quota-current">{{ quotaInfo.remaining }}</text>
+          <text class="quota-total">/ {{ quotaInfo.max }}</text>
+        </view>
+        <view class="quota-bar-bg">
+          <view class="quota-bar" :style="{ width: Math.min(100, ((quotaInfo.used + quotaInfo.bonus) / quotaInfo.max) * 100) + '%' }">
+            <view class="quota-bar-shimmer"></view>
           </view>
         </view>
-        <view class="quota-progress">
-          <view class="quota-progress-bar" :style="{ width: Math.min(100, (quotaInfo.used / quotaInfo.max) * 100) + '%' }"></view>
+        <view class="quota-footer">
+          <text>已使用：{{ quotaInfo.used }} 次</text>
+          <text>12 天后重置</text>
         </view>
-      </view>
+      </section>
 
-      <!-- 核心菜单列表 -->
-      <view class="menu-card card-stack">
-        <!-- 我的行程 -->
-        <view class="menu-item" @click="reLaunchTo('/pages/history/index')">
-          <view class="menu-left">
-            <view class="menu-icon-wrapper menu-icon-blue">
-              <text class="menu-icon">🧳</text>
+      <!-- Bento Menu -->
+      <section class="menu-section">
+        <view class="menu-card">
+          <view class="menu-item" @click="goTo('/pages/history/index')">
+            <view class="menu-item-left">
+              <view class="menu-icon" style="background: var(--color-primary-fixed); opacity: 0.3;">
+                <text style="color: var(--color-primary); font-size: 24px;">📅</text>
+              </view>
+              <text class="menu-item-title">我的行程</text>
             </view>
-            <view class="menu-content">
-              <text class="menu-title">我的行程</text>
-              <text class="menu-desc">管理您的旅行计划</text>
-            </view>
+            <text class="menu-arrow">›</text>
           </view>
-          <text class="menu-arrow">›</text>
-        </view>
-
-        <!-- 设置 -->
-        <view class="menu-item" @click="navigateTo('/pages/settings/index')">
-          <view class="menu-left">
-            <view class="menu-icon-wrapper menu-icon-slate">
-              <text class="menu-icon">⚙️</text>
+          <view class="menu-divider"></view>
+          <view class="menu-item" @click="showDevToast">
+            <view class="menu-item-left">
+              <view class="menu-icon" style="background: var(--color-secondary-fixed); opacity: 0.3;">
+                <text style="color: var(--color-secondary); font-size: 24px;">⚙️</text>
+              </view>
+              <text class="menu-item-title">设置</text>
             </view>
-            <view class="menu-content">
-              <text class="menu-title">设置</text>
-              <text class="menu-desc">偏好与账户安全</text>
-            </view>
+            <text class="menu-arrow">›</text>
           </view>
-          <text class="menu-arrow">›</text>
-        </view>
-
-        <!-- 帮助与反馈 -->
-        <view class="menu-item" @click="navigateTo('/pages/feedback/index')">
-          <view class="menu-left">
-            <view class="menu-icon-wrapper menu-icon-orange">
-              <text class="menu-icon">💬</text>
+          <view class="menu-divider"></view>
+          <view class="menu-item" @click="showDevToast">
+            <view class="menu-item-left">
+              <view class="menu-icon" style="background: var(--color-tertiary-fixed); opacity: 0.3;">
+                <text style="color: var(--color-tertiary); font-size: 24px;">💬</text>
+              </view>
+              <text class="menu-item-title">帮助与反馈</text>
             </view>
-            <view class="menu-content">
-              <text class="menu-title">帮助与反馈</text>
-              <text class="menu-desc">遇到问题？告诉我们</text>
-            </view>
+            <text class="menu-arrow">›</text>
           </view>
-          <text class="menu-arrow">›</text>
         </view>
-      </view>
+      </section>
 
-      <!-- 会员权益卡片 -->
-      <view class="vip-card">
-        <view class="vip-content">
-          <text class="vip-title">Voyage AI 会员权益</text>
-          <text class="vip-desc">享受专属定制行程与极速办理服务</text>
-        </view>
-        <text class="vip-icon">👑</text>
-      </view>
-
-      <!-- 退出登录 -->
-      <button class="logout-btn" @click="handleLogout">退出登录</button>
-
-      <!-- 版本信息 -->
-      <view class="version-info">
-        <text>Voyage AI · 微信小程序 v2.4.0</text>
-      </view>
-
-      <!-- 底部安全区域 -->
-      <view class="safe-area-bottom"></view>
+      <!-- Logout -->
+      <section class="logout-section">
+        <button class="logout-btn" @click="handleLogout">
+          <text class="logout-icon">🚪</text>
+          <text>退出登录</text>
+        </button>
+      </section>
     </scroll-view>
 
-    <!-- 底部导航栏 -->
-    <view class="bottom-nav">
-      <view class="nav-item" @click="reLaunchTo('/pages/index/index')">
-        <text class="nav-icon">🗺️</text>
-        <text class="nav-label">探索</text>
-      </view>
-      <view class="nav-item" @click="reLaunchTo('/pages/plan/plan')">
-        <text class="nav-icon">📅</text>
-        <text class="nav-label">行程</text>
-      </view>
-      <view class="nav-item active" @click="reLaunchTo('/pages/mine/index')">
-        <text class="nav-icon">👤</text>
-        <text class="nav-label active-label">我的</text>
-      </view>
-    </view>
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+      <button class="nav-item" @click="reLaunch('/pages/index/index')">
+        <text class="nav-item-icon">🧭</text>
+        <text class="nav-item-label">探索</text>
+      </button>
+      <button class="nav-item" @click="reLaunch('/pages/plan/plan')">
+        <text class="nav-item-icon">📅</text>
+        <text class="nav-item-label">行程</text>
+      </button>
+      <button class="nav-item nav-active">
+        <text class="nav-item-icon">👤</text>
+        <text class="nav-item-label">我的</text>
+      </button>
+    </nav>
   </view>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useUserStore } from '@/store/user.js'
 import { getUserInfo } from '@/api/user.js'
 import { getQuota } from '@/api/quota.js'
 
 const userStore = useUserStore()
+const defaultAvatar = 'https://ui-avatars.com/api/?name=慧游&background=1a237e&color=fff&size=256'
+const userAvatar = computed(() => userStore.avatarUrl || defaultAvatar)
 
-const defaultAvatar = 'https://ui-avatars.com/api/?name=User&background=1e40af&color=fff'
-
-const userInfo = ref({
-  nickname: '',
-  avatar: '',
-  id: ''
-})
-
-const quotaInfo = ref({
-  used: 0,
-  bonus: 0,
-  max: 10,
-  remaining: 10
-})
-
-// 安全区域顶部高度
-const safeAreaTop = ref(0)
+const userInfo = ref({ nickname: '', avatar: '', id: '' })
+const quotaInfo = ref({ used: 0, bonus: 0, max: 10, remaining: 10 })
 
 onMounted(async () => {
-  console.log('[Mine] onMounted 开始')
-  
-  // 获取安全区域
-  try {
-    const systemInfo = uni.getSystemInfoSync()
-    safeAreaTop.value = systemInfo.safeAreaInsets?.top || 0
-    console.log('[Mine] 安全区域顶部:', safeAreaTop.value)
-  } catch (e) {
-    console.error('[Mine] 获取安全区域失败:', e)
-    safeAreaTop.value = 0
-  }
-  
-  // 从本地存储恢复登录状态
   userStore.restoreFromStorage()
-  console.log('[Mine] userStore 恢复后:', {
-    nickname: userStore.nickname,
-    avatarUrl: userStore.avatarUrl,
-    hasToken: userStore.hasToken,
-    accessToken: userStore.accessToken ? userStore.accessToken.substring(0, 20) + '...' : null
-  })
-  
-  // 检查是否已登录
   if (!userStore.hasToken) {
-    console.log('[Mine] 未登录，跳转到登录页')
     uni.showToast({ title: '请先登录', icon: 'none' })
-    // 使用 redirectTo 替代 reLaunch，避免页面栈问题
     uni.redirectTo({ url: '/pages/login/index' })
     return
   }
-
-  // 加载用户信息
   await loadUserInfo()
-  
-  // 加载配额信息
-  console.log('[Mine] 开始加载配额信息')
   await loadQuotaInfo()
-  console.log('[Mine] loadQuotaInfo done, quotaInfo:', JSON.stringify(quotaInfo.value))
 })
 
 const loadUserInfo = async () => {
   try {
-    console.log('[Mine] 开始加载用户信息...')
     const info = await getUserInfo()
-    console.log('[Mine] getUserInfo 返回:', info)
     if (info) {
       userInfo.value.nickname = info.nickname || ''
       userInfo.value.avatar = info.avatar_url || ''
       userInfo.value.id = info.id || ''
-      console.log('[Mine] userInfo 设置完成:', userInfo.value)
     }
-  } catch (error) {
-    console.error('[Mine] 加载用户信息失败:', error)
-    // 使用本地存储的信息
+  } catch {
     userInfo.value.nickname = userStore.nickname || ''
     userInfo.value.avatar = userStore.avatarUrl || ''
   }
 }
 
 const loadQuotaInfo = async () => {
-  console.log('[Mine] loadQuotaInfo 开始')
   try {
-    console.log('[Mine] 调用 getQuota()')
     const quota = await getQuota()
-    console.log('[Mine] getQuota 返回结果:', JSON.stringify(quota))
-    console.log('[Mine] quota 类型:', typeof quota, quota === null ? 'null' : quota.constructor?.name)
-    
-    if (quota && typeof quota === 'object') {
+    if (quota) {
       quotaInfo.value = {
-        used: quota.used ?? 0,
-        bonus: quota.bonus ?? 0,
-        max: quota.max ?? 10,
-        remaining: quota.remaining ?? 0
-      }
-      console.log('[Mine] quotaInfo 已更新:', JSON.stringify(quotaInfo.value))
-    } else {
-      console.warn('[Mine] quota 数据无效，使用默认值')
-      quotaInfo.value = {
-        used: 0,
-        bonus: 0,
-        max: 10,
-        remaining: 10
+        used: quota.used ?? 0, bonus: quota.bonus ?? 0,
+        max: quota.max ?? 10, remaining: quota.remaining ?? 0
       }
     }
-  } catch (error) {
-    console.error('[Mine] 加载配额失败:', error)
-    // 使用本地存储的配额
-    quotaInfo.value = userStore.quota
-    console.log('[Mine] 使用本地配额:', JSON.stringify(quotaInfo.value))
+  } catch {
+    quotaInfo.value = userStore.quota || { used: 0, bonus: 0, max: 10, remaining: 10 }
   }
-}
-
-const handleEdit = () => {
-  uni.showToast({ title: '编辑功能开发中', icon: 'none' })
 }
 
 const handleLogout = () => {
@@ -268,413 +179,162 @@ const handleLogout = () => {
   })
 }
 
-const navigateTo = (url) => {
-  uni.showToast({ title: '页面开发中', icon: 'none' })
-}
-
-const reLaunchTo = (url) => {
-  uni.reLaunch({ url })
-}
-
+const goTo = (url) => uni.navigateTo({ url })
+const reLaunch = (url) => uni.reLaunch({ url })
+const showDevToast = () => uni.showToast({ title: '页面开发中', icon: 'none' })
 </script>
 
 <style scoped>
-@keyframes floatIn { from { opacity: 0; transform: translateY(18rpx);} to { opacity: 1; transform: translateY(0);} }
+.mine-page { min-height: 100vh; background: var(--color-surface); }
 
-.mine-page {
-  width: 100vw;
-  min-height: 100vh;
-  background: var(--gradient-aurora);
-  position: relative;
-  font-family: var(--font-body);
+.top-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: calc(12px + var(--status-bar-height)) 20px 12px;
+  background: rgba(255,255,255,0.7); backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  border-bottom: 1px solid rgba(255,255,255,0.2);
+  position: sticky; top: 0; z-index: 10;
+}
+.top-left { display: flex; align-items: center; gap: 12px; }
+.top-avatar { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--color-outline-variant); box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+.top-brand { font-size: 24px; font-weight: 700; color: var(--color-primary); letter-spacing: -0.01em; line-height: 32px; }
+.top-notif {
+  width: 40px; height: 40px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; color: var(--color-primary);
 }
 
-.mine-content {
-  position: relative;
-  z-index: 2;
-  height: calc(100vh - 160rpx);
-  padding: 0 32rpx;
-  padding-top: 32rpx;
-  padding-bottom: 120rpx;
+.content { padding: 8px 20px 140px; }
+
+.profile-section { margin-bottom: 24px; }
+.profile-row { display: flex; align-items: center; gap: 24px; position: relative; }
+.avatar-wrap { position: relative; }
+.avatar-glow {
+  position: absolute; inset: -16px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(76,86,175,0.15) 0%, transparent 70%);
 }
-
-
-.hero-strip {
-  margin-bottom: 28rpx;
-  padding: 24rpx 28rpx;
-  background: rgba(255,255,255,.66);
-  border: 1rpx solid rgba(255,255,255,.72);
-  border-radius: 24rpx;
-  box-shadow: 0 12rpx 26rpx rgba(24,73,169,.10);
-}
-.hero-kicker { display:block; font-size: 22rpx; letter-spacing: 4rpx; color:#2f67d8; font-weight:700; }
-.hero-sub { display:block; margin-top: 8rpx; font-size: 24rpx; color:#334155; line-height:1.5; }
-.card-stack { transform: rotate(-.25deg); }
-
-/* 用户资料头部 */
-.profile-header {
-  background: rgba(255,255,255,.72);
-  border: 1rpx solid rgba(255,255,255,.72);
-  box-shadow: 0 14rpx 36rpx rgba(37,75,156,.12);
-  border-radius: 32rpx;
-  padding: 24rpx 28rpx;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 64rpx;
-}
-
-.profile-info {
-  display: flex;
-  align-items: center;
-  gap: 32rpx;
-  flex: 1;
-}
-
 .profile-avatar {
-  width: 160rpx;
-  height: 160rpx;
-  border-radius: 50%;
-  border: 4rpx solid #ffffff;
-  box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.1);
+  width: 80px; height: 80px; border-radius: 50%;
+  border: 2px solid #fff; box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+  position: relative; z-index: 1;
 }
-
-.profile-details {
-  flex: 1;
+.verified-badge {
+  position: absolute; bottom: 0; right: 0; z-index: 2;
+  width: 24px; height: 24px; border-radius: 50%;
+  background: var(--color-primary); border: 2px solid #fff;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
-
-.profile-name-row {
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-  margin-bottom: 16rpx;
-}
-
-.profile-name {
-  font-size: 42rpx;
-  font-family: var(--font-display);
-  font-weight: 700;
-  color: #202124;
-}
-
-.profile-verified {
-  font-size: 32rpx;
-  color: #4285F4;
-}
-
+.verified-badge text { color: #fff; font-size: 12px; font-weight: 700; }
+.profile-details { flex: 1; position: relative; z-index: 1; }
+.profile-name { font-size: 20px; font-weight: 700; color: var(--color-on-surface); line-height: 28px; display: block; margin-bottom: 4px; }
 .profile-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 12rpx;
-  background: rgba(0, 40, 142, 0.05);
-  padding: 8rpx 20rpx;
-  border-radius: 32rpx;
-  border: 1rpx solid rgba(0, 40, 142, 0.1);
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 12px; border-radius: 999px;
+  background: var(--color-secondary-container);
+  font-size: 12px; font-weight: 500; letter-spacing: 0.05em;
+  color: var(--color-on-secondary-container);
+  border: 1px solid rgba(255,255,255,0.3);
 }
 
-.badge-icon {
-  font-size: 28rpx;
-  color: #4285F4;
-}
-
-.badge-text {
-  font-size: 24rpx;
-  font-weight: 600;
-  color: #4285F4;
-}
-
-.edit-btn {
-  background: #ffffff;
-  border: 1rpx solid #DADCE0;
-  padding: 12rpx 32rpx;
-  border-radius: 32rpx;
-  font-size: 28rpx;
-  font-weight: 500;
-  color: #202124;
-}
-
-.edit-btn:active {
-  background: #F1F3F4;
-}
-
-/* 今日配额卡片 */
 .quota-card {
-  background: linear-gradient(132deg, #1849a9 0%, #2f67d8 48%, #6cb6ff 100%);
-  border-radius: 24rpx;
-  padding: 32rpx;
-  margin-bottom: 32rpx;
-  box-shadow: 0 12rpx 30rpx rgba(24, 73, 169, 0.28);
-  opacity: 1;
-}
-
-.quota-header {
-  margin-bottom: 24rpx;
-}
-
-.quota-title {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.quota-content {
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
-  margin-bottom: 24rpx;
-}
-
-.quota-stat {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  flex: 1;
-}
-
-.quota-num {
-  font-size: 48rpx;
-  font-weight: 700;
-  color: #ffffff;
-  line-height: 1.2;
-}
-
-.quota-label {
-  font-size: 22rpx;
-  color: rgba(255, 255, 255, 0.7);
-  margin-top: 8rpx;
-}
-
-.quota-divider {
-  width: 1rpx;
-  height: 60rpx;
-  background: rgba(255, 255, 255, 0.3);
-}
-
-.quota-progress {
-  height: 8rpx;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 4rpx;
-  overflow: hidden;
-}
-
-.quota-progress-bar {
-  height: 100%;
-  background: #ffffff;
-  border-radius: 4rpx;
-  transition: width 0.3s ease;
-}
-
-/* 菜单卡片 */
-.menu-card {
-  background: rgba(255,255,255,.82);
-  border-radius: 32rpx;
-  overflow: hidden;
-  box-shadow: 0 14rpx 34rpx rgba(37,75,156,.1);
-  border: 1rpx solid rgba(255, 255, 255, 0.72);
-}
-
-.menu-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 32rpx;
-  border-bottom: 1rpx solid rgba(0, 0, 0, 0.05);
-}
-
-.menu-item:last-child {
-  border-bottom: none;
-}
-
-.menu-item:active {
-  background: #F1F3F4;
-}
-
-.menu-left {
-  display: flex;
-  align-items: center;
-  gap: 32rpx;
-  flex: 1;
-}
-
-.menu-icon-wrapper {
-  width: 80rpx;
-  height: 80rpx;
-  border-radius: 24rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.menu-icon-blue {
-  background: rgba(0, 40, 142, 0.08);
-}
-
-.menu-icon-slate {
-  background: #f8fafc;
-}
-
-.menu-icon-orange {
-  background: rgba(234, 88, 12, 0.08);
-}
-
-.menu-icon {
-  font-size: 40rpx;
-}
-
-.menu-icon-slate .menu-icon {
-  color: #5F6368;
-}
-
-.menu-icon-orange .menu-icon {
-  color: #ea580c;
-}
-
-.menu-content {
-  flex: 1;
-}
-
-.menu-title {
-  display: block;
-  font-size: 32rpx;
-  font-weight: 600;
-  color: #202124;
-  margin-bottom: 8rpx;
-}
-
-.menu-desc {
-  display: block;
-  font-size: 24rpx;
-  color: #5F6368;
-}
-
-.menu-arrow {
-  font-size: 40rpx;
-  color: #DADCE0;
-  opacity: 0.4;
-}
-
-/* 会员权益卡片 */
-.vip-card {
-  margin-top: 64rpx;
-  padding: 48rpx;
-  background: linear-gradient(140deg, #1b3f91 0%, #356cdd 65%, #7fb5ff 100%);
-  border-radius: 32rpx;
-  position: relative;
-  overflow: hidden;
-}
-
-.vip-content {
-  position: relative;
-  z-index: 1;
-}
-
-.vip-title {
-  display: block;
-  font-size: 32rpx;
-  font-weight: 700;
-  color: #ffffff;
-  margin-bottom: 16rpx;
-}
-
-.vip-desc {
-  display: block;
-  font-size: 24rpx;
-  color: rgba(255, 255, 255, 0.8);
-}
-
-.vip-icon {
-  position: absolute;
-  right: -32rpx;
-  bottom: -32rpx;
-  font-size: 256rpx;
-  color: rgba(255, 255, 255, 0.1);
-}
-
-/* 退出登录按钮 */
-.logout-btn {
-  margin-top: 64rpx;
-  background: rgba(255,255,255,.82);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  width: 100%;
-  padding: 64rpx 0;
-  border: 1rpx solid rgba(255,255,255,.7);
-  border-radius: 32rpx;
-  font-size: 32rpx;
-  font-weight: 600;
-  color: #ba1a1a;
-  box-shadow: 0 14rpx 34rpx rgba(37,75,156,.1);
-}
-
-.logout-btn:active {
-  background: rgba(186, 26, 26, 0.1);
-}
-
-/* 版本信息 */
-.version-info {
-  margin-top: 192rpx;
-  text-align: center;
-}
-
-.version-info text {
-  font-size: 24rpx;
-  color: #DADCE0;
-  opacity: 0.4;
-}
-
-/* 底部安全区域 */
-.safe-area-bottom {
-  height: 32rpx;
-}
-
-/* 底部导航栏 */
-.bottom-nav {
-  position: fixed;
-  backdrop-filter: blur(20px);
+  background: rgba(255,255,255,0.7); backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 120rpx;
-  background: rgba(255,255,255,.82);
-  border-top: 1rpx solid rgba(255,255,255,.75);
-  box-shadow: 0 -10rpx 28rpx rgba(22,32,58,.08);
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
-  z-index: 100;
+  border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 32px; padding: 24px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.03);
+  margin-bottom: 24px;
+}
+.quota-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px; }
+.quota-label { font-size: 12px; font-weight: 500; letter-spacing: 0.05em; color: var(--color-on-surface-variant); opacity: 0.8; }
+.quota-bonus {
+  font-size: 12px; font-weight: 500; letter-spacing: 0.05em;
+  color: var(--color-on-secondary-container);
+  background: var(--color-secondary-fixed);
+  padding: 6px 12px; border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.2);
+}
+.quota-numbers { display: flex; align-items: baseline; gap: 4px; margin-bottom: 16px; }
+.quota-current { font-size: 36px; font-weight: 700; color: var(--color-primary); line-height: 44px; }
+.quota-total { font-size: 20px; font-weight: 600; color: var(--color-on-surface-variant); opacity: 0.6; line-height: 28px; }
+.quota-bar-bg { height: 10px; background: var(--color-surface-container); border-radius: 999px; overflow: hidden; margin-bottom: 16px; }
+.quota-bar {
+  height: 100%; border-radius: 999px;
+  background: var(--color-primary); position: relative; overflow: hidden;
+}
+.quota-bar-shimmer {
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%);
+  animation: shimmer 2s infinite linear;
+}
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+.quota-footer {
+  display: flex; justify-content: space-between;
+  font-size: 12px; font-weight: 500; letter-spacing: 0.05em;
+  color: var(--color-on-surface-variant); opacity: 0.7;
 }
 
+.menu-section { margin-bottom: 24px; }
+.menu-card {
+  background: rgba(255,255,255,0.7); backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.4);
+  border-radius: 32px; overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+}
+.menu-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 24px; transition: all var(--transition-fast);
+}
+.menu-item:active { background: rgba(255,255,255,0.4); }
+.menu-item-left { display: flex; align-items: center; gap: 20px; }
+.menu-icon {
+  width: 48px; height: 48px; border-radius: 16px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid rgba(255,255,255,0.4);
+}
+.menu-item-title { font-size: 16px; font-weight: 500; color: var(--color-on-surface); line-height: 26px; }
+.menu-arrow { font-size: 24px; color: var(--color-outline-variant); }
+.menu-divider { height: 1px; margin: 0 24px; background: linear-gradient(to right, transparent, rgba(255,255,255,0.4), transparent); }
+
+.logout-section { margin-top: 16px; }
+.logout-btn {
+  width: 100%; padding: 16px;
+  background: rgba(255,255,255,0.4); backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  border: 1px solid rgba(255,255,255,0.4);
+  border-radius: 16px;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  font-size: 16px; font-weight: 600; color: var(--color-error);
+  line-height: 26px;
+  box-shadow: 0 8px 32px rgba(31,38,135,0.07), inset 0 0 0 1px rgba(255,255,255,0.2);
+}
+.logout-icon { font-size: 20px; }
+
+.bottom-nav {
+  position: fixed; bottom: 24px; left: 20px; right: 20px; z-index: 10;
+  display: flex; align-items: center; justify-content: space-around;
+  height: 80px; padding: 0 8px;
+  background: rgba(255,255,255,0.85); backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  border: 1px solid rgba(255,255,255,0.4);
+  border-radius: 999px;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.1);
+}
 .nav-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8rpx;
-  padding: 24rpx;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 8px 24px; border-radius: 999px;
+  color: var(--color-on-secondary-container); opacity: 0.5;
 }
-
-.nav-icon {
-  font-size: 48rpx;
+.nav-active {
+  background: var(--color-primary-container);
+  color: var(--color-on-primary-container); opacity: 1;
+  box-shadow: 0 4px 12px rgba(0,6,102,0.15);
+  padding: 14px 32px;
 }
-
-.nav-label {
-  font-size: 20rpx;
-  font-weight: 500;
-  color: #9AA0A6;
-}
-
-.nav-item.active .nav-icon {
-  color: #4285F4;
-  font-size: 56rpx;
-}
-
-.nav-item.active .nav-label {
-  color: #4285F4;
-  font-weight: 700;
-}
-
-.filled {
-  font-variation-settings: 'FILL' 1;
-}
+.nav-item-icon { font-size: 22px; margin-bottom: 2px; }
+.nav-item-label { font-size: 12px; font-weight: 700; letter-spacing: 0.05em; }
 </style>

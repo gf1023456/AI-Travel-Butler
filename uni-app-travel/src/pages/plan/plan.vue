@@ -1,160 +1,208 @@
 <template>
-  <view class="page-container">
-    <!-- 行程面板 -->
-    <view class="side-panel plan-panel panel-active">
-      <view class="panel-header">
-        <text class="panel-title">行程方案</text>
-        <view class="header-actions">
-          <view class="action-icon action-pill" @click="saveToHistory">💾</view>
-          <view class="action-icon action-pill" @click="copyToClipboard">📋</view>
-          <view class="action-icon action-pill" @click="exportToFile">📥</view>
-          <view class="close-btn" @click="goBack">✕</view>
-        </view>
+  <view class="plan-page">
+    <header class="top-bar">
+      <view class="top-left">
+        <button class="back-btn" @click="goBack">
+          <text>←</text>
+        </button>
+        <text class="top-title">行程详情</text>
       </view>
-      
-      <scroll-view scroll-y class="panel-body plan-body">
-        <view v-if="!travelStore.currentPlan" class="empty-state">
-          <view class="empty-icon">🗺️</view>
-          <text class="empty-title">暂无行程</text>
-          <text class="empty-desc">您还没有生成任何行程方案</text>
-        </view>
-        
-        <view v-else class="plan-content">
-          <!-- 行程摘要 -->
-          <view class="summary-card">
-            <text class="summary-text">{{ itinerarySummary }}</text>
+      <button class="top-avatar-btn">
+        <image class="top-avatar" :src="userAvatar" mode="aspectFill" />
+      </button>
+    </header>
+
+    <scroll-view scroll-y class="content">
+      <section class="hero-card" v-if="travelStore.currentPlan">
+        <image class="hero-img" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA02IZ_Cr-4sufxcvHZE8BU-38VV750iCYCWUNAwyxlCSLM0AjHjpLAhgQRLRXHRHbXoirHSD1z_1rNdMbasVr_jytZZbzzrdl2hnY71--UeKVV3Hdz4bystRXxSG5qzhpJ3APxP4J6AxfOIImSrnJqnP5Ln1SB6Tr-1uIFhp3Nl1SiR56udEqhJYI7BtB92gIKbmACxLNZB7As774DxNGWsoJOszF7XWoB-hu0sTorTf2jEN5xipAxGw32wLlBCLeC-ZIwBXLUhDs" mode="aspectFill" />
+        <view class="hero-overlay"></view>
+        <view class="hero-content">
+          <text class="hero-title">{{ itinerarySummary || '行程方案' }}</text>
+          <text class="hero-date">{{ planDate }}</text>
+          <view class="hero-badge">
+            <text>商务休闲</text>
           </view>
-          
-          <!-- 每日行程 -->
-          <view class="days-container">
-            <view
-              v-for="(item, index) in sortedItinerary"
-              :key="index"
-              class="day-card"
-              :style="{ borderLeftColor: getDayColor(item.day) }"
-              @click="goMapWithItem(item)"
-            >
-              <view class="day-header">
-                <view class="day-label" :style="{ background: getDayColor(item.day) }">
-                  <text class="day-label-text">D{{ item.day }}</text>
-                </view>
-                <text class="time-label">{{ item.time }}</text>
+        </view>
+      </section>
+
+      <section class="empty-state" v-if="!travelStore.currentPlan">
+        <text class="empty-icon">🗺️</text>
+        <text class="empty-title">暂无行程</text>
+        <text>您还没有生成任何行程方案</text>
+      </section>
+
+      <section class="timeline" v-if="travelStore.currentPlan && days.length">
+        <view v-for="(dayItems, dayKey) in daysByDay" :key="dayKey" class="day-group">
+          <view class="day-header">
+            <view :class="['day-badge', dayKey === '1' ? 'day-active' : '']">
+              <text>D{{ dayKey }}</text>
+            </view>
+            <text class="day-title">{{ getDayTitle(dayKey) }}</text>
+          </view>
+          <view class="day-items">
+            <view v-for="(item, idx) in dayItems" :key="idx" class="timeline-item">
+              <view class="timeline-dot">
+                <view :class="['dot', idx === 0 ? 'dot-active' : '']"></view>
               </view>
-              <text class="place-name">{{ item.name }}</text>
-              <text class="place-desc">{{ item.description }}</text>
-              <view v-if="item.city || (item.weather_icon && item.temperature)" class="place-meta">
-                <text v-if="item.city" class="meta-item">📍 {{ item.city }}</text>
-                <text v-if="item.weather_icon && item.temperature" class="meta-item">{{ item.weather_icon }} {{ item.temperature }}</text>
+              <view class="item-card">
+                <view class="item-img-wrap">
+                  <image class="item-img" :src="item.image || getPlaceholderImg(idx)" mode="aspectFill" />
+                </view>
+                <view class="item-info">
+                  <view class="item-header">
+                    <text class="item-name">{{ item.name || '景点' }}</text>
+                    <text class="item-weather" v-if="item.weather_icon">{{ item.weather_icon }} {{ item.temperature }}</text>
+                  </view>
+                  <view class="item-time">
+                    <text>🕐</text>
+                    <text>{{ item.time || '全天' }}</text>
+                  </view>
+                  <text class="item-desc">{{ item.description }}</text>
+                </view>
               </view>
             </view>
           </view>
         </view>
-      </scroll-view>
+      </section>
+    </scroll-view>
+
+    <!-- Bottom Action Bar -->
+    <view class="action-bar">
+      <button class="action-btn action-outline" @click="copyToClipboard">
+        <text>📋</text>
+        <text>复制</text>
+      </button>
+      <button class="action-btn action-outline" @click="exportToFile">
+        <text>📤</text>
+        <text>导出</text>
+      </button>
+      <button class="action-btn action-primary" @click="saveToHistory">
+        <text>💾</text>
+        <text>保存行程</text>
+      </button>
     </view>
+
+    <!-- Floating AI Bubble -->
+    <button class="ai-bubble" @click="goRefine">
+      <text>🤖</text>
+    </button>
   </view>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useTravelStore } from '@/store/travel.js'
+import { useUserStore } from '@/store/user.js'
 import { saveHistory } from '@/api/history.js'
 
 const travelStore = useTravelStore()
+const userStore = useUserStore()
+const userAvatar = computed(() => userStore.avatarUrl || 'https://ui-avatars.com/api/?name=慧游&background=1a237e&color=fff&size=64')
 
-// 数据
 const dayPlanItinerary = ref([])
-const socialRecommendations = ref([])
 const itinerarySummary = ref('')
-const itineraryEvidence = ref([])
-const verifierWarnings = ref([])
 
-// 颜色
-const DAY_COLORS = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98FB98', '#DDA0DD', '#F0E68C', '#FF6347', '#BA55D3', '#9ACD32']
-
-// 计算属性
-const sortedItinerary = computed(() => [...dayPlanItinerary.value].sort((a, b) => (a.day - b.day) || (a.sequence - b.sequence)))
-const getDayColor = (day) => DAY_COLORS[(day - 1) % DAY_COLORS.length]
-
-// 在页面加载时从store获取数据
 onMounted(() => {
+  userStore.restoreFromStorage()
   if (travelStore.currentPlan) {
-    loadPlanDataFromStore()
-  } else {
-    itinerarySummary.value = '暂无行程'
+    const plan = travelStore.currentPlan
+    dayPlanItinerary.value = Array.isArray(plan.dayPlanItinerary) ? plan.dayPlanItinerary : []
+    itinerarySummary.value = plan.itinerarySummary || '排期已生成'
   }
 })
 
-// 从store加载数据
-const loadPlanDataFromStore = () => {
+const sortedItinerary = computed(() =>
+  [...dayPlanItinerary.value].sort((a, b) => (a.day - b.day) || (a.sequence - b.sequence))
+)
+
+const days = computed(() => {
+  const set = new Set()
+  sortedItinerary.value.forEach(i => set.add(i.day))
+  return [...set].sort()
+})
+
+const daysByDay = computed(() => {
+  const map = {}
+  sortedItinerary.value.forEach(item => {
+    const key = String(item.day || 1)
+    if (!map[key]) map[key] = []
+    map[key].push(item)
+  })
+  return map
+})
+
+const getStartDate = () => {
   const plan = travelStore.currentPlan
-  dayPlanItinerary.value = Array.isArray(plan.dayPlanItinerary) ? plan.dayPlanItinerary : []
-  socialRecommendations.value = Array.isArray(plan.socialRecommendations) ? plan.socialRecommendations : []
-  itinerarySummary.value = plan.itinerarySummary || '排期已生成'
-  itineraryEvidence.value = Array.isArray(plan.evidence) ? plan.evidence : []
-  verifierWarnings.value = Array.isArray(plan.verifierWarnings) ? plan.verifierWarnings : []
+  if (!plan) return new Date()
+  if (plan.startDate) return new Date(plan.startDate)
+  return new Date()
 }
 
-// 保存到历史
+const planDate = computed(() => {
+  if (!travelStore.currentPlan) return ''
+  const start = getStartDate()
+  const numDays = days.value.length || 1
+  const end = new Date(start)
+  end.setDate(end.getDate() + numDays - 1)
+  const f = (d) => `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`
+  return `${f(start)} - ${f(end)} (${numDays}天)`
+})
+
+const getDayTitle = (day) => {
+  const start = getStartDate()
+  const d = new Date(start)
+  d.setDate(d.getDate() + parseInt(day) - 1)
+  const theme = (daysByDay.value[day]?.[0]?.dayTheme) || ''
+  const m = d.getMonth() + 1
+  const dd = d.getDate()
+  return theme ? `${m}月${dd}日 · ${theme}` : `${m}月${dd}日 · Day ${day}`
+}
+
+const getPlaceholderImg = (idx) => {
+  const imgs = [
+    'https://tonystark-ai.ccwu.cc/png/600dc4e1-70ed-491a-85d4-a0edea269eb8.png',
+    'https://tonystark-ai.ccwu.cc/png/62d9b74c-a24c-4474-b119-59f01af3902b.png',
+    'https://tonystark-ai.ccwu.cc/png/79b1c1f7-445f-49bc-a075-e44c66b289d8.png'
+  ]
+  return imgs[idx % imgs.length]
+}
+
+const goBack = () => uni.redirectTo({ url: '/pages/index/index' })
+const goRefine = () => uni.navigateTo({ url: '/pages/refine/refine' })
+
 const saveToHistory = async () => {
-  if (!dayPlanItinerary.value.length) { 
-    uni.showToast({ title: '无行程可保存', icon: 'none' })
-    return 
+  if (!dayPlanItinerary.value.length) {
+    uni.showToast({ title: '无行程可保存', icon: 'none' }); return
   }
-  
-  const plan = travelStore.currentPlan
-  if (!plan) {
-    uni.showToast({ title: '无行程数据', icon: 'none' })
-    return
-  }
-  
   try {
     uni.showLoading({ title: '保存中...' })
-    
-    // 调用后端API保存
     const result = await saveHistory({
-      userInput: plan.userInput || '行程方案',
-      modelType: plan.modelType || 'auto',
-      provider: plan.provider || 'unknown',
-      itinerarySummary: itinerarySummary.value || '',
-      dayPlan: dayPlanItinerary.value || [],
-      socialRecommendations: socialRecommendations.value || [],
-      evidence: itineraryEvidence.value || [],
-      warnings: verifierWarnings.value || []
+      userInput: travelStore.currentPlan?.userInput || '行程方案',
+      modelType: 'auto', provider: 'unknown',
+      itinerarySummary: itinerarySummary.value,
+      dayPlan: dayPlanItinerary.value,
+      socialRecommendations: [],
+      evidence: [], warnings: []
     })
-    
     uni.hideLoading()
-    
     if (result?.id) {
       uni.showToast({ title: '保存成功', icon: 'success' })
     } else {
-      // 保存到本地作为备份
       saveToLocalStorage()
     }
   } catch (error) {
-    console.error('保存失败', error)
     uni.hideLoading()
-    // 降级到本地存储
     saveToLocalStorage()
   }
 }
 
-// 保存到本地存储
 const saveToLocalStorage = () => {
   try {
     const history = JSON.parse(uni.getStorageSync('travel_history') || '[]')
-    const userData = ''
-    
     history.unshift({
-      id: Date.now(),
-      timestamp: new Date().toLocaleString(),
-      prompt: userData,
-      summary: itinerarySummary.value,
-      itinerary: dayPlanItinerary.value,
-      recommendations: socialRecommendations.value,
-      evidence: itineraryEvidence.value,
-      warnings: verifierWarnings.value
+      id: Date.now(), timestamp: new Date().toLocaleString(),
+      summary: itinerarySummary.value, itinerary: dayPlanItinerary.value
     })
-    
     if (history.length > 30) history.pop()
     uni.setStorageSync('travel_history', JSON.stringify(history))
     uni.showToast({ title: '已保存到本地', icon: 'success' })
@@ -163,367 +211,161 @@ const saveToLocalStorage = () => {
   }
 }
 
-// 复制到剪贴板
 const copyToClipboard = () => {
-  if (!dayPlanItinerary.value.length && !itinerarySummary.value) { 
-    showToast('无内容', 'error')
-    return 
-  }
-  
-  uni.setClipboardData({ 
-    data: generatePlainTextGuide(),
-    success: () => showToast('已复制', 'success'),
-    fail: () => showToast('复制失败', 'error')
+  if (!dayPlanItinerary.value.length) { uni.showToast({ title: '无内容', icon: 'none' }); return }
+  uni.setClipboardData({
+    data: generateText(),
+    success: () => uni.showToast({ title: '已复制', icon: 'success' }),
+    fail: () => uni.showToast({ title: '复制失败', icon: 'error' })
   })
 }
 
-// 导出行程
 const exportToFile = () => {
-  if (!dayPlanItinerary.value.length) { 
-    showToast('无行程', 'error')
-    return 
-  }
-  
-  uni.showModal({ 
-    title: '导出行程', 
-    content: '已将行程复制到剪贴板', 
-    showCancel: false,
-    success: () => copyToClipboard() 
+  uni.showModal({
+    title: '导出行程', content: '已将行程复制到剪贴板',
+    showCancel: false, success: () => copyToClipboard()
   })
 }
 
-// 生成纯文本行程指南
-const generatePlainTextGuide = () => {
-  let text = `🌍 AI Travel Pro 行程指南\n📅 ${new Date().toLocaleString()}\n🎯 旅行方案\n\n`
-  
-  if (itinerarySummary.value) text += `📝 亮点\n${itinerarySummary.value}\n\n`
-  
-  if (socialRecommendations.value.length) {
-    text += `🔥 热门打卡\n`
-    socialRecommendations.value.forEach((item, i) => { 
-      text += `${i+1}. ${item.title || item.name} [${item.platform}] - ${item.reason || item.description}\n`
+const generateText = () => {
+  let text = `🌍 慧游 行程指南\n📅 ${new Date().toLocaleString()}\n\n`
+  if (itinerarySummary.value) text += `📝 ${itinerarySummary.value}\n\n`
+  const days = {}
+  dayPlanItinerary.value.forEach(item => {
+    if (!days[item.day]) days[item.day] = []
+    days[item.day].push(item)
+  })
+  Object.keys(days).sort().forEach(day => {
+    text += `【Day ${day}】\n`
+    days[day].forEach(item => {
+      text += `📍 ${item.sequence || ''}. ${item.name || ''} ${item.time || ''}\n`
+      if (item.description) text += `   ${item.description}\n`
     })
     text += '\n'
-  }
-  
-  if (dayPlanItinerary.value.length) {
-    text += `🗺️ 每日行程\n`
-    const days = {}
-    dayPlanItinerary.value.forEach(item => { 
-      if (!days[item.day]) days[item.day] = []
-      days[item.day].push(item)
-    })
-    
-    Object.keys(days).sort().forEach(day => {
-      text += `\n【Day ${day}】\n`
-      days[day].forEach(item => {
-        const city = item.city ? `(${item.city})` : ''
-        const weather = item.weather_icon && item.temperature ? ` [${item.weather_icon} ${item.temperature}]` : ''
-        text += `📍 ${item.sequence || ''}. ${item.name} ${city}\n   ⏰ ${item.time}${weather}\n   📖 ${item.description}\n`
-        if (item.transit_hint) text += `   🚗 ${item.transit_hint}\n`
-        text += `   ────────────────────\n`
-      })
-    })
-  }
-  
+  })
   return text
-}
-
-// 跳转到地图并定位
-const goMapWithItem = (item) => {
-  // 如果有地图功能页面则跳转
-  if (item.lat && item.lng) {
-    showToast(`Day ${item.day} - ${item.name}`, 'normal')
-  }
-}
-
-// 返回主页（地图页面）
-const goBack = () => {
-  uni.redirectTo({ url: '/pages/index/index' })
-}
-
-// Toast
-const showToast = (message, type = 'normal', duration = 3000) => {
-  toast.value = { show: true, message, type }
-  setTimeout(() => { toast.value.show = false }, duration)
 }
 </script>
 
 <style scoped>
-/* 页面 */
-.page-container {
-  position: relative;
-  width: 100%;
-  height: 100vh;
-  overflow: hidden;
-  background: var(--gradient-aurora);
+.plan-page { min-height: 100vh; background: var(--color-surface); }
+
+.top-bar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: calc(12px + var(--status-bar-height)) 20px 12px;
+  background: rgba(255,255,255,0.7); backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  border-bottom: 1px solid rgba(255,255,255,0.2);
+}
+.top-left { display: flex; align-items: center; gap: 12px; }
+.back-btn {
+  width: 36px; height: 36px; display: flex; align-items: center;
+  justify-content: center; font-size: 20px; color: var(--color-primary);
+}
+.top-title { font-size: 24px; font-weight: 700; color: var(--color-primary); letter-spacing: -0.01em; line-height: 32px; }
+.top-avatar { width: 32px; height: 32px; border-radius: 50%; }
+
+.content { padding: calc(80px + var(--status-bar-height)) 20px 140px; }
+
+.hero-card {
+  position: relative; overflow: hidden; border-radius: 16px;
+  height: 200px; margin-bottom: 48px;
+  box-shadow: 0 12px 32px rgba(0,6,102,0.08);
+}
+.hero-img { position: absolute; inset: 0; width: 100%; height: 100%; }
+.hero-overlay {
+  position: absolute; inset: 0;
+  background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.2) 50%, transparent 100%);
+}
+.hero-content {
+  position: absolute; bottom: 0; left: 0; right: 0; padding: 24px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.hero-title { font-size: 24px; font-weight: 700; color: #fff; letter-spacing: -0.01em; line-height: 32px; }
+.hero-date { font-size: 14px; color: rgba(255,255,255,0.9); display: flex; align-items: center; gap: 8px; }
+.hero-badge { align-self: flex-start; }
+.hero-badge text {
+  font-size: 12px; font-weight: 500; letter-spacing: 0.05em;
+  color: #fff; background: rgba(255,255,255,0.2); backdrop-filter: blur(8px);
+  padding: 6px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.3);
 }
 
-/* 行程面板通用 */
-.side-panel {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  right: 0;
-  width: 100%;
-  max-width: 100%;
-  background: var(--gradient-aurora);
-  border-radius: 0;
-  box-shadow: 0 16rpx 60rpx rgba(0, 40, 142, 0.15);
-  transform: translateX(0);
-  z-index: 100;
-  display: flex;
-  flex-direction: column;
-}
+.empty-state { display: flex; flex-direction: column; align-items: center; padding: 80px 20px; gap: 16px; }
+.empty-icon { font-size: 64px; opacity: 0.5; }
+.empty-title { font-size: 20px; font-weight: 700; color: var(--color-on-surface); }
 
-.panel-header {
-  border-bottom: 1rpx solid rgba(255,255,255,.2);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 36rpx 40rpx;
-  background: linear-gradient(135deg, #4285F4 0%, #3367D6 100%);
-  border-radius: 0;
+.timeline { padding-bottom: 32px; }
+.day-group { margin-bottom: 48px; }
+.day-header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
+.day-badge {
+  width: 44px; height: 44px; border-radius: 50%;
+  background: var(--color-secondary-container);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 700; color: var(--color-primary);
+  box-shadow: 0 4px 12px rgba(0,6,102,0.15);
 }
-
-.header-content {
-  display: flex;
-  align-items: center;
-  gap: 14rpx;
-}
-
-.panel-title {
-  font-size: 38rpx;
-  font-weight: 700;
-  color: #ffffff;
-  letter-spacing: 1rpx;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
-}
-
-.model-tag {
-  padding: 8rpx 18rpx;
-  background: rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border-radius: 24rpx;
-  font-size: 24rpx;
-  color: #ffffff;
-  font-weight: 500;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
-}
-
-.close-btn {
-  width: 56rpx;
-  height: 56rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.18);
-  border-radius: 50%;
-  color: #ffffff;
-  font-size: 32rpx;
-}
-
-.close-btn:active {
-  background: rgba(255, 255, 255, 0.25);
-}
-
-.header-actions {
-  flex-wrap: wrap;
-  display: flex;
-  align-items: center;
-  gap: 14rpx;
-}
-
-.action-icon {
-  min-width: 54rpx;
-  min-height: 54rpx;
-  border: 1rpx solid rgba(255,255,255,.24);
-  width: 48rpx;
-  height: 48rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.18);
-  border-radius: 50%;
-  font-size: 28rpx;
-}
-
-.action-icon:active {
-  background: rgba(255, 255, 255, 0.25);
-}
-
-/* 行程主体 */
-.panel-body {
-  flex: 1;
-  padding: 32rpx;
-  overflow-y: auto;
-}
-
-/* 空状态 */
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 120rpx 40rpx;
-  gap: 24rpx;
-}
-
-.empty-icon {
-  font-size: 120rpx;
-  opacity: 0.5;
-}
-
-.empty-title {
-  font-size: 36rpx;
-  font-weight: 600;
-  color: #1A1B22;
-}
-
-.empty-desc {
-  font-size: 28rpx;
-  color: #80868B;
-}
-
-/* 行程内容 */
-.plan-content {
-  padding-bottom: 32rpx;
-}
-
-.summary-card {
-  background: linear-gradient(135deg, rgba(0, 40, 142, 0.06) 0%, rgba(30, 64, 175, 0.04) 100%);
-  border-radius: 24rpx;
-  padding: 32rpx;
-  margin-bottom: 32rpx;
-  border: 1rpx solid rgba(0, 40, 142, 0.1);
-}
-
-.summary-text {
-  font-size: 30rpx;
-  line-height: 1.6;
-  color: #202124;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
-}
-
-/* 日期卡片 */
-.days-container {
-  display: flex;
-  flex-direction: column;
-  gap: 24rpx;
-}
-
-.day-card {
-  background: var(--gradient-aurora);
-  border-radius: 24rpx;
-  padding: 32rpx;
-  border-left: 8rpx solid #4285F4;
-  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.04);
-  transition: all 0.2s;
-}
-
-.day-card:active {
-  transform: scale(0.98);
-  box-shadow: 0 8rpx 24rpx rgba(0, 40, 142, 0.1);
-}
-
-.day-header {
-  display: flex;
-  align-items: center;
-  gap: 20rpx;
-  margin-bottom: 20rpx;
-}
-
-.day-label {
-  display: flex;
-  align-items: center;
-  padding: 12rpx 24rpx;
-  border-radius: 24rpx;
-  background: linear-gradient(135deg, #4285F4 0%, #3367D6 100%);
-}
-
-.day-label-text {
-  font-size: 28rpx;
-  font-weight: 700;
-  color: #ffffff;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
-}
-
-.time-label {
-  font-size: 28rpx;
-  color: #5F6368;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
-}
-
-.place-name {
-  display: block;
-  font-size: 34rpx;
-  font-weight: 700;
-  color: #202124;
-  margin-bottom: 16rpx;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
-}
-
-.place-desc {
-  display: block;
-  font-size: 28rpx;
-  color: #5F6368;
-  line-height: 1.6;
-  margin-bottom: 20rpx;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
-}
-
-.place-meta {
-  display: flex;
-  gap: 24rpx;
-  flex-wrap: wrap;
-}
-
-.meta-item {
-  font-size: 26rpx;
-  color: #5F6368;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
-}
-
-/* Toast */
-.toast-wrap {
-  position: absolute;
-  top: 140rpx;
-  left: 0;
-  right: 0;
-  z-index: 200;
-  display: flex;
-  justify-content: center;
-  pointer-events: none;
-}
-
-.toast {
-  background: rgba(23,23,23,0.9);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+.day-active {
+  background: linear-gradient(135deg, #000666 0%, #343d96 100%);
   color: #fff;
-  padding: 24rpx 48rpx;
-  border-radius: 16rpx;
-  font-size: 28rpx;
-  font-weight: 500;
-  opacity: 0;
-  transform: translateY(-20rpx);
-  transition: all 0.3s;
-  box-shadow: 0 8rpx 32rpx rgba(0,0,0,0.2);
+}
+.day-title { font-size: 20px; font-weight: 600; color: var(--color-primary); letter-spacing: -0.01em; }
+.day-items { padding-left: 20px; }
+
+.timeline-item { display: flex; gap: 16px; margin-bottom: 24px; position: relative; }
+.timeline-dot { display: flex; flex-direction: column; align-items: center; padding-top: 8px; width: 24px; flex-shrink: 0; }
+.dot {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--color-outline-variant);
+  border: 4px solid var(--color-surface);
+  box-shadow: 0 0 0 2px var(--color-outline-variant);
+}
+.dot-active { background: var(--color-primary); box-shadow: 0 0 0 2px var(--color-primary); }
+
+.item-card {
+  flex: 1; display: flex; gap: 16px;
+  background: rgba(255,255,255,0.75); backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.5);
+  border-radius: 16px; padding: 16px;
+  box-shadow: 0 8px 24px rgba(0,6,102,0.04);
+}
+.item-img-wrap { width: 96px; height: 96px; border-radius: 12px; overflow: hidden; flex-shrink: 0; }
+.item-img { width: 100%; height: 100%; }
+.item-info { flex: 1; }
+.item-header { display: flex; justify-content: space-between; align-items: flex-start; }
+.item-name { font-size: 16px; font-weight: 700; color: var(--color-primary); }
+.item-weather { font-size: 12px; font-weight: 500; color: var(--color-secondary); }
+.item-time { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--color-on-surface-variant); margin-top: 4px; }
+.item-desc { font-size: 13px; color: var(--color-on-surface-variant); margin-top: 8px; line-height: 1.5; }
+
+.action-bar {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 10;
+  display: flex; gap: 12px; padding: 20px;
+  background: rgba(255,255,255,0.85); backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-top: 1px solid rgba(0,6,102,0.08);
+}
+.action-btn {
+  flex: 1; height: 48px; border-radius: 999px;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  font-size: 14px; font-weight: 600;
+}
+.action-outline {
+  border: 1px solid var(--color-outline-variant); color: var(--color-primary);
+}
+.action-primary {
+  flex: 1.5;
+  background: linear-gradient(135deg, #000666 0%, #343d96 100%);
+  color: #fff; box-shadow: 0 8px 20px rgba(0,6,102,0.25);
 }
 
-.toast-visible {
-  opacity: 1;
-  transform: translateY(0);
+.ai-bubble {
+  position: fixed; bottom: 112px; right: 24px; z-index: 10;
+  width: 56px; height: 56px; border-radius: 50%;
+  background: linear-gradient(135deg, #000666 0%, #343d96 100%);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; color: #fff;
+  box-shadow: 0 8px 24px rgba(0,6,102,0.3);
 }
-
-.toast.success {
-  background: rgba(34,197,94,0.9);
-}
-
-.toast.error {
-  background: rgba(239,68,68,0.9);
-}
-
-.action-pill { transition: transform .2s var(--ease-out), box-shadow .2s var(--ease-out); }
-.action-pill:active { transform: translateY(1rpx) scale(.95); box-shadow: 0 8rpx 16rpx rgba(0,0,0,.2); }
 </style>
