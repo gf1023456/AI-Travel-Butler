@@ -32,6 +32,24 @@ export const createPlanV2 = (params) => {
 }
 
 /**
+ * 查询任务状态
+ * @param {string} taskId - 任务ID
+ * @returns {Promise}
+ */
+export const getPlanStatus = (taskId) => {
+  return get(`/plan/v2/status/${taskId}`)
+}
+
+/**
+ * 获取任务结果
+ * @param {string} taskId - 任务ID
+ * @returns {Promise}
+ */
+export const getPlanResult = (taskId) => {
+  return get(`/plan/v2/result/${taskId}`)
+}
+
+/**
  * 优化现有行程
  * @param {Object} params - 优化参数
  * @returns {Promise}

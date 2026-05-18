@@ -61,6 +61,11 @@ app.include_router(weather_router)
 app.include_router(location_router)
 app.include_router(plan_v2_router)
 
+@app.on_event("startup")
+async def startup_plan_v2_cleanup():
+    from routes.plan_v2 import _cleanup_old_tasks
+    asyncio.create_task(_cleanup_old_tasks())
+
 knowledge_cache = None
 execution_log_store: Dict[str, Dict] = {}
 response_cache: Dict[str, Dict] = {}

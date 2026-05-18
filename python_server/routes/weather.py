@@ -24,7 +24,7 @@ async def get_weather_now(
     params = {"location": location, "key": QWEATHER_API_KEY}
 
     async with httpx.AsyncClient() as client:
-        resp = await client.get(url, params=params, timeout=10)
+        resp = await client.get(url, params=params, timeout=httpx.Timeout(30.0, connect_timeout=30.0, read_timeout=30.0))
 
     if resp.status_code != 200:
         raise HTTPException(status_code=502, detail="和风天气服务暂不可用")
