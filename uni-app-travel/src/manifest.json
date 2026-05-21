@@ -1,7 +1,7 @@
 {
   "name": "ai-travel-butler",
   "appid": "__UNI__AITRAVEL",
-  "description": "AI旅行助手",
+  "description": "慧游旅行助手",
   "versionName": "1.0.0",
   "versionCode": "100",
   "transformPx": false,
@@ -15,7 +15,7 @@
     }
   },
   "mp-weixin": {
-    "appid": "",
+    "appid": "wx0c96ac321aba9e4a",
     "setting": {
       "urlCheck": false
     },
@@ -23,7 +23,7 @@
     "requiredPrivateInfos": ["getLocation", "chooseLocation"]
   },
   "h5": {
-    "title": "AI旅行助手",
+    "title": "慧游旅行助手",
     "router": {
       "mode": "hash"
     }

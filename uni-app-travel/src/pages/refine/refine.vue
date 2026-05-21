@@ -32,7 +32,7 @@
         <view class="input-header">
           <view class="input-header-left">
             <text class="section-icon">✏️</text>
-            <text class="section-overline">告诉 AI 你的想法</text>
+            <text class="section-overline">告诉慧游你的想法</text>
           </view>
           <text class="char-count">{{ charCount }} / 500</text>
         </view>
@@ -67,18 +67,18 @@
           <text class="apply-icon">✨</text>
           <text>立即应用优化</text>
         </button>
-        <text class="apply-hint">AI 将在 5 秒内为您重新生成最优路线</text>
+        <text class="apply-hint">慧游 将为您重新生成最优路线</text>
       </section>
 
-      <!-- Decorative Visual -->
-      <view class="deco-image">
-        <image class="deco-img" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBvaIBpvSfc7bQdB9Eyz-qbNj0HwauVvGllVjqsfxny-ctimt6M4tS2QwntgTeb2Q1bSZI2-uK13weAGS26NEGecLp7LT7YVok6UJNMO61aFQSN-8SIDchRAkmM0jeABJAUdcjbGDTg2ZPGsHLU8oxq6J1XRuL2fGtuaySVhZzwNhHRwLbHCP5Ppo_2GZCCtQ5-wP8H9kD44BpsojqgU2T9QoTHH_AK-m_gvKWV69xHpn2KecwEKfFOe5ps4v5lLp-9dIkhBkJJIx0" mode="aspectFill" />
-        <view class="deco-overlay"></view>
-        <view class="deco-content">
-          <text class="deco-title">灵感启发</text>
-          <text class="deco-sub">探索京都最隐秘的红叶观赏点</text>
-        </view>
-      </view>
+<!--      &lt;!&ndash; Decorative Visual &ndash;&gt;-->
+<!--      <view class="deco-image">-->
+<!--        <image class="deco-img" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBvaIBpvSfc7bQdB9Eyz-qbNj0HwauVvGllVjqsfxny-ctimt6M4tS2QwntgTeb2Q1bSZI2-uK13weAGS26NEGecLp7LT7YVok6UJNMO61aFQSN-8SIDchRAkmM0jeABJAUdcjbGDTg2ZPGsHLU8oxq6J1XRuL2fGtuaySVhZzwNhHRwLbHCP5Ppo_2GZCCtQ5-wP8H9kD44BpsojqgU2T9QoTHH_AK-m_gvKWV69xHpn2KecwEKfFOe5ps4v5lLp-9dIkhBkJJIx0" mode="aspectFill" />-->
+<!--        <view class="deco-overlay"></view>-->
+<!--        <view class="deco-content">-->
+<!--          <text class="deco-title">灵感启发</text>-->
+<!--          <text class="deco-sub">探索京都最隐秘的红叶观赏点</text>-->
+<!--        </view>-->
+<!--      </view>-->
     </scroll-view>
   </view>
 </template>

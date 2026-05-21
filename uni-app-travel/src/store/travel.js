@@ -52,7 +52,7 @@ export const useTravelStore = defineStore('travel', {
           throw new Error('请输入旅行需求')
         }
         if (!params.modelType || typeof params.modelType !== 'string') {
-          throw new Error('请选择AI模型')
+          throw new Error('请选择模型')
         }
 
         // 先检查配额是否足够

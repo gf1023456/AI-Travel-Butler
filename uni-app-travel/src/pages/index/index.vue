@@ -35,8 +35,8 @@
         </view>
       </view>
       <view class="nav-actions">
-        <button class="nav-btn"><text>🔍</text></button>
-        <button class="nav-btn"><text>🔔</text></button>
+<!--        <button class="nav-btn"><text>🔍</text></button>-->
+<!--        <button class="nav-btn"><text>🔔</text></button>-->
       </view>
     </header>
 
@@ -74,7 +74,7 @@
       </view>
     </view>
 
-    <!-- Floating AI Butler -->
+    <!-- Floating 慧游 Butler -->
     <button class="ai-butler" @click="goExplore" :style="{ bottom: (136 + safeAreaBottom) + 'px' }">
       <text class="ai-icon">✨</text>
       <text class="ai-text">为您推荐附近的百年书屋</text>
@@ -401,6 +401,16 @@ export default {
     this.safeAreaBottom = safeAreaBottom
     this.userStore.restoreFromStorage()
     this.getUserLocation().then(() => this.loadFromStore())
+    wx.showShareMenu({
+      withShareTicket: false,  // 是否带 shareTicket（用于群聊信息）
+      menus: ['shareAppMessage', 'shareTimeline'],  // 显示两个分享按钮
+      success: () => {
+        console.log('分享菜单设置成功')
+      },
+      fail: (err) => {
+        console.error('设置失败:', err)
+      }
+    })
   },
   onShow() {
     this.userStore.restoreFromStorage()

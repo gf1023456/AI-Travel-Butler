@@ -94,9 +94,9 @@ const userInput = ref('')
 const travelModeIndex = ref(0)
 
 const travelStyles = [
-  { name: '轻装上阵', icon: '🌤️', image: 'https://tonystark-ai.ccwu.cc/png/1aaa9239-ca21-4e2d-a661-04ac864d9918.png' },
+  { name: '轻装上阵', icon: '🌤️', image: 'https://tonystark-ai.ccwu.cc/png/d852559c-ac19-43e1-ab02-78e1f529c25c.png' },
   { name: '深度打卡', icon: '📍', image: 'https://tonystark-ai.ccwu.cc/png/4d94c032-2cd5-4e00-8771-b1cd89cb0850.png' },
-  { name: '美食之旅', icon: '🍜', image: 'https://tonystark-ai.ccwu.cc/png/d852559c-ac19-43e1-ab02-78e1f529c25c.png' },
+  { name: '美食之旅', icon: '🍜', image: 'https://tonystark-ai.ccwu.cc/png/1aaa9239-ca21-4e2d-a661-04ac864d9918.png' },
   { name: '户外探索', icon: '🏔️', image: 'https://tonystark-ai.ccwu.cc/png/f02f9327-4f1e-4a51-bfdd-5dd343151fb8.png' }
 ]
 
@@ -229,7 +229,7 @@ const handleGenerate = async () => {
   box-shadow: 0 12px 24px rgba(0,0,0,0.02);
 }
 .main-textarea {
-  width: 100%; min-height: 140px;
+  width: 90%; min-height: 90px;
   background: transparent; border: none; resize: none;
   font-size: 16px; line-height: 26px;
   color: var(--color-on-surface);
