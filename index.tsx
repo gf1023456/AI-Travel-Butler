@@ -307,7 +307,7 @@ async function tryBackendPlan(userInput: string, modelType: string, isPlannerMod
     socialRecommendations = Array.isArray(data.socialRecommendations) ? data.socialRecommendations : [];
     itinerarySummary = data.itinerarySummary || '排期已生成';
     itineraryEvidence = Array.isArray(data.evidence) ? data.evidence : [];
-    verifierWarnings = Array.isArray(data.verifierWarnings) ? data.verifierWarnings : [];
+    verifierWarnings = Array.isArray(data.warnings) ? data.warnings : [];
     return true;
   } catch (error) {
     console.warn('Backend planner unavailable.', error);

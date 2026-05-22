@@ -1,5 +1,5 @@
 <template>
-  <view class="plan-page">
+  <view class="plan-page" :class="themeClass">
     <header class="top-bar" :style="{ paddingTop: (12 + statusBarHeight) + 'px' }">
       <view class="top-left">
         <button class="back-btn" @click="goBack">
@@ -26,9 +26,12 @@
       </section>
 
       <section class="empty-state" v-if="!travelStore.currentPlan">
-        <text class="empty-icon">🗺️</text>
-        <text class="empty-title">暂无行程</text>
-        <text>您还没有生成任何行程方案</text>
+        <text class="empty-icon">✨</text>
+        <text class="empty-title">快去生成你的专属方案吧</text>
+        <text class="empty-desc">告诉我们你的想法，慧游为你智能规划旅程</text>
+        <button class="empty-btn" @click="goExplore">
+          <text>开始探索</text>
+        </button>
       </section>
 
       <section class="timeline" v-if="travelStore.currentPlan && days.length">
@@ -72,18 +75,16 @@
     </scroll-view>
 
     <!-- Bottom Action Bar -->
-    <view class="action-bar" :style="{ bottom: safeAreaBottom + 'px' }">
-      <button class="action-btn action-outline" @click="generatePoster">
+    <view class="action-bar" :style="{ bottom: safeAreaBottom + 'px' }" v-if="travelStore.currentPlan">
+      <button class="action-btn action-outline" @click="generateBackendLongPoster">
         <text>📤</text>
         <text>分享行程</text>
       </button>
-      <!-- 发表贴图功能暂时隐藏
-      <button class="action-btn action-outline" @click="shareToOfficial">
-        <text>✨</text>
-        <text>发表贴图</text>
+      <button class="action-btn action-outline" @click="copyToClipboard">
+        <text>📋</text>
+        <text>复制方案</text>
       </button>
-      -->
-      <button class="action-btn action-primary" @click="saveToHistory">
+      <button class="action-btn action-primary" @click="saveToHistory" v-if="!travelStore.currentPlan.isFromHistory">
         <text>💾</text>
         <text>保存行程</text>
       </button>
@@ -104,7 +105,9 @@ import { ref, computed, onMounted, getCurrentInstance, nextTick } from 'vue'
 import { useTravelStore } from '@/store/travel.js'
 import { useUserStore } from '@/store/user.js'
 import { saveHistory } from '@/api/history.js'
+import { generatePoster as generateBackendPoster, downloadPoster } from '@/api/poster.js'
 import { useSafeArea } from '@/utils/safeArea.js'
+import { themeClass } from '@/utils/theme.js'
 import PosterGenerator from '@/utils/poster.js'
 
 const travelStore = useTravelStore()
@@ -310,6 +313,12 @@ const generatePoster = () => {
     uni.showToast({ title: '无行程可分享', icon: 'none' })
     return
   }
+  
+  // 直接调用后端生成海报
+  generateBackendLongPoster()
+}
+
+const generateFrontendPoster = () => {
 
   // #ifdef MP-WEIXIN
   uni.showLoading({ title: '生成海报中...' })
@@ -479,6 +488,68 @@ const generateText = () => {
   })
   return text
 }
+
+const generateBackendLongPoster = async () => {
+  if (!dayPlanItinerary.value.length) {
+    uni.showToast({ title: '无行程可生成', icon: 'none' })
+    return
+  }
+  
+  try {
+    uni.showLoading({ title: '生成海报中...' })
+    
+    const posterData = {
+      itinerarySummary: itinerarySummary.value,
+      days: days.value,
+      dayPlanItinerary: dayPlanItinerary.value
+    }
+    
+    const result = await generateBackendPoster(posterData)
+    
+    if (result.code === 0 && result.data?.image) {
+      // 将base64图片保存到本地
+      const tempFilePath = await downloadPoster(result.data.image)
+      
+      // 调用微信分享图片菜单
+      // #ifdef MP-WEIXIN
+      wx.showShareImageMenu({
+        path: tempFilePath,
+        needShowEntrance: true,
+        entrancePath: 'pages/index/index',
+        success: () => {
+          uni.showToast({ title: '分享成功', icon: 'success' })
+        },
+        fail: (err) => {
+          console.error('分享失败:', err)
+          // 如果分享失败，至少让用户可以预览保存
+          uni.previewImage({
+            urls: [tempFilePath],
+            success: () => {
+              uni.showToast({ title: '海报已生成，请长按保存', icon: 'none', duration: 2000 })
+            }
+          })
+        }
+      })
+      // #endif
+      
+      // #ifndef MP-WEIXIN
+      uni.previewImage({
+        urls: [result.data.image],
+        success: () => {
+          uni.showToast({ title: '海报生成成功', icon: 'success' })
+        }
+      })
+      // #endif
+    } else {
+      uni.showToast({ title: '海报生成失败', icon: 'error' })
+    }
+  } catch (error) {
+    console.error('后端海报生成错误:', error)
+    uni.showToast({ title: '生成失败: ' + (error.message || '未知错误'), icon: 'none' })
+  } finally {
+    uni.hideLoading()
+  }
+}
 </script>
 
 <style scoped>
@@ -501,6 +572,28 @@ const generateText = () => {
 .top-avatar { width: 32px; height: 32px; border-radius: 50%; }
 
 .content { padding: 80px 20px 140px; }
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 120px 40px;
+  gap: 12px;
+}
+.empty-icon { font-size: 48px; }
+.empty-title { font-size: 20px; font-weight: 600; color: var(--color-primary); }
+.empty-desc { font-size: 14px; color: var(--color-on-surface-variant); text-align: center; }
+.empty-btn {
+  margin-top: 16px;
+  padding: 12px 32px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #000666 0%, #343d96 100%);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  box-shadow: 0 8px 20px rgba(0,6,102,0.25);
+}
 
 .disclaimer {
   text-align: center;

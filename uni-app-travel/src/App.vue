@@ -7,6 +7,7 @@
 <script setup>
 import { onLaunch, onShow } from '@dcloudio/uni-app'
 import { useUserStore } from './store/user.js'
+import { initTheme } from './utils/theme.js'
 
 // 添加更多的公共无需登录页面到白名单
 const whiteList = [
@@ -17,6 +18,10 @@ const whiteList = [
 onLaunch(() => {
   const systemInfo = uni.getSystemInfoSync()
   uni.$systemInfo = systemInfo
+
+  // 初始化主题
+  initTheme()
+
   // #ifdef H5
   try {
     if (typeof document !== 'undefined' && document.documentElement) {

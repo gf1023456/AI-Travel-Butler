@@ -3,6 +3,7 @@
  * 适配微信小程序环境
  */
 import { API_CONFIG } from '@/config/index.js'
+import { useUserStore } from '@/store/user.js'
 
 // 请求配置
 const BASE_URL = API_CONFIG.BASE_URL
@@ -10,11 +11,18 @@ let isRedirecting = false  // 防止多次跳转
 
 function getAuthHeader() {
   try {
-    var token = uni.getStorageSync('user_token')
+    const userStore = useUserStore()
+    // 确保 store 状态是最新的
+    if (!userStore.accessToken) {
+      userStore.restoreFromStorage()
+    }
+    
+    var token = userStore.accessToken
     var header = token ? 'Bearer ' + token : ''
     console.log('[Request] getAuthHeader:', {
       hasToken: !!token,
-      header: header ? header.substring(0, 50) + '...' : ''
+      header: header ? header.substring(0, 50) + '...' : '',
+      storeToken: token ? token.substring(0, 20) + '...' : null
     })
     return header
   } catch (e) {
@@ -38,7 +46,9 @@ export function request(options) {
     
     if (authHeader) {
       header['Authorization'] = authHeader
-      console.log('已设置 Authorization header')
+      console.log('已设置 Authorization header:', authHeader.substring(0, 50) + '...')
+    } else {
+      console.log('未设置 Authorization header，可能未登录或 token 丢失')
     }
     
     uni.request({

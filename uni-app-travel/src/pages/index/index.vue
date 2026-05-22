@@ -1,5 +1,5 @@
 <template>
-  <view class="map-page">
+  <view class="map-page" :class="themeClass">
     <!-- Fullscreen Map -->
     <map
       class="map-container"
@@ -23,7 +23,7 @@
       <view class="nav-left">
         <image class="nav-avatar" :src="userAvatar" mode="aspectFill" />
         <view class="nav-location">
-          <text class="nav-brand">慧游</text>
+          <text class="nav-brand">{{ userNickname }}</text>
           <view class="location-row">
             <text class="loc-icon">📍</text>
             <text class="loc-text">{{ locationName }}</text>
@@ -77,7 +77,7 @@
     <!-- Floating 慧游 Butler -->
     <button class="ai-butler" @click="goExplore" :style="{ bottom: (136 + safeAreaBottom) + 'px' }">
       <text class="ai-icon">✨</text>
-      <text class="ai-text">为您推荐附近的百年书屋</text>
+      <text class="ai-text">快来生成你得专属攻略吧</text>
     </button>
 
     <!-- Bottom Navigation -->
@@ -162,6 +162,7 @@ import { useUserStore } from '@/store/user.js'
 import { computed } from 'vue'
 import { getWeatherNow } from '@/api/weather.js'
 import { useSafeArea } from '@/utils/safeArea.js'
+import { themeClass } from '@/utils/theme.js'
 
 export default {
   data() {
@@ -187,6 +188,10 @@ export default {
     userAvatar() {
       return this.userStore.avatarUrl || 'https://ui-avatars.com/api/?name=慧游&background=1a237e&color=fff&size=64'
     },
+    userNickname() {
+      return this.userStore.nickname || '慧游'
+    },
+    themeClass() { return themeClass.value },
     hasPlan() {
       return !!(this.travelStore.currentPlan && this.travelStore.currentPlan.dayPlanItinerary?.length)
     },
@@ -435,8 +440,8 @@ export default {
   position: fixed; top: 0; left: 0; right: 0; z-index: 10;
   display: flex; align-items: center; justify-content: space-between;
   padding: 12px 24px 12px;
-  background: rgba(255,255,255,0.85); backdrop-filter: blur(32px) saturate(200%);
-  -webkit-backdrop-filter: blur(32px) saturate(200%);
+  background: rgba(255,255,255,0.7); backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
   border-bottom: 1px solid rgba(255,255,255,0.5);
 }
 .nav-left { display: flex; align-items: center; gap: 16px; }
@@ -463,8 +468,8 @@ export default {
 }
 .ctrl-group {
   display: flex; flex-direction: column;
-  background: rgba(255,255,255,0.75); backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  background: rgba(255,255,255,0.7); backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
   border-radius: 20px; padding: 6px; overflow: hidden;
   box-shadow: 0 4px 16px rgba(0,0,0,0.08);
 }
@@ -477,8 +482,8 @@ export default {
 .ctrl-active { background: var(--color-primary-container); color: var(--color-on-primary-container); }
 .ctrl-divider { width: 32px; height: 1px; margin: 4px auto; background: var(--color-outline-variant); opacity: 0.3; }
 .ctrl-locate {
-  background: rgba(255,255,255,0.75); backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  background: rgba(255,255,255,0.7); backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
   border-radius: 50%; box-shadow: 0 4px 16px rgba(0,0,0,0.08);
 }
 
@@ -487,8 +492,8 @@ export default {
   max-width: 360px; margin: 0 auto;
 }
 .quick-card-inner {
-  background: rgba(255,255,255,0.75); backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  background: rgba(255,255,255,0.7); backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
   border: 1px solid rgba(255,255,255,0.4);
   border-radius: 28px; padding: 20px;
   box-shadow: 0 20px 40px rgba(0,0,0,0.08);
@@ -533,8 +538,8 @@ export default {
   position: fixed; left: 24px; right: 24px; z-index: 10;
   display: flex; align-items: center; justify-content: space-around;
   height: 72px; padding: 0 8px;
-  background: rgba(255,255,255,0.85); backdrop-filter: blur(32px) saturate(200%);
-  -webkit-backdrop-filter: blur(32px) saturate(200%);
+  background: rgba(255,255,255,0.7); backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
   border: 1px solid rgba(255,255,255,0.5);
   border-radius: 999px;
   box-shadow: 0 20px 40px rgba(0,0,0,0.1);

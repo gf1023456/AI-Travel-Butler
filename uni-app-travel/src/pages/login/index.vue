@@ -1,5 +1,5 @@
 <template>
-  <view class="login-page">
+  <view class="login-page" :class="themeClass">
     <view class="bg-orbs">
       <view class="orb orb-1"></view>
       <view class="orb orb-2"></view>
@@ -23,6 +23,10 @@
             <text class="input-label">昵称</text>
             <input class="nickname-input" type="nickname" v-model="nickname" @blur="onNicknameBlur" placeholder="点击自动获取微信昵称" maxlength="20" />
           </view>
+        </view>
+        <view class="login-hint">
+          <text class="login-hint-icon">💡</text>
+          <text class="login-hint-text">点击上方头像和昵称框，可快速获取微信信息</text>
         </view>
         <view class="login-actions">
           <button class="login-btn" @click="handleWechatLogin" :disabled="loading">
@@ -58,6 +62,7 @@
 import { ref } from 'vue'
 import { wechatLogin } from '@/api/user.js'
 import { useUserStore } from '@/store/user.js'
+import { themeClass } from '@/utils/theme.js'
 
 const agreed = ref(false)
 const loading = ref(false)
@@ -86,6 +91,7 @@ const handleWechatLogin = async () => {
     uni.showToast({ title: '请先同意用户协议', icon: 'none' })
     return
   }
+
   if (loading.value) return
   loading.value = true
 
@@ -108,9 +114,10 @@ const handleWechatLogin = async () => {
 
     const userStore = useUserStore()
     userStore.setLoginData(loginData)
+    // 优先使用后端数据库配置，其次使用本次输入，最后兜底
     userStore.setUserInfo({
-      nickname: nickname.value || loginData.nickname || '微信用户',
-      avatar_url: avatarUrl.value || loginData.avatar_url || ''
+      nickname: loginData.nickname || nickname.value || '微信用户',
+      avatar_url: loginData.avatar_url || avatarUrl.value || ''
     })
 
     uni.hideLoading()
@@ -216,6 +223,26 @@ const handleWechatLogin = async () => {
   border: 1px solid rgba(255,255,255,0.6);
   border-radius: 12px; padding: 0 16px;
   font-size: 16px; line-height: 26px; color: var(--color-on-surface);
+}
+.login-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  background: rgba(255,255,255,0.5);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.4);
+  border-radius: 12px;
+}
+.login-hint-icon { font-size: 14px; flex-shrink: 0; }
+.login-hint-text {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-on-surface-variant);
+  line-height: 18px;
+  opacity: 0.8;
 }
 .login-actions { width: 100%; display: flex; flex-direction: column; gap: 16px; }
 .login-btn {

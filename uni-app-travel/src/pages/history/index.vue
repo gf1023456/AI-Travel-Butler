@@ -1,5 +1,5 @@
 <template>
-  <view class="history-page">
+  <view class="history-page" :class="themeClass">
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <header class="top-bar">
       <button class="back-btn" @click="goBack"><text>←</text></button>
@@ -112,6 +112,7 @@ import { useTravelStore } from '@/store/travel.js'
 import { useUserStore } from '@/store/user.js'
 import { getHistoryList, deleteHistory as deleteHistoryApi, getHistoryDetail } from '@/api/history.js'
 import { useSafeArea } from '@/utils/safeArea.js'
+import { themeClass } from '@/utils/theme.js'
 
 const travelStore = useTravelStore()
 const userStore = useUserStore()
@@ -168,7 +169,9 @@ const loadHistory = async (item) => {
     dayPlanItinerary,
     socialRecommendations: sourceItem.social_recommendations || [],
     evidence: sourceItem.evidence || [],
-    warnings: sourceItem.warnings || []
+    warnings: sourceItem.warnings || [],
+    isFromHistory: true,
+    historyId: sourceItem.id
   }
   uni.navigateTo({ url: '/pages/plan/plan' })
 }
@@ -229,7 +232,9 @@ const loadDetailToPlan = () => {
     dayPlanItinerary,
     socialRecommendations: selectedDetail.value.social_recommendations || [],
     evidence: selectedDetail.value.evidence || [],
-    warnings: selectedDetail.value.warnings || []
+    warnings: selectedDetail.value.warnings || [],
+    isFromHistory: true,
+    historyId: selectedDetail.value.id
   }
   uni.navigateTo({ url: '/pages/plan/plan' })
   closeDetailPopup()
@@ -240,8 +245,13 @@ const deleteHistory = (id) => {
     title: '确认删除', content: '确定删除这条记录？',
     success: async (res) => {
       if (res.confirm) {
-        try { await deleteHistoryApi(id) } catch { /* ignore */ }
-        loadHistoryList()
+        try {
+          await deleteHistoryApi(id)
+          uni.showToast({ title: '已删除', icon: 'success' })
+          loadHistoryList()
+        } catch {
+          uni.showToast({ title: '删除失败', icon: 'none' })
+        }
       }
     }
   })

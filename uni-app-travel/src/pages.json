@@ -51,6 +51,13 @@
         "navigationBarTitleText": "历史记录",
         "navigationStyle": "custom"
       }
+    },
+    {
+      "path": "pages/settings/index",
+      "style": {
+        "navigationBarTitleText": "设置",
+        "navigationStyle": "custom"
+      }
     }
   ],
   "globalStyle": {

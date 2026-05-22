@@ -1,5 +1,5 @@
 <template>
-  <view class="explore-page">
+  <view class="explore-page" :class="themeClass">
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <header class="top-bar">
       <view class="top-left">
@@ -7,7 +7,7 @@
           <text>←</text>
         </button>
         <image class="top-avatar" :src="userAvatar" mode="aspectFill" />
-        <text class="top-brand">慧游</text>
+        <text class="top-brand">{{ userNickname }}</text>
       </view>
       <button class="top-notif">
         <text class="notif-icon">🔔</text>
@@ -80,10 +80,12 @@ import { useTravelStore } from '@/store/travel.js'
 import { useUserStore } from '@/store/user.js'
 import { getCurrentModel } from '@/api/travel.js'
 import { useSafeArea } from '@/utils/safeArea.js'
+import { themeClass } from '@/utils/theme.js'
 
 const travelStore = useTravelStore()
 const userStore = useUserStore()
 const userAvatar = computed(() => userStore.avatarUrl || 'https://ui-avatars.com/api/?name=慧游&background=1a237e&color=fff&size=64')
+const userNickname = computed(() => userStore.nickname || '慧游')
 const { statusBarHeight } = useSafeArea()
 
 onMounted(() => { userStore.restoreFromStorage() })

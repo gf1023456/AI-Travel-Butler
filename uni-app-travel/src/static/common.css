@@ -4,6 +4,7 @@
 
   --status-bar-height: 0px;
 
+  /* Light Theme (Default) */
   --color-primary: #000666;
   --color-on-primary: #ffffff;
   --color-primary-container: #1a237e;
@@ -82,6 +83,72 @@
   --transition-base: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Dark Theme - Supports both page-level and container-level */
+page.dark-theme,
+.dark-theme {
+  --color-primary: #bdc2ff;
+  --color-on-primary: #000767;
+  --color-primary-container: #343d96;
+  --color-on-primary-container: #e0e0ff;
+  --color-primary-fixed: #e0e0ff;
+  --color-primary-fixed-dim: #bdc2ff;
+  --color-on-primary-fixed: #000767;
+  --color-on-primary-fixed-variant: #bdc2ff;
+  --color-inverse-primary: #000666;
+
+  --color-secondary: #b8cac9;
+  --color-on-secondary: #0e1e1e;
+  --color-secondary-container: #3a4a49;
+  --color-on-secondary-container: #d4e6e5;
+  --color-secondary-fixed: #d4e6e5;
+  --color-secondary-fixed-dim: #b8cac9;
+  --color-on-secondary-fixed: #0e1e1e;
+  --color-on-secondary-fixed-variant: #b8cac9;
+
+  --color-tertiary: #cdc6b8;
+  --color-on-tertiary: #1e1b13;
+  --color-tertiary-container: #4b463c;
+  --color-on-tertiary-container: #e9e2d3;
+  --color-tertiary-fixed: #e9e2d3;
+  --color-tertiary-fixed-dim: #cdc6b8;
+  --color-on-tertiary-fixed: #1e1b13;
+  --color-on-tertiary-fixed-variant: #cdc6b8;
+
+  --color-surface: #0f1112;
+  --color-surface-dim: #0f1112;
+  --color-surface-bright: #2e3132;
+  --color-surface-container-lowest: #000000;
+  --color-surface-container-low: #191c1d;
+  --color-surface-container: #232627;
+  --color-surface-container-high: #2e3132;
+  --color-surface-container-highest: #393c3d;
+  --color-on-surface: #e1e3e4;
+  --color-on-surface-variant: #c4c7c8;
+  --color-inverse-surface: #e1e3e4;
+  --color-inverse-on-surface: #191c1d;
+
+  --color-error: #ffb4ab;
+  --color-on-error: #690005;
+  --color-error-container: #93000a;
+  --color-on-error-container: #ffdad6;
+
+  --color-outline: #8e9192;
+  --color-outline-variant: #454652;
+  --color-surface-variant: #2e3132;
+  --color-surface-tint: #bdc2ff;
+  --color-background: #0f1112;
+  --color-on-background: #e1e3e4;
+
+  --gradient-brand: linear-gradient(135deg, #343d96 0%, #4c56af 100%);
+  --gradient-brand-reverse: linear-gradient(135deg, #4c56af 0%, #343d96 100%);
+  --gradient-shimmer: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+
+  --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  --shadow-card: 0px 8px 24px rgba(0,0,0,0.2);
+  --shadow-elevated: 0px 12px 32px rgba(0,0,0,0.3);
+  --shadow-button: 0 12px 32px rgba(0,0,0,0.4);
+}
+
 page {
   background: var(--color-surface);
   font-family: var(--font-body);
@@ -112,9 +179,9 @@ button::after { border: none; }
 }
 
 .glass-card-heavy {
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(32px) saturate(200%);
-  -webkit-backdrop-filter: blur(32px) saturate(200%);
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
   border: 1px solid rgba(255, 255, 255, 0.5);
 }
 

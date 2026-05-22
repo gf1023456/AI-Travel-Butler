@@ -1,5 +1,5 @@
 <template>
-  <view class="refine-page">
+  <view class="refine-page" :class="themeClass">
     <header class="top-bar" :style="{ paddingTop: (12 + statusBarHeight) + 'px' }">
       <view class="top-left">
         <button class="back-btn" @click="goBack"><text>←</text></button>
@@ -87,6 +87,7 @@
 import { ref, computed } from 'vue'
 import { useTravelStore } from '@/store/travel.js'
 import { useSafeArea } from '@/utils/safeArea.js'
+import { themeClass } from '@/utils/theme.js'
 
 const travelStore = useTravelStore()
 const { statusBarHeight } = useSafeArea()
