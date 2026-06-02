@@ -54,17 +54,29 @@ app.add_middleware(
 # 注册路由
 from routes import user_router, history_router, quota_router, weather_router, location_router
 from routes.plan_v2 import router as plan_v2_router
+from routes.plan_v3 import router as plan_v3_router
+from routes.plan_v4 import router as plan_v4_router
+
+from routes.poster import router as poster_router
+
+app.include_router(poster_router)
 app.include_router(user_router)
 app.include_router(history_router)
 app.include_router(quota_router)
 app.include_router(weather_router)
 app.include_router(location_router)
 app.include_router(plan_v2_router)
+app.include_router(plan_v3_router)
+app.include_router(plan_v4_router)
 
 @app.on_event("startup")
-async def startup_plan_v2_cleanup():
-    from routes.plan_v2 import _cleanup_old_tasks
-    asyncio.create_task(_cleanup_old_tasks())
+async def startup_plan_cleanup():
+    from routes.plan_v2 import _cleanup_old_tasks as v2_cleanup
+    from routes.plan_v3 import _cleanup_old_tasks as v3_cleanup
+    from routes.plan_v4 import _cleanup_v4_tasks as v4_cleanup
+    asyncio.create_task(v2_cleanup())
+    asyncio.create_task(v3_cleanup())
+    asyncio.create_task(v4_cleanup())
 
 knowledge_cache = None
 execution_log_store: Dict[str, Dict] = {}

@@ -159,7 +159,13 @@ page {
   line-height: 22px;
 }
 
-view { box-sizing: border-box; }
+view, scroll-view { box-sizing: border-box; }
+
+page {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
 
 button {
   margin: 0;

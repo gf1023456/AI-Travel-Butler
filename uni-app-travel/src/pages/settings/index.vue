@@ -292,7 +292,7 @@ const clearLocalData = () => {
 .status-bar { background: rgba(255,255,255,0.7); backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px); }
 .top-bar {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 20px 12px;
+  padding: 24rpx 40rpx 24rpx;
   background: rgba(255,255,255,0.7); backdrop-filter: blur(40px);
   -webkit-backdrop-filter: blur(40px);
   border-bottom: 1px solid rgba(255,255,255,0.2);
@@ -307,14 +307,14 @@ const clearLocalData = () => {
 .back-btn::after { border: none; }
 .top-title { font-size: 24px; font-weight: 700; color: var(--color-primary); letter-spacing: -0.01em; line-height: 32px; }
 
-.content { padding: 8px 20px 40px; }
+.content { padding: 16rpx 40rpx 80rpx; }
 
 .settings-section { margin-bottom: 24px; }
 .section-label {
   font-size: 12px; font-weight: 600; letter-spacing: 0.05em;
   color: var(--color-on-surface-variant); opacity: 0.7;
   text-transform: uppercase;
-  margin-bottom: 12px; padding-left: 8px;
+  margin-bottom: 12px;
 }
 
 .settings-card {
@@ -326,7 +326,7 @@ const clearLocalData = () => {
 }
 .settings-item {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 18px 20px; transition: all var(--transition-fast);
+  padding: 36rpx 40rpx; transition: all var(--transition-fast);
 }
 .settings-item:active { background: rgba(255,255,255,0.4); }
 .settings-item-left { display: flex; align-items: center; gap: 14px; }
@@ -335,7 +335,7 @@ const clearLocalData = () => {
 .settings-item-right { display: flex; align-items: center; gap: 8px; }
 .settings-item-desc { font-size: 13px; color: var(--color-on-surface-variant); opacity: 0.6; }
 .menu-arrow { font-size: 20px; color: var(--color-outline-variant); }
-.menu-divider { height: 1px; margin: 0 20px; background: linear-gradient(to right, transparent, rgba(255,255,255,0.4), transparent); }
+.menu-divider { height: 1px; margin: 0 40rpx; background: linear-gradient(to right, transparent, rgba(255,255,255,0.4), transparent); }
 
 .settings-item.danger .settings-item-title { color: var(--color-error); }
 </style>

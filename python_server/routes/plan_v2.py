@@ -89,7 +89,8 @@ V2_SYSTEM_PROMPT = """你是一位专业的深度旅游规划专家。请根据�
 - lat/lng 必须真实有效
 - location.city 必须为目标城市
 - 相邻地点应地理接近，合理安排路线
-- socialRecommendations 至少 3 条"""
+- socialRecommendations 至少 3 条
+- 如果用户未指定天数，则默认生成一天"""
 
 
 async def call_model_once(provider: str, model: str, messages: List[Dict], request_id: str) -> Dict:
@@ -109,8 +110,8 @@ async def call_model_once(provider: str, model: str, messages: List[Dict], reque
     body = {
         "model": model,
         "messages": messages,
-        "max_tokens": 8888,
-        "temperature": 0.3,
+        "max_tokens": 3000,
+        "temperature": 0.15,
     }
 
     max_retries = settings.server.max_retries

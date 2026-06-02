@@ -52,6 +52,15 @@
             <text class="char-count">{{ charCount }} / 500</text>
           </view>
         </view>
+        
+        <!-- 骨架状态提示 -->
+        <view class="skeleton-status" v-if="isSkeletonPhase">
+          <view class="skeleton-icon">🧠</view>
+          <view class="skeleton-info">
+            <text class="skeleton-title">{{ skeletonStatusText }}</text>
+            <text class="skeleton-sub" v-if="skeletonElapsed">耗时: {{ skeletonElapsed }}s</text>
+          </view>
+        </view>
         <view class="tag-chips">
           <text class="tag-chip" @click="userInput = '上海 3天 深度游'">上海 3天</text>
           <text class="tag-chip" @click="userInput = '东京 樱花季 4天'">东京 樱花季</text>
@@ -75,7 +84,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useTravelStore } from '@/store/travel.js'
 import { useUserStore } from '@/store/user.js'
 import { getCurrentModel } from '@/api/travel.js'
@@ -94,6 +103,34 @@ const goBack = () => uni.navigateBack()
 
 const userInput = ref('')
 const travelModeIndex = ref(0)
+
+// 骨架状态
+const isSkeletonPhase = ref(false)
+const skeletonStatusText = ref('正在生成行程骨架...')
+const skeletonElapsed = ref(0)
+let skeletonStartTime = 0
+
+// 监听 loading 状态变化
+watch(() => travelStore.loading, (loading) => {
+  if (loading && !isSkeletonPhase.value) {
+    isSkeletonPhase.value = true
+    skeletonStartTime = Date.now()
+    skeletonStatusText.value = '正在生成行程骨架...'
+    updateSkeletonPhase()
+  }
+})
+
+const updateSkeletonPhase = () => {
+  if (!isSkeletonPhase.value) return
+  skeletonElapsed.value = Math.round((Date.now() - skeletonStartTime) / 1000)
+  if (skeletonElapsed.value > 0) {
+    skeletonStatusText.value = `正在生成行程骨架... ${skeletonElapsed.value}s`
+  }
+  // 每秒更新一次
+  if (isSkeletonPhase.value) {
+    setTimeout(updateSkeletonPhase, 1000)
+  }
+}
 
 const travelStyles = [
   { name: '轻装上阵', icon: '🌤️', image: 'https://tonystark-ai.ccwu.cc/png/d852559c-ac19-43e1-ab02-78e1f529c25c.png' },
@@ -118,19 +155,25 @@ const handleGenerate = async () => {
 
   try {
     uni.showLoading({ title: '规划中...' })
-    const result = await travelStore.createPlanV2({
+    isSkeletonPhase.value = false // 重置状态
+    // 使用 V4 骨架优先方案（支持完整状态流转：pending → running → skeleton_ready → completed）
+    const result = await travelStore.createPlanV4({
       userInput: userInput.value,
       modelType: 'auto',
       travelMode: travelStyles[travelModeIndex.value].name
     })
+    // 无论骨架还是完整结果，都跳转
     uni.hideLoading()
-    if (result) {
+    isSkeletonPhase.value = false
+    if (result && result.dayPlanItinerary && result.dayPlanItinerary.length > 0) {
+      // 骨架阶段也可以跳转，让用户先看到行程列表
       uni.showToast({ title: '行程已生成', icon: 'success' })
-      uni.navigateTo({ url: '/pages/plan/plan' })
+      uni.reLaunch({ url: '/pages/index/index' })
     }
   } catch (error) {
     uni.hideLoading()
-    uni.showToast({ title: error.message || '生成失败', icon: 'none' })
+    isSkeletonPhase.value = false
+    uni.showToast({ title: '生成失败，请稍后重试', icon: 'none' })
   }
 }
 </script>
@@ -142,7 +185,7 @@ const handleGenerate = async () => {
 }
 .top-bar {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 20px 8px;
+  padding: 24rpx 40rpx 16rpx;
   background: rgba(248,249,250,0.8);
   backdrop-filter: blur(40px);
   -webkit-backdrop-filter: blur(40px);
@@ -153,7 +196,6 @@ const handleGenerate = async () => {
 .top-back {
   width: 40px; height: 40px; display: flex; align-items: center;
   justify-content: center; font-size: 20px; color: var(--color-primary);
-  margin-left: -4px;
 }
 .top-avatar {
   width: 40px; height: 40px; border-radius: 50%;
@@ -170,14 +212,14 @@ const handleGenerate = async () => {
 }
 .notif-icon { font-size: 20px; }
 .content {
-  padding: 8px 20px 120px;
+  padding: 16rpx 40rpx 240rpx;
 }
 .section { margin-bottom: 24px; }
 .section-overline {
   display: block;
   font-size: 11px; font-weight: 700; color: var(--color-outline);
   text-transform: uppercase; letter-spacing: 0.15em;
-  margin-bottom: 8px; padding-left: 4px;
+  margin-bottom: 8px;
 }
 
 .style-grid {
@@ -227,12 +269,13 @@ const handleGenerate = async () => {
   background: rgba(255,255,255,0.6);
   backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255,255,255,0.5);
-  border-radius: 24px; padding: 20px; margin-top: 8px;
+  border-radius: 24px; padding: 40rpx; margin-top: 8px;
   box-shadow: 0 12px 24px rgba(0,0,0,0.02);
 }
 .main-textarea {
-  width: 90%; min-height: 90px;
+  width: 100%; min-height: 90px;
   background: transparent; border: none; resize: none;
+  margin: 0; padding: 0;
   font-size: 16px; line-height: 26px;
   color: var(--color-on-surface);
 }
@@ -254,6 +297,17 @@ const handleGenerate = async () => {
   color: var(--color-on-surface-variant);
   background: rgba(243,244,245,0.5);
 }
+
+.skeleton-status {
+  display: flex; align-items: center; gap: 12px;
+  padding: 32rpx 40rpx; margin-top: 12px;
+  background: rgba(0,102,153,0.1); border-radius: 16px;
+  border: 1px solid rgba(0,102,153,0.2);
+}
+.skeleton-icon { font-size: 24px; }
+.skeleton-info { flex: 1; }
+.skeleton-title { font-size: 14px; font-weight: 600; color: #006699; }
+.skeleton-sub { font-size: 12px; color: #999; margin-top: 2px; }
 
 .action-section { margin-top: 16px; display: flex; flex-direction: column; align-items: center; }
 .generate-btn {

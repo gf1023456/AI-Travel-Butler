@@ -24,7 +24,7 @@ export const createPlan = (params) => {
 }
 
 export const createPlanV2 = (params) => {
-  return post('/plan/v2', {
+  return post('/plan/v3', {
     userInput: params.userInput,
     modelType: params.modelType || 'auto',
     travelMode: params.travelMode || 'deep'
@@ -37,7 +37,7 @@ export const createPlanV2 = (params) => {
  * @returns {Promise}
  */
 export const getPlanStatus = (taskId) => {
-  return get(`/plan/v2/status/${taskId}`)
+  return get(`/plan/v3/status/${taskId}`)
 }
 
 /**
@@ -46,7 +46,70 @@ export const getPlanStatus = (taskId) => {
  * @returns {Promise}
  */
 export const getPlanResult = (taskId) => {
-  return get(`/plan/v2/result/${taskId}`)
+  return get(`/plan/v3/result/${taskId}`)
+}
+
+/**
+ * 创建行程（V4 骨架优先异步方案）
+ * @param {Object} params - 行程参数
+ * @returns {Promise}
+ */
+export const createPlanV4 = (params) => {
+  return post('/plan/v4', {
+    userInput: params.userInput,
+    modelType: params.modelType || 'auto',
+    travelMode: params.travelMode || 'deep'
+  })
+}
+
+/**
+ * 创建行程（V3 骨架优先 + 完整状态流转）
+ * 状态流转：pending → running → skeleton_ready → filling → completed
+ * @param {Object} params - 行程参数
+ * @returns {Promise}
+ */
+export const createPlanV3 = (params) => {
+  return post('/plan/v3', {
+    userInput: params.userInput,
+    modelType: params.modelType || 'auto',
+    travelMode: params.travelMode || 'deep'
+  })
+}
+
+/**
+ * 查询 V3 任务状态
+ * @param {string} taskId - 任务ID
+ * @returns {Promise}
+ */
+export const getPlanV3Status = (taskId) => {
+  return get(`/plan/v3/status/${taskId}`)
+}
+
+/**
+ * 获取 V3 任务结果
+ * @param {string} taskId - 任务ID
+ * @returns {Promise}
+ */
+export const getPlanV3Result = (taskId) => {
+  return get(`/plan/v3/result/${taskId}`)
+}
+
+/**
+ * 查询 V4 任务状态
+ * @param {string} taskId - 任务ID
+ * @returns {Promise}
+ */
+export const getPlanV4Status = (taskId) => {
+  return get(`/plan/v4/status/${taskId}`)
+}
+
+/**
+ * 获取 V4 任务结果
+ * @param {string} taskId - 任务ID
+ * @returns {Promise}
+ */
+export const getPlanV4Result = (taskId) => {
+  return get(`/plan/v4/result/${taskId}`)
 }
 
 /**
@@ -83,6 +146,15 @@ export const getCurrentModel = () => {
 
 export default {
   createPlan,
+  createPlanV2,
+  getPlanStatus,
+  getPlanResult,
+  createPlanV4,
+  getPlanV4Status,
+  getPlanV4Result,
+  createPlanV3,
+  getPlanV3Status,
+  getPlanV3Result,
   refinePlan,
   getFrontendConfig,
   getCurrentModel

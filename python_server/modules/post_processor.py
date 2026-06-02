@@ -69,7 +69,7 @@ def synthesize_locations_from_social(user_input: str, social_recommendations: Li
     city = infer_city_from_request(user_input, social_recommendations)
     center = get_city_center(city or "北京")
     requested_days = infer_requested_days(user_input)
-    target_count = min(12, max(4, requested_days * 3))
+    target_count = min(15, max(4, requested_days * 3))
     picks = social_recommendations[:target_count]
 
     slots = ["09:30 - 11:00", "12:30 - 14:00", "15:30 - 17:00", "19:00 - 21:00"]
@@ -78,17 +78,24 @@ def synthesize_locations_from_social(user_input: str, social_recommendations: Li
     for idx, rec in enumerate(picks):
         lat_offset = (idx - 1.5) * 0.02
         lng_offset = (idx - 1.5) * 0.02
+        # 按顺序分配到不同天数（每天3个地点）
+        day_num = (idx // 3) + 1
+        sequence_num = (idx % 3) + 1
+        # 如果超过 requested_days，循环到第一天
+        if day_num > requested_days:
+            day_num = ((idx) % requested_days) + 1
+            sequence_num = ((idx) % 3) + 1
         item = normalize_location({
             "name": rec.get("title", ""),
             "city": city or "目的地待确认",
             "description": rec.get("reason") or f"热门打卡：{rec.get('title', '')}",
             "lat": center["lat"] + lat_offset,
             "lng": center["lng"] + lng_offset,
-            "time": slots[idx % len(slots)] if slots else "10:00 - 12:00",
-            "day": min(requested_days, idx // 3 + 1),
-            "sequence": idx % 3 + 1,
+            "time": slots[sequence_num - 1] if slots else "10:00 - 12:00",
+            "day": day_num,
+            "sequence": sequence_num,
             "transit_hint": "从酒店/出发地前往" if idx == 0 else f"从上一站前往 {rec.get('title', '')}",
-            "category": "FOOD" if idx == 1 else "SIGHT",
+            "category": "FOOD" if idx % 3 == 1 else "SIGHT",
             "source": f"fallback:{provider}:social_to_location",
             "confidence": 0.45
         }, provider)

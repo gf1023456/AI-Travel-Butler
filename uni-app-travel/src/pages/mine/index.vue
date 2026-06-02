@@ -284,7 +284,7 @@ const showDevToast = () => uni.showToast({ title: '页面开发中', icon: 'none
 
 .top-bar {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 20px 12px;
+  padding: 24rpx 40rpx 24rpx;
   background: rgba(255,255,255,0.7); backdrop-filter: blur(40px);
   -webkit-backdrop-filter: blur(40px);
   border-bottom: 1px solid rgba(255,255,255,0.2);
@@ -299,7 +299,7 @@ const showDevToast = () => uni.showToast({ title: '页面开发中', icon: 'none
   font-size: 20px; color: var(--color-primary);
 }
 
-.content { padding: 8px 20px 140px; }
+.content { padding: 16rpx 40rpx 280rpx; }
 
 .profile-section { margin-bottom: 24px; }
 .profile-row { display: flex; align-items: center; gap: 24px; position: relative; }
@@ -353,7 +353,7 @@ const showDevToast = () => uni.showToast({ title: '页面开发中', icon: 'none
   background: rgba(255,255,255,0.7); backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255,255,255,0.3);
-  border-radius: 32px; padding: 24px;
+  border-radius: 32px; padding: 48rpx;
   box-shadow: 0 12px 32px rgba(0,0,0,0.03);
   margin-bottom: 24px;
 }
@@ -399,7 +399,7 @@ const showDevToast = () => uni.showToast({ title: '页面开发中', icon: 'none
 }
 .menu-item {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 24px; transition: all var(--transition-fast);
+  padding: 48rpx; transition: all var(--transition-fast);
 }
 .menu-item:active { background: rgba(255,255,255,0.4); }
 .menu-item-left { display: flex; align-items: center; gap: 20px; }
@@ -410,11 +410,11 @@ const showDevToast = () => uni.showToast({ title: '页面开发中', icon: 'none
 }
 .menu-item-title { font-size: 16px; font-weight: 500; color: var(--color-on-surface); line-height: 26px; }
 .menu-arrow { font-size: 24px; color: var(--color-outline-variant); }
-.menu-divider { height: 1px; margin: 0 24px; background: linear-gradient(to right, transparent, rgba(255,255,255,0.4), transparent); }
+.menu-divider { height: 1px; margin: 0 48rpx; background: linear-gradient(to right, transparent, rgba(255,255,255,0.4), transparent); }
 
 .logout-section { margin-top: 16px; }
 .logout-btn {
-  width: 100%; padding: 16px;
+  width: 100%; padding: 32rpx;
   background: rgba(255,255,255,0.4); backdrop-filter: blur(40px);
   -webkit-backdrop-filter: blur(40px);
   border: 1px solid rgba(255,255,255,0.4);
@@ -427,7 +427,7 @@ const showDevToast = () => uni.showToast({ title: '页面开发中', icon: 'none
 .logout-icon { font-size: 20px; }
 
 .bottom-nav {
-  position: fixed; left: 20px; right: 20px; z-index: 10;
+  position: fixed; left: 40rpx; right: 40rpx; z-index: 10;
   display: flex; align-items: center; justify-content: space-around;
   height: 80px; padding: 0 8px;
   background: rgba(255,255,255,0.7); backdrop-filter: blur(30px);

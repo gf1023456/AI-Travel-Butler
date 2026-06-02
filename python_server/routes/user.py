@@ -139,8 +139,13 @@ async def get_user_info(authorization: str = Header(None)):
 @router.post("/userInfo")
 async def update_user_info(
     info: UserInfoUpdate,
-    current_user_id: int = Depends(get_current_user_id)
+    authorization: str = Header(None),
+
 ):
+    if not authorization:
+        raise HTTPException(status_code=401, detail="请先登录")
+
+    current_user_id = get_current_user_id(authorization)
     """
     更新用户信息
     """

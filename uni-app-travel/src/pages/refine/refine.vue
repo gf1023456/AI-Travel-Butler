@@ -138,7 +138,7 @@ const handleRefine = async () => {
     setTimeout(() => uni.navigateBack(), 1500)
   } catch (error) {
     uni.hideLoading()
-    uni.showToast({ title: '优化失败', icon: 'error' })
+    uni.showToast({ title: '优化失败，请稍后重试', icon: 'none' })
   }
 }
 </script>
@@ -149,7 +149,7 @@ const handleRefine = async () => {
 .top-bar {
   position: fixed; top: 0; left: 0; right: 0; z-index: 10;
   display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 20px 12px;
+  padding: 24rpx 40rpx 24rpx;
   background: var(--color-surface); opacity: 0.95;
   backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid rgba(255,255,255,0.2);
@@ -159,9 +159,9 @@ const handleRefine = async () => {
 .top-title { font-size: 20px; font-weight: 600; color: var(--color-primary); line-height: 28px; }
 .more-btn { font-size: 24px; color: var(--color-on-surface-variant); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
 
-.content { padding: 80px 20px 32px; }
+.content { padding: 160rpx 40rpx 64rpx; }
 
-.section { margin-bottom: 40px; }
+.section { margin-bottom: 80rpx; }
 .section-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .section-icon { font-size: 18px; color: var(--color-on-primary-container); }
 .section-overline {
@@ -172,7 +172,7 @@ const handleRefine = async () => {
 .summary-card {
   position: relative; overflow: hidden;
   background: #fff; border: 1px solid rgba(255,255,255,0.8);
-  border-radius: 16px; padding: 24px;
+  border-radius: 16px; padding: 48rpx;
   box-shadow: 0 12px 32px rgba(0,0,0,0.04);
 }
 .summary-bg-deco {
@@ -203,20 +203,20 @@ const handleRefine = async () => {
   border-radius: 16px; overflow: hidden;
 }
 .input-textarea {
-  width: 100%; height: 160px; padding: 24px;
+  width: 100%; height: 320rpx; padding: 48rpx;
   font-size: 16px; line-height: 26px; color: var(--color-on-surface);
   background: transparent;
 }
 .input-textarea::placeholder { color: var(--color-outline-variant); opacity: 0.6; }
 .voice-btn {
-  position: absolute; bottom: 16px; right: 16px;
+  position: absolute; bottom: 32rpx; right: 32rpx;
   width: 44px; height: 44px; border-radius: 12px;
   background: rgba(255,255,255,0.8); border: 1px solid #fff;
   display: flex; align-items: center; justify-content: center;
   font-size: 20px;
 }
 
-.suggestions { margin-top: 24px; }
+.suggestions { margin-top: 48rpx; }
 .suggestions-label {
   font-size: 12px; font-weight: 500; letter-spacing: 0.05em;
   color: var(--color-on-surface-variant); opacity: 0.7;
@@ -225,13 +225,13 @@ const handleRefine = async () => {
 .suggestions-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .suggestion-chip {
   display: flex; align-items: center; justify-content: center; gap: 8px;
-  padding: 12px 16px;
+  padding: 24rpx 32rpx;
   background: #fff; border: 1px solid var(--color-outline-variant); opacity: 0.2;
   border-radius: 12px;
   font-size: 14px; font-weight: 600; color: var(--color-primary); opacity: 0.8;
 }
 
-.action-section { margin-top: 24px; display: flex; flex-direction: column; align-items: center; }
+.action-section { margin-top: 48rpx; display: flex; flex-direction: column; align-items: center; }
 .apply-btn {
   width: 100%; height: 56px;
   background: linear-gradient(135deg, #000666 0%, #2a3eb1 50%, #1a237e 100%);
@@ -259,7 +259,7 @@ const handleRefine = async () => {
   background: linear-gradient(to top, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.2) 50%, transparent 100%);
 }
 .deco-content {
-  position: absolute; bottom: 20px; left: 24px; right: 24px;
+  position: absolute; bottom: 40rpx; left: 48rpx; right: 48rpx;
 }
 .deco-title { font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 4px; line-height: 28px; }
 .deco-sub { font-size: 14px; color: rgba(255,255,255,0.8); font-weight: 500; }

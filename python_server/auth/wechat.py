@@ -143,9 +143,9 @@ async def wechat_login(code: str, user_info: dict = None, phone_code: str = None
         else:
             # 更新用户信息
             if user_info:
-                if user_info.get('nickname'):
+                if user_info.get('nickname') != '微信用户':
                     user.nickname = user_info['nickname']
-                if user_info.get('avatar_url'):
+                if user_info.get('avatar_url') != None and user_info.get('avatar_url') != '':
                     user.avatar_url = user_info['avatar_url']
                 if user_info.get('gender') is not None:
                     user.gender = user_info['gender']

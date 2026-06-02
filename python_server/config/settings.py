@@ -62,10 +62,12 @@ class WeChatSettings(BaseModel):
 
 
 class DatabaseSettings(BaseModel):
-    host: str = "localhost"
-    port: int = 5432
+   # host: str = "localhost"
+    host: str = "47.108.24.14"
+    port: int = 15477
     username: str = "postgres"
     password: str = "postgres123"
+   # password: str = "147258"
     name: str = "ai_travel_butler"
     url: str = ""  # 直接指定数据库URL
 

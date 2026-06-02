@@ -22,13 +22,20 @@
           <view class="hero-badge">
             <text>商务休闲</text>
           </view>
+          <!-- 填充进度提示 -->
+          <view class="fill-progress" v-if="isFilling">
+            <text class="fill-icon">🔄</text>
+            <text class="fill-text">{{ fillProgressText }}</text>
+            <view class="fill-bar">
+              <view class="fill-bar-inner" :style="{ width: fillProgress + '%' }"></view>
+            </view>
+          </view>
         </view>
       </section>
 
       <section class="empty-state" v-if="!travelStore.currentPlan">
         <text class="empty-icon">✨</text>
         <text class="empty-title">快去生成你的专属方案吧</text>
-        <text class="empty-desc">告诉我们你的想法，慧游为你智能规划旅程</text>
         <button class="empty-btn" @click="goExplore">
           <text>开始探索</text>
         </button>
@@ -91,8 +98,8 @@
     </view>
 
     <!-- Floating AI Bubble -->
-    <button class="ai-bubble" @click="goRefine" :style="{ bottom: (112 + safeAreaBottom) + 'px' }">
-      <text>🤖</text>
+    <button class="ai-bubble" @click="goRefine" :style="{ bottom: (112 + safeAreaBottom) + 'px' }" v-if="travelStore.currentPlan">
+      <text>💡</text>
     </button>
 
     <!-- 隐藏 Canvas 用于生成分享图片 -->
@@ -101,7 +108,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, getCurrentInstance, nextTick } from 'vue'
+import { ref, computed, onMounted, getCurrentInstance, nextTick, watch } from 'vue'
 import { useTravelStore } from '@/store/travel.js'
 import { useUserStore } from '@/store/user.js'
 import { saveHistory } from '@/api/history.js'
@@ -120,6 +127,51 @@ const posterGen = new PosterGenerator({ canvasId: 'shareCanvas', instance })
 const dayPlanItinerary = ref([])
 const itinerarySummary = ref('')
 const officialImagePath = ref('')
+
+// 填充进度相关状态
+const isFilling = ref(false)
+const fillProgress = ref(0)
+const fillProgressText = ref('正在加载...')
+
+// 监听 currentPlan 变化，骨架填充完成后自动更新页面
+watch(() => travelStore.currentPlan, (newPlan) => {
+  if (newPlan) {
+    const plan = newPlan
+    dayPlanItinerary.value = Array.isArray(plan.dayPlanItinerary) ? plan.dayPlanItinerary : []
+    itinerarySummary.value = plan.itinerarySummary || '排期已生成'
+    
+    // 检查是否已完成填充（description 有内容）
+    const hasContent = dayPlanItinerary.value.some(item => item.description && item.description.length > 0)
+    if (hasContent) {
+      isFilling.value = false
+      nextTick(() => preGenerateOfficialImage())
+    } else {
+      // 骨架阶段或填充中
+      isFilling.value = true
+      updateFillProgress()
+    }
+  }
+}, { deep: true })
+
+// 计算填充进度
+const updateFillProgress = () => {
+  const items = dayPlanItinerary.value
+  if (!items || items.length === 0) {
+    fillProgress.value = 0
+    fillProgressText.value = '正在加载...'
+    return
+  }
+  
+  const total = items.length
+  const filled = items.filter(item => item.description && item.description.length > 10).length
+  fillProgress.value = Math.round((filled / total) * 100)
+  fillProgressText.value = `正在填充详细信息 ${filled}/${total}`
+  
+  // 每500ms更新一次
+  if (isFilling.value && fillProgress.value < 100) {
+    setTimeout(updateFillProgress, 500)
+  }
+}
 
 onMounted(() => {
   userStore.restoreFromStorage()
@@ -192,6 +244,7 @@ const getPlaceholderImg = (idx) => {
 }
 
 const goBack = () => uni.redirectTo({ url: '/pages/index/index' })
+const goExplore = () => uni.navigateTo({ url: '/pages/explore/index' })
 const goRefine = () => uni.navigateTo({ url: '/pages/refine/refine' })
 
 const previewImage = (current) => {
@@ -558,7 +611,7 @@ const generateBackendLongPoster = async () => {
 .top-bar {
   position: fixed; top: 0; left: 0; right: 0; z-index: 10;
   display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 20px 12px;
+  padding: 24rpx 40rpx 24rpx;
   background: rgba(255,255,255,0.7); backdrop-filter: blur(40px);
   -webkit-backdrop-filter: blur(40px);
   border-bottom: 1px solid rgba(255,255,255,0.2);
@@ -571,19 +624,8 @@ const generateBackendLongPoster = async () => {
 .top-title { font-size: 24px; font-weight: 700; color: var(--color-primary); letter-spacing: -0.01em; line-height: 32px; }
 .top-avatar { width: 32px; height: 32px; border-radius: 50%; }
 
-.content { padding: 80px 20px 140px; }
+.content { padding: 160rpx 40rpx 280rpx; }
 
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 120px 40px;
-  gap: 12px;
-}
-.empty-icon { font-size: 48px; }
-.empty-title { font-size: 20px; font-weight: 600; color: var(--color-primary); }
-.empty-desc { font-size: 14px; color: var(--color-on-surface-variant); text-align: center; }
 .empty-btn {
   margin-top: 16px;
   padding: 12px 32px;
@@ -597,7 +639,7 @@ const generateBackendLongPoster = async () => {
 
 .disclaimer {
   text-align: center;
-  padding: 24px 20px 8px;
+  padding: 48rpx 40rpx 16rpx;
   font-size: 12px;
   color: #999;
 }
@@ -613,7 +655,7 @@ const generateBackendLongPoster = async () => {
   background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.2) 50%, transparent 100%);
 }
 .hero-content {
-  position: absolute; bottom: 0; left: 0; right: 0; padding: 24px;
+  position: absolute; bottom: 0; left: 0; right: 0; padding: 48rpx;
   display: flex; flex-direction: column; gap: 8px;
 }
 .hero-title { font-size: 24px; font-weight: 700; color: #fff; letter-spacing: -0.01em; line-height: 32px; }
@@ -625,7 +667,19 @@ const generateBackendLongPoster = async () => {
   padding: 6px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.3);
 }
 
-.empty-state { display: flex; flex-direction: column; align-items: center; padding: 80px 20px; gap: 16px; }
+.fill-progress {
+  display: flex; align-items: center; gap: 8px; margin-top: 12px;
+}
+.fill-icon { font-size: 14px; }
+.fill-text { font-size: 12px; color: rgba(255,255,255,0.9); }
+.fill-bar {
+  flex: 1; height: 4px; background: rgba(255,255,255,0.3); border-radius: 2px; overflow: hidden;
+}
+.fill-bar-inner {
+  height: 100%; background: #34C759; border-radius: 2px; transition: width 0.3s;
+}
+
+.empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 160rpx 40rpx; gap: 16px; }
 .empty-icon { font-size: 64px; opacity: 0.5; }
 .empty-title { font-size: 20px; font-weight: 700; color: var(--color-on-surface); }
 
@@ -644,10 +698,10 @@ const generateBackendLongPoster = async () => {
   color: #fff;
 }
 .day-title { font-size: 20px; font-weight: 600; color: var(--color-primary); letter-spacing: -0.01em; }
-.day-items { padding-left: 20px; }
+.day-items { padding: 0; }
 
-.timeline-item { display: flex; gap: 16px; margin-bottom: 24px; position: relative; }
-.timeline-dot { display: flex; flex-direction: column; align-items: center; padding-top: 8px; width: 24px; flex-shrink: 0; }
+.timeline-item { display: flex; gap: 12px; margin-bottom: 24px; position: relative; }
+.timeline-dot { display: flex; flex-direction: column; align-items: center; padding-top: 8px; width: 20px; flex-shrink: 0; }
 .dot {
   width: 16px; height: 16px; border-radius: 50%;
   background: var(--color-outline-variant);
@@ -675,7 +729,7 @@ const generateBackendLongPoster = async () => {
 
 .action-bar {
   position: fixed; left: 0; right: 0; z-index: 10;
-  display: flex; gap: 12px; padding: 20px;
+  display: flex; gap: 12px; padding: 40rpx;
   background: rgba(255,255,255,0.85); backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border-top: 1px solid rgba(0,6,102,0.08);
@@ -695,7 +749,7 @@ const generateBackendLongPoster = async () => {
 }
 
 .ai-bubble {
-  position: fixed; right: 24px; z-index: 10;
+  position: fixed; right: 48rpx; z-index: 10;
   width: 56px; height: 56px; border-radius: 50%;
   background: linear-gradient(135deg, #000666 0%, #343d96 100%);
   display: flex; align-items: center; justify-content: center;

@@ -173,7 +173,7 @@ const loadHistory = async (item) => {
     isFromHistory: true,
     historyId: sourceItem.id
   }
-  uni.navigateTo({ url: '/pages/plan/plan' })
+  uni.reLaunch({ url: '/pages/index/index' })
 }
 
 const showDetails = async (item) => {
@@ -236,7 +236,7 @@ const loadDetailToPlan = () => {
     isFromHistory: true,
     historyId: selectedDetail.value.id
   }
-  uni.navigateTo({ url: '/pages/plan/plan' })
+  uni.reLaunch({ url: '/pages/index/index' })
   closeDetailPopup()
 }
 
@@ -274,7 +274,7 @@ const loadHistoryList = async () => {
 .history-page { min-height: 100vh; background: var(--color-surface); }
 .top-bar {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 20px 8px;
+  padding: 24rpx 40rpx 16rpx;
   background: rgba(248,249,250,0.8); backdrop-filter: blur(40px);
   -webkit-backdrop-filter: blur(40px);
   border-bottom: 1px solid rgba(198,197,212,0.3);
@@ -283,7 +283,6 @@ const loadHistoryList = async () => {
 .back-btn {
   width: 40px; height: 40px; display: flex; align-items: center;
   justify-content: center; font-size: 20px; color: var(--color-primary);
-  margin-left: -4px;
 }
 .top-brand {
   font-size: 24px; font-weight: 700; color: var(--color-primary);
@@ -291,16 +290,16 @@ const loadHistoryList = async () => {
 }
 .top-spacer { width: 40px; }
 
-.content { padding: 8px 20px 120px; }
+.content { padding: 16rpx 40rpx 240rpx; }
 
 .section-overline {
   display: block;
   font-size: 11px; font-weight: 700; color: var(--color-outline);
   text-transform: uppercase; letter-spacing: 0.15em;
-  margin-bottom: 12px; padding-left: 4px;
+  margin-bottom: 12px;
 }
 
-.empty-state { display: flex; flex-direction: column; align-items: center; padding: 80px 20px; gap: 12px; }
+.empty-state { display: flex; flex-direction: column; align-items: center; padding: 160rpx 40rpx; gap: 12px; }
 .empty-icon-wrap {
   width: 80px; height: 80px; border-radius: 50%;
   background: var(--color-surface-container-low);
@@ -313,7 +312,7 @@ const loadHistoryList = async () => {
 
 .history-card {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 20px; margin-bottom: 12px;
+  padding: 40rpx; margin-bottom: 12px;
   background: rgba(255,255,255,0.65); backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255,255,255,0.5);
@@ -374,7 +373,7 @@ const loadHistoryList = async () => {
   align-self: center; margin: 12px auto 4px;
 }
 .sheet-header {
-  padding: 16px 24px 20px;
+  padding: 32rpx 48rpx 40rpx;
   background: linear-gradient(135deg, #000666 0%, #1a237e 100%);
   color: #fff;
 }
@@ -391,7 +390,7 @@ const loadHistoryList = async () => {
   text-transform: uppercase; opacity: 0.6;
 }
 .meta-value { font-size: 13px; font-weight: 500; }
-.sheet-body { flex: 1; overflow-y: auto; padding: 20px 24px; }
+.sheet-body { flex: 1; overflow-y: auto; padding: 40rpx 48rpx; }
 .sheet-section-label {
   font-size: 11px; font-weight: 700; color: var(--color-outline);
   text-transform: uppercase; letter-spacing: 0.15em;
@@ -425,7 +424,7 @@ const loadHistoryList = async () => {
 }
 .sheet-footer {
   display: flex; gap: 12px;
-  padding: 16px 24px 28px;
+  padding: 32rpx 48rpx 56rpx;
   border-top: 1px solid rgba(198,197,212,0.1);
 }
 .sheet-btn {

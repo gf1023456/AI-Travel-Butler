@@ -57,22 +57,36 @@
     </view>
 
     <!-- Itinerary Quick Card -->
-    <view class="quick-card" v-if="hasPlan" :style="{ bottom: (180 + safeAreaBottom) + 'px' }">
-      <view class="quick-card-inner">
-        <image class="quick-img" :src="planImage" mode="aspectFill" />
-        <view class="quick-info">
-          <view class="quick-tags">
-            <text class="quick-tag">{{ planStatus }}</text>
-            <text class="quick-day">Day {{ currentDay }} / {{ totalDays }}</text>
+    <view class="quick-card-wrapper" v-if="hasPlan && !quickCardHidden" :style="{ bottom: (180 + safeAreaBottom) + 'px' }">
+      <view class="quick-card" @touchstart="onQuickCardTouchStart" @touchmove="onQuickCardTouchMove" @touchend="onQuickCardTouchEnd">
+        <view class="quick-card-inner">
+          <image class="quick-img" :src="currentQuickItem.image || planImage" mode="aspectFill" />
+          <view class="quick-info">
+            <view class="quick-tags">
+              <text class="quick-tag">{{ planStatus }}</text>
+              <text class="quick-day">Day {{ currentQuickItem.day || currentDay }} / {{ totalDays }}</text>
+            </view>
+            <text class="quick-title">{{ currentQuickItem.name || planTitle }}</text>
+            <text class="quick-desc" v-if="currentQuickItem.description">{{ currentQuickItem.description }}</text>
+            <text class="quick-next" v-else>下一个：{{ nextStop }} · {{ nextDist }}</text>
           </view>
-          <text class="quick-title">{{ planTitle }}</text>
-          <text class="quick-next">下一个：{{ nextStop }} · {{ nextDist }}</text>
+          <button class="quick-arrow" @click="goPlan">
+            <text>→</text>
+          </button>
         </view>
-        <button class="quick-arrow" @click="goPlan">
-          <text>→</text>
-        </button>
+        <view class="quick-card-dots" v-if="quickCardItems.length > 1">
+          <view v-for="(item, index) in quickCardItems" :key="index" :class="['quick-dot', index === quickCardIndex ? 'quick-dot-active' : '']"></view>
+        </view>
       </view>
+      <button class="quick-card-hide" @click="hideQuickCard">
+        <text>×</text>
+      </button>
     </view>
+    <!-- Hidden Quick Card Indicator -->
+    <button class="quick-card-show" v-if="hasPlan && quickCardHidden" @click="showQuickCard" :style="{ bottom: (180 + safeAreaBottom) + 'px' }">
+      <text>📍</text>
+      <text class="show-text">显示行程</text>
+    </button>
 
     <!-- Floating 慧游 Butler -->
     <button class="ai-butler" @click="goExplore" :style="{ bottom: (136 + safeAreaBottom) + 'px' }">
@@ -98,58 +112,69 @@
 
     <!-- Detail Bottom Sheet -->
     <view v-if="showDetail" class="sheet-overlay" @click="closeDetail">
-      <view class="sheet-container" @click.stop>
+      <view class="sheet-container" @click.stop @touchstart="onTouchStart" @touchmove="onTouchMove" @touchend="onTouchEnd">
+        <!-- Modal Handle -->
         <view class="sheet-handle"></view>
-        <view class="sheet-header" :style="{ background: `linear-gradient(135deg, ${selectedMarker.dayColor || '#000666'}, ${selectedMarker.dayColor ? selectedMarker.dayColor + 'cc' : '#1a237e'})` }">
+        <!-- Swipe Indicator -->
+        <view class="sheet-swipe-indicator" v-if="markers.length > 1">
+          <text class="swipe-arrow">‹</text>
+          <text class="swipe-text">滑动切换景点</text>
+          <text class="swipe-arrow">›</text>
+        </view>
+        <!-- Card Header -->
+        <view class="sheet-header">
           <view class="sheet-day-badge">Day {{ selectedMarker.day }}</view>
           <text class="sheet-title">{{ selectedMarker.name }}</text>
         </view>
+        <!-- Content Body -->
         <scroll-view scroll-y class="sheet-body">
           <view class="sheet-row">
-            <view class="sheet-icon-wrap"><text class="sheet-icon">📅</text></view>
+            <view class="sheet-icon-wrap">
+              <view class="sheet-icon-img icon-clock"></view>
+            </view>
             <view class="sheet-info">
               <text class="sheet-label">时间</text>
               <text class="sheet-value">{{ selectedMarker.time || '待定' }}</text>
             </view>
           </view>
-          <view v-if="selectedMarker.city" class="sheet-row">
-            <view class="sheet-icon-wrap"><text class="sheet-icon">📍</text></view>
+          <view class="sheet-row" v-if="selectedMarker.city">
+            <view class="sheet-icon-wrap">
+              <view class="sheet-icon-img icon-location"></view>
+            </view>
             <view class="sheet-info">
               <text class="sheet-label">位置</text>
               <text class="sheet-value">{{ selectedMarker.city }}</text>
             </view>
           </view>
-          <view v-if="selectedMarker.weather_icon" class="sheet-row">
-            <view class="sheet-icon-wrap"><text class="sheet-icon">🌤️</text></view>
+          <view class="sheet-row" v-if="selectedMarker.weather_icon">
+            <view class="sheet-icon-wrap">
+              <view class="sheet-icon-img icon-weather"></view>
+            </view>
             <view class="sheet-info">
               <text class="sheet-label">天气</text>
               <text class="sheet-value">{{ selectedMarker.weather_icon }} {{ selectedMarker.temperature }}</text>
             </view>
           </view>
-          <view v-if="selectedMarker.description" class="sheet-row sheet-desc">
-            <view class="sheet-icon-wrap"><text class="sheet-icon">📖</text></view>
+          <view class="sheet-row sheet-desc-row" v-if="selectedMarker.description">
+            <view class="sheet-icon-wrap">
+              <view class="sheet-icon-img icon-book"></view>
+            </view>
             <view class="sheet-info">
               <text class="sheet-label">介绍</text>
               <text class="sheet-value sheet-desc-text">{{ selectedMarker.description }}</text>
             </view>
           </view>
-          <view v-if="selectedMarker.transit_hint" class="sheet-row">
-            <view class="sheet-icon-wrap"><text class="sheet-icon">🚗</text></view>
-            <view class="sheet-info">
-              <text class="sheet-label">交通建议</text>
-              <text class="sheet-value">{{ selectedMarker.transit_hint }}</text>
-            </view>
-          </view>
-          <view v-if="selectedMarker.visit_duration" class="sheet-row">
-            <view class="sheet-icon-wrap"><text class="sheet-icon">⏱️</text></view>
-            <view class="sheet-info">
-              <text class="sheet-label">游玩时长</text>
-              <text class="sheet-value">{{ selectedMarker.visit_duration }}</text>
-            </view>
-          </view>
         </scroll-view>
+        <!-- Action Footer -->
         <view class="sheet-footer">
-          <button class="sheet-btn sheet-btn-primary" @click="closeDetail">关闭</button>
+          <button class="sheet-btn-nav" @click="openNavigation">
+            <view class="sheet-icon-img icon-navigate"></view>
+            <span>去导航</span>
+          </button>
+          <button class="sheet-btn-hide" @click="closeDetail">
+            <text>✕</text>
+            <text>隐藏</text>
+          </button>
         </view>
       </view>
     </view>
@@ -174,6 +199,11 @@ export default {
       polylines: [],
       showDetail: false,
       selectedMarker: {},
+      currentMarkerIndex: 0,
+      quickCardHidden: false,
+      quickCardIndex: 0,
+      quickCardTouchStartX: 0,
+      quickCardTouchStartY: 0,
       userLocation: null,
       locationName: '获取位置中...',
       weather: null,
@@ -215,6 +245,18 @@ export default {
     nextDist() { return '1.2km' },
     planImage() {
       return 'https://tonystark-ai.ccwu.cc/png/8c8c5e70-c661-4658-a1cf-a732fec20c4f.png'
+    },
+    quickCardItems() {
+      const plan = this.travelStore.currentPlan
+      if (!plan?.dayPlanItinerary?.length) return []
+      return plan.dayPlanItinerary.filter(item => item.lat && item.lng).map((item, index) => ({
+        ...item,
+        id: index
+      }))
+    },
+    currentQuickItem() {
+      if (this.quickCardItems.length === 0) return {}
+      return this.quickCardItems[this.quickCardIndex] || this.quickCardItems[0]
     }
   },
   methods: {
@@ -343,7 +385,8 @@ export default {
               day: item.day || 1, dayColor, name: item.name, time: item.time,
               city: item.city, description: item.description,
               transit_hint: item.transit_hint, visit_duration: item.visit_duration,
-              weather_icon: item.weather_icon, temperature: item.temperature
+              weather_icon: item.weather_icon, temperature: item.temperature,
+              latitude: lat, longitude: lng
             }
           })
           const day = item.day || 1
@@ -371,11 +414,128 @@ export default {
     goExplore() { uni.navigateTo({ url: '/pages/explore/index' }) },
     goPlan() { uni.navigateTo({ url: '/pages/plan/plan' }) },
     goMine() { uni.navigateTo({ url: '/pages/mine/index' }) },
+    // Quick Card 滑动切换方法
+    onQuickCardTouchStart(e) {
+      const touch = e.touches[0]
+      this.quickCardTouchStartX = touch.clientX
+      this.quickCardTouchStartY = touch.clientY
+    },
+    onQuickCardTouchMove(e) {
+      if (e.touches.length > 1) return
+      const touch = e.touches[0]
+      const deltaX = touch.clientX - this.quickCardTouchStartX
+      const deltaY = touch.clientY - this.quickCardTouchStartY
+      if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 10) {
+        e.preventDefault()
+      }
+    },
+    onQuickCardTouchEnd(e) {
+      const touch = e.changedTouches[0]
+      const deltaX = touch.clientX - this.quickCardTouchStartX
+      const deltaY = touch.clientY - this.quickCardTouchStartY
+      if (Math.abs(deltaX) > 30 && Math.abs(deltaY) < 50) {
+        if (deltaX > 50) {
+          // 向右滑动，切换到上一个
+          this.switchQuickCard(this.quickCardIndex - 1)
+        } else if (deltaX < -50) {
+          // 向左滑动，切换到下一个
+          this.switchQuickCard(this.quickCardIndex + 1)
+        }
+      }
+    },
+    switchQuickCard(index) {
+      if (index < 0) index = this.quickCardItems.length - 1
+      if (index >= this.quickCardItems.length) index = 0
+      this.quickCardIndex = index
+      
+      // 聚焦到对应的标记点
+      const item = this.quickCardItems[index]
+      if (item && item.lat && item.lng) {
+        this.center = [parseFloat(item.lat), parseFloat(item.lng)]
+        this.zoom = 15
+      }
+    },
+    hideQuickCard() {
+      this.quickCardHidden = true
+    },
+    showQuickCard() {
+      this.quickCardHidden = false
+    },
     onMarkerTap(e) {
       const marker = this.markers.find(m => m.id === e.detail.markerId)
-      if (marker?.detail) { this.selectedMarker = marker.detail; this.showDetail = true }
+      if (marker?.detail) { 
+        this.selectedMarker = marker.detail;
+        // 找到当前 marker 的索引
+        const index = this.markers.findIndex(m => m.id === e.detail.markerId);
+        if (index !== -1) {
+          this.currentMarkerIndex = index;
+        }
+        this.showDetail = true 
+      }
+    },
+    onTouchStart(e) {
+      const touch = e.touches[0]
+      this.touchStartX = touch.clientX
+      this.touchStartY = touch.clientY
+      this.touchStartTime = Date.now()
+    },
+    onTouchMove(e) {
+      if (e.touches.length > 1) return
+      
+      const touch = e.touches[0]
+      const deltaX = touch.clientX - this.touchStartX
+      const deltaY = touch.clientY - this.touchStartY
+      
+      // 水平滑动距离大于垂直滑动距离时才处理
+      if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 10) {
+        e.preventDefault() // 阻止默认滚动行为
+      }
+    },
+    onTouchEnd(e) {
+      const touch = e.changedTouches[0]
+      const deltaX = touch.clientX - this.touchStartX
+      const deltaY = touch.clientY - this.touchStartY
+      const deltaTime = Date.now() - this.touchStartTime
+      
+      // 检查是否为有效滑动手势
+      if (Math.abs(deltaX) > 30 && Math.abs(deltaY) < 50 && deltaTime < 500) {
+        if (deltaX > 50) {
+          // 向右滑动，切换到上一个
+          this.switchToMarker(this.currentMarkerIndex - 1)
+        } else if (deltaX < -50) {
+          // 向左滑动，切换到下一个
+          this.switchToMarker(this.currentMarkerIndex + 1)
+        }
+      }
+    },
+    switchToMarker(index) {
+      if (index < 0) index = this.markers.length - 1
+      if (index >= this.markers.length) index = 0
+      
+      if (this.markers[index]) {
+        this.selectedMarker = this.markers[index].detail
+        this.currentMarkerIndex = index
+        
+        // 聚焦到新的标记点
+        this.center = [this.markers[index].latitude, this.markers[index].longitude]
+        this.zoom = 15
+      }
     },
     closeDetail() { this.showDetail = false },
+    openNavigation() {
+      const m = this.selectedMarker
+      if (!m || !m.latitude || !m.longitude) {
+        uni.showToast({ title: '该地点暂无坐标信息', icon: 'none' })
+        return
+      }
+      uni.openLocation({
+        latitude: parseFloat(m.latitude),
+        longitude: parseFloat(m.longitude),
+        name: m.name || '目的地',
+        address: m.city || '',
+        scale: 16
+      })
+    },
     async fetchWeather(lat, lng) {
       const CACHE_KEY = 'weather_cache'
       const CACHE_TTL = 30 * 60 * 1000
@@ -439,7 +599,7 @@ export default {
 .top-nav {
   position: fixed; top: 0; left: 0; right: 0; z-index: 10;
   display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 24px 12px;
+  padding: 24rpx 48rpx 24rpx;
   background: rgba(255,255,255,0.7); backdrop-filter: blur(30px);
   -webkit-backdrop-filter: blur(30px);
   border-bottom: 1px solid rgba(255,255,255,0.5);
@@ -463,7 +623,7 @@ export default {
 }
 
 .map-controls {
-  position: fixed; right: 24px; top: 112px; z-index: 10;
+  position: fixed; right: 48rpx; top: 112px; z-index: 10;
   display: flex; flex-direction: column; gap: 24px;
 }
 .ctrl-group {
@@ -487,22 +647,28 @@ export default {
   border-radius: 50%; box-shadow: 0 4px 16px rgba(0,0,0,0.08);
 }
 
-.quick-card {
-  position: fixed; left: 24px; right: 24px; bottom: 180px; z-index: 10;
+.quick-card-wrapper {
+  position: fixed; left: 48rpx; right: 48rpx; z-index: 10;
   max-width: 360px; margin: 0 auto;
+  display: flex; align-items: flex-start; gap: 8px;
 }
-.quick-card-inner {
+.quick-card {
+  flex: 1;
   background: rgba(255,255,255,0.7); backdrop-filter: blur(30px);
   -webkit-backdrop-filter: blur(30px);
   border: 1px solid rgba(255,255,255,0.4);
-  border-radius: 28px; padding: 20px;
+  border-radius: 28px;
   box-shadow: 0 20px 40px rgba(0,0,0,0.08);
-  display: flex; align-items: center; gap: 20px;
+  overflow: hidden;
+}
+.quick-card-inner {
+  display: flex; align-items: center; gap: 40rpx;
+  padding: 40rpx;
 }
 .quick-img {
   width: 96px; height: 96px; border-radius: 16px; flex-shrink: 0;
 }
-.quick-info { flex: 1; }
+.quick-info { flex: 1; min-width: 0; }
 .quick-tags { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .quick-tag {
   font-size: 11px; font-weight: 700; letter-spacing: 0.05em;
@@ -513,6 +679,13 @@ export default {
 .quick-title {
   font-size: 20px; font-weight: 700; color: var(--color-primary);
   line-height: 28px; margin-bottom: 4px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.quick-desc {
+  font-size: 13px; color: var(--color-on-surface-variant);
+  line-height: 1.4;
+  overflow: hidden; text-overflow: ellipsis;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
 }
 .quick-next { font-size: 14px; color: var(--color-on-surface-variant); font-weight: 500; }
 .quick-arrow {
@@ -520,12 +693,44 @@ export default {
   background: linear-gradient(135deg, #1a237e 0%, #4c56af 50%, #6366f1 100%);
   display: flex; align-items: center; justify-content: center;
   color: #fff; font-size: 20px; font-weight: 700;
+  flex-shrink: 0;
 }
+.quick-card-dots {
+  display: flex; justify-content: center; gap: 6px;
+  padding: 8px 0 12px;
+}
+.quick-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--color-outline-variant);
+  transition: all 0.3s;
+}
+.quick-dot-active {
+  background: var(--color-primary);
+  width: 20px; border-radius: 10px;
+}
+.quick-card-hide {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: rgba(255,255,255,0.8); backdrop-filter: blur(20px);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--color-on-surface-variant); font-size: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  flex-shrink: 0;
+}
+.quick-card-show {
+  position: fixed; left: 48rpx; z-index: 10;
+  display: flex; align-items: center; gap: 8px;
+  padding: 24rpx 40rpx;
+  background: rgba(255,255,255,0.8); backdrop-filter: blur(30px);
+  border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+  color: var(--color-primary); font-size: 14px; font-weight: 600;
+}
+.show-text { font-size: 14px; }
 
 .ai-butler {
-  position: fixed; right: 24px; bottom: 136px; z-index: 10;
+  position: fixed; right: 48rpx; bottom: 136px; z-index: 10;
   display: flex; align-items: center; gap: 12px;
-  padding: 16px 20px;
+  padding: 32rpx 40rpx;
   background: linear-gradient(135deg, #1a237e 0%, #4c56af 50%, #6366f1 100%);
   border-radius: 22px 22px 22px 4px;
   box-shadow: 0 8px 24px rgba(0,6,102,0.2);
@@ -535,7 +740,7 @@ export default {
 .ai-text { font-size: 14px; font-weight: 600; line-height: 22px; white-space: nowrap; }
 
 .bottom-nav {
-  position: fixed; left: 24px; right: 24px; z-index: 10;
+  position: fixed; left: 48rpx; right: 48rpx; z-index: 10;
   display: flex; align-items: center; justify-content: space-around;
   height: 72px; padding: 0 8px;
   background: rgba(255,255,255,0.7); backdrop-filter: blur(30px);
@@ -563,65 +768,115 @@ export default {
   display: flex; align-items: flex-end;
 }
 .sheet-container {
-  width: 100%; max-height: 78vh;
-  background: rgba(255,255,255,0.85); backdrop-filter: blur(24px) saturate(200%);
-  -webkit-backdrop-filter: blur(24px) saturate(200%);
+  width: 100%; height: 85%;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-top: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: 32px 32px 0 0;
-  box-shadow: 0 -8px 40px rgba(0,0,0,0.08);
+  box-shadow: 0 -10px 40px rgba(0,0,0,0.1);
   display: flex; flex-direction: column;
   overflow: hidden;
 }
 .sheet-handle {
-  width: 36px; height: 5px; border-radius: 999px;
-  background: var(--color-outline-variant); opacity: 0.5;
-  align-self: center; margin: 12px auto 4px;
+  width: 36px; height: 5px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 2.5px;
+  margin: 12px auto;
+  flex-shrink: 0;
+}
+.sheet-swipe-indicator {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 0 0 8px; flex-shrink: 0;
+}
+.swipe-arrow {
+  font-size: 14px; color: var(--color-on-surface-variant); opacity: 0.4;
+  line-height: 1;
+}
+.swipe-text {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--color-on-surface-variant); opacity: 0.6;
 }
 .sheet-header {
-  padding: 24px 24px 20px; color: #fff; position: relative;
-  display: flex; flex-direction: column; gap: 12px;
+  padding: 8px 24px 12px; flex-shrink: 0;
+  display: flex; flex-direction: column; gap: 6px;
 }
 .sheet-day-badge {
   align-self: flex-start;
-  background: rgba(255,255,255,0.25); backdrop-filter: blur(8px);
+  background: rgba(26,35,126,0.08);
   padding: 4px 14px; border-radius: 999px;
-  font-size: 11px; font-weight: 600; letter-spacing: 0.05em;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  color: #1a237e;
 }
 .sheet-title {
-  font-size: 24px; font-weight: 700; line-height: 32px;
-  letter-spacing: -0.01em;
+  font-size: 28px; font-weight: 700; color: #1a237e;
+  letter-spacing: -0.02em; line-height: 36px;
 }
-.sheet-body { flex: 1; overflow-y: auto; padding: 16px 24px; }
+.sheet-body {
+  flex: 1; overflow-y: auto; padding: 8px 24px 16px;
+}
 .sheet-row {
-  display: flex; gap: 16px; padding: 14px 0;
+  display: flex; gap: 16px; padding: 16px 0;
   border-bottom: 1px solid rgba(198,197,212,0.15);
 }
+.sheet-row:first-child { padding-top: 8px; }
 .sheet-row:last-child { border-bottom: none; }
 .sheet-icon-wrap {
-  width: 40px; height: 40px; border-radius: 12px;
-  background: var(--color-surface-container-low);
+  width: 36px; height: 36px; border-radius: 8px;
+  background: rgba(26,35,126,0.05);
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
-.sheet-icon { font-size: 18px; }
-.sheet-info { flex: 1; display: flex; flex-direction: column; gap: 4px; justify-content: center; }
+.sheet-icon-img {
+  width: 18px; height: 18px;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+.icon-clock {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231a237e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z'/%3E%3C/svg%3E");
+}
+.icon-location {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231a237e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z'/%3E%3Cpath d='M15 11a3 3 0 11-6 0 3 3 0 016 0z'/%3E%3C/svg%3E");
+}
+.icon-weather {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231a237e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M15 12a3 3 0 11-6 0 3 3 0 016 0z'/%3E%3C/svg%3E");
+}
+.icon-book {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231a237e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253'/%3E%3C/svg%3E");
+}
+.icon-navigate {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 6L12 18M12 6L8 10M12 6L16 10'/%3E%3C/svg%3E");
+}
+.sheet-info { flex: 1; display: flex; flex-direction: column; gap: 2px; justify-content: center; }
 .sheet-label {
   font-size: 11px; font-weight: 600; letter-spacing: 0.05em;
   color: var(--color-outline); text-transform: uppercase;
 }
 .sheet-value { font-size: 14px; font-weight: 500; color: var(--color-on-surface); line-height: 1.5; }
-.sheet-desc { align-items: flex-start; }
-.sheet-desc-text { line-height: 1.6; }
+.sheet-desc-row { align-items: flex-start; }
+.sheet-desc-text { line-height: 1.6; font-size: 13px; color: var(--color-on-surface-variant); }
 .sheet-footer {
-  padding: 16px 24px 28px;
-  border-top: 1px solid rgba(198,197,212,0.1);
+  padding: 16px 24px; flex-shrink: 0;
+  background: rgba(255,255,255,0.5); backdrop-filter: blur(8px);
+  border-top: 1px solid rgba(255,255,255,0.4);
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px;
 }
-.sheet-btn {
-  width: 100%; height: 52px; border-radius: 16px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 16px; font-weight: 600;
+.sheet-btn-nav {
+  flex: 1;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  background: #1a237e; color: #fff;
+  padding: 16px 10px; border-radius: 999px;
+  font-size: 17px; font-weight: 700;
+  box-shadow: 0 4px 14px 0 rgba(26, 35, 126, 0.39);
+  transition: all 0.15s;
 }
-.sheet-btn-primary {
-  background: linear-gradient(135deg, #000666 0%, #1a237e 100%);
-  color: #fff; box-shadow: 0 8px 24px rgba(0,6,102,0.2);
+.sheet-btn-nav:active { transform: scale(0.95); }
+.sheet-btn-nav .icon-navigate { width: 20px; height: 20px; }
+.sheet-btn-hide {
+  display: flex; align-items: center; gap: 4px;
+  color: var(--color-outline); font-weight: 500; font-size: 14px;
+  padding: 12px 8px; flex-shrink: 0;
 }
-.sheet-btn-primary:active { transform: scale(0.97); }
+.sheet-btn-hide:active { opacity: 0.6; }
 </style>
