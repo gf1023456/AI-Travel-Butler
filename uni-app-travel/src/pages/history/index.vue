@@ -1,112 +1,105 @@
 <template>
-  <view class="page-container">
-    <view class="top-bar" :style="'padding-top:' + (safeAreaTop + 32) + 'px'">
-      <view class="back-btn" @click="goBack">
-        <text>←</text>
-      </view>
-      <text class="page-title">历史记录</text>
-    </view>
+  <view class="history-page" :class="themeClass">
+    <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
+    <header class="top-bar">
+      <button class="back-btn" @click="goBack"><text>←</text></button>
+      <text class="top-brand">慧游</text>
+      <view class="top-spacer"></view>
+    </header>
 
     <scroll-view scroll-y class="content">
       <view v-if="historyList.length === 0" class="empty-state">
-        <text class="empty-icon">📭</text>
-        <text class="empty-text">暂无历史记录</text>
+        <view class="empty-icon-wrap"><text class="empty-icon">📭</text></view>
+        <text class="empty-title">暂无历史记录</text>
+        <text class="empty-desc">你的旅行方案将显示在这里</text>
       </view>
 
-      <view
-        v-for="item in historyList"
-        :key="item.id"
-        class="history-item"
-        @click="showDetails(item)"
-      >
-        <view class="history-info">
-          <view class="history-header">
-            <text class="history-time" v-if="item.created_at">{{ formatDate(item.created_at) }}</text>
-            <text class="history-time" v-else-if="item.timestamp">{{ item.timestamp }}</text>
-            <view 
-              v-if="item.is_favorite" 
-              class="history-favorite"
-            >
-              ⭐
+      <view class="history-section" v-else>
+        <text class="section-overline">旅行记录</text>
+        <view
+          v-for="item in historyList"
+          :key="item.id"
+          class="history-card"
+          @click="showDetails(item)"
+        >
+          <view class="history-info">
+            <view class="history-meta">
+              <view class="meta-left">
+                <text class="history-time">{{ formatDate(item.created_at || item.timestamp) }}</text>
+                <view v-if="item.is_favorite" class="fav-badge"><text>⭐</text></view>
+              </view>
+              <view class="history-tag">{{ item.model_type || 'AI' }}</view>
             </view>
+            <text class="history-preview">{{ getPreviewText(item) }}</text>
           </view>
-          <text class="history-prompt">{{ getPreviewText(item) }}</text>
-        </view>
-        <view class="history-actions">
-          <view class="history-load" @click.stop="loadHistory(item)">载入</view>
-          <view class="history-delete" @click.stop="deleteHistory(item.id)">🗑️</view>
+          <view class="history-actions">
+            <button class="action-load" @click.stop="loadHistory(item)">载入</button>
+            <button class="action-delete" @click.stop="deleteHistory(item.id)">
+              <text class="del-icon">🗑️</text>
+            </button>
+          </view>
         </view>
       </view>
     </scroll-view>
 
-    <!-- 详情弹窗 -->
-    <view v-if="showDetailPopup" class="popup-overlay" @click="closeDetailPopup">
-      <view class="popup-content" @click.stop>
-        <view class="popup-header">
-          <text class="popup-title">{{ selectedDetail.itinerary_summary?.substring(0, 20) || '行程详情' }}</text>
-          <view class="popup-close" @click="closeDetailPopup">×</view>
+    <!-- Detail Bottom Sheet -->
+    <view v-if="showDetailPopup" class="sheet-overlay" @click="closeDetailPopup">
+      <view class="sheet-container" @click.stop>
+        <view class="sheet-handle"></view>
+        <view class="sheet-header">
+          <text class="sheet-title">{{ selectedDetail.itinerary_summary?.substring(0, 24) || '行程详情' }}</text>
+          <view class="sheet-header-meta">
+            <view class="sheet-meta-item">
+              <text class="meta-label">创建时间</text>
+              <text class="meta-value">{{ formatDate(selectedDetail.created_at) }}</text>
+            </view>
+            <view class="sheet-meta-item">
+              <text class="meta-label">模型</text>
+              <text class="meta-value">{{ selectedDetail.model_type || 'N/A' }}</text>
+            </view>
+            <view class="sheet-meta-item">
+              <text class="meta-label">提供商</text>
+              <text class="meta-value">{{ selectedDetail.provider || 'N/A' }}</text>
+            </view>
+          </view>
         </view>
-        <view class="popup-body">
-          <view class="detail-section">
-            <text class="detail-label">行程ID:</text>
-            <text class="detail-value">{{ selectedDetail.id }}</text>
+        <scroll-view scroll-y class="sheet-body">
+          <view v-if="selectedDetail.itinerary_summary" class="sheet-summary">
+            <view class="sheet-section-label">行程摘要</view>
+            <text class="summary-text">{{ selectedDetail.itinerary_summary.substring(0, 500) }}</text>
           </view>
-          <view class="detail-section">
-            <text class="detail-label">创建时间:</text>
-            <text class="detail-value">{{ formatDate(selectedDetail.created_at) }}</text>
-          </view>
-          <view class="detail-section">
-            <text class="detail-label">模型类型:</text>
-            <text class="detail-value">{{ selectedDetail.model_type || 'N/A' }}</text>
-          </view>
-          <view class="detail-section">
-            <text class="detail-label">服务提供商:</text>
-            <text class="detail-value">{{ selectedDetail.provider || 'N/A' }}</text>
-          </view>
-          <view class="detail-section" v-if="selectedDetail.itinerary_summary">
-            <text class="detail-label">行程摘要:</text>
-            <text class="detail-value preview-text">{{ selectedDetail.itinerary_summary.substring(0, 300) }}...</text>
-          </view>
-          <view class="detail-section" v-if="selectedDetail.day_plan">
-            <text class="detail-label">行程计划:</text>
-            <view class="day-plan-container">
-              <!-- 数组格式（扁平列表） -->
-              <view v-if="Array.isArray(selectedDetail.day_plan)">
-                <view v-for="(location, locIndex) in selectedDetail.day_plan" :key="locIndex" class="location-item">
-                  <text class="location-name">{{ location.name || location.title || '未知地点' }}</text>
-                  <text class="location-time" v-if="location.time">⏰ {{ location.time }}</text>
-                  <text class="location-city" v-if="location.city">📍 {{ location.city }}</text>
-                  <text class="location-desc">{{ location.description }}</text>
-                  <view class="location-coords" v-if="location.lat && location.lng">
-                    坐标: {{ location.lat }}, {{ location.lng }}
-                  </view>
+          <view v-if="selectedDetail.day_plan" class="sheet-plan">
+            <view class="sheet-section-label">行程计划</view>
+            <view v-if="Array.isArray(selectedDetail.day_plan)">
+              <view v-for="(loc, i) in selectedDetail.day_plan" :key="i" class="plan-loc-card">
+                <view class="loc-badge">{{ i + 1 }}</view>
+                <view class="loc-content">
+                  <text class="loc-name">{{ loc.name || loc.title || '未知地点' }}</text>
+                  <text class="loc-time" v-if="loc.time">{{ loc.time }}</text>
+                  <text class="loc-desc" v-if="loc.description">{{ loc.description }}</text>
                 </view>
               </view>
-              <!-- 对象分组格式 { '1': [...], '2': [...] } -->
-              <view v-else>
-                <view v-for="(locations, dayKey) in selectedDetail.day_plan" :key="dayKey">
-                  <view v-if="Array.isArray(locations)" class="day-plan-group">
-                    <text class="day-title">Day {{ dayKey }}</text>
-                    <view class="location-list">
-                      <view class="location-item" v-for="(location, locIndex) in locations" :key="locIndex">
-                        <text class="location-name">{{ location.name || location.title || '未知地点' }}</text>
-                        <text class="location-time" v-if="location.time">⏰ {{ location.time }}</text>
-                        <text class="location-city" v-if="location.city">📍 {{ location.city }}</text>
-                        <text class="location-desc">{{ location.description }}</text>
-                        <view class="location-coords" v-if="location.lat && location.lng">
-                          坐标: {{ location.lat }}, {{ location.lng }}
-                        </view>
-                      </view>
+            </view>
+            <view v-else>
+              <view v-for="(locs, dayKey) in selectedDetail.day_plan" :key="dayKey">
+                <view v-if="Array.isArray(locs)">
+                  <view class="day-group-header">Day {{ dayKey }}</view>
+                  <view v-for="(loc, i) in locs" :key="i" class="plan-loc-card">
+                    <view class="loc-badge">{{ i + 1 }}</view>
+                    <view class="loc-content">
+                      <text class="loc-name">{{ loc.name || loc.title || '未知地点' }}</text>
+                      <text class="loc-time" v-if="loc.time">{{ loc.time }}</text>
+                      <text class="loc-desc" v-if="loc.description">{{ loc.description }}</text>
                     </view>
                   </view>
                 </view>
               </view>
             </view>
           </view>
-        </view>
-        <view class="popup-actions">
-          <button class="action-btn load-btn" @click="loadDetailToPlan">载入此方案</button>
-          <button class="action-btn cancel-btn" @click="closeDetailPopup">关闭</button>
+        </scroll-view>
+        <view class="sheet-footer">
+          <button class="sheet-btn sheet-btn-primary" @click="loadDetailToPlan">载入此方案</button>
+          <button class="sheet-btn sheet-btn-secondary" @click="closeDetailPopup">关闭</button>
         </view>
       </view>
     </view>
@@ -117,13 +110,13 @@
 import { ref, onMounted } from 'vue'
 import { useTravelStore } from '@/store/travel.js'
 import { useUserStore } from '@/store/user.js'
-import { getHistoryList, deleteHistory as deleteHistoryApi, getHistoryDetail, toggleFavorite as toggleFavoriteApi } from '@/api/history.js'
+import { getHistoryList, deleteHistory as deleteHistoryApi, getHistoryDetail } from '@/api/history.js'
+import { useSafeArea } from '@/utils/safeArea.js'
+import { themeClass } from '@/utils/theme.js'
 
 const travelStore = useTravelStore()
 const userStore = useUserStore()
-
-// 安全区域顶部高度
-const safeAreaTop = ref(0)
+const { statusBarHeight } = useSafeArea()
 
 const historyList = ref([])
 const showDetailPopup = ref(false)
@@ -134,667 +127,320 @@ const getPreviewText = (item) => {
   return text.substring(0, 50) + (text.length > 50 ? '...' : '')
 }
 
-const goBack = () => {
-  // 使用 reLaunch 重置页面栈并跳转到首页
-  uni.reLaunch({ url: '/pages/index/index' })
-}
+const goBack = () => uni.reLaunch({ url: '/pages/index/index' })
 
 onMounted(() => {
-  // 获取安全区域
-  try {
-    const systemInfo = uni.getSystemInfoSync()
-    safeAreaTop.value = systemInfo.safeAreaInsets?.top || 0
-    console.log('[History] 安全区域顶部:', safeAreaTop.value)
-  } catch (e) {
-    console.error('[History] 获取安全区域失败:', e)
-    safeAreaTop.value = 0
-  }
-  
-  // 从本地存储恢复登录状态
   userStore.restoreFromStorage()
-  
-  // 检查是否已登录
   if (!userStore.hasToken) {
-    console.log('[History] 未登录，跳转到登录页')
     uni.showToast({ title: '请先登录', icon: 'none' })
     uni.redirectTo({ url: '/pages/login/index' })
     return
   }
-  
   loadHistoryList()
 })
 
 const loadHistory = async (item) => {
-  console.log('载入历史数据', { item })
   uni.showLoading({ title: '加载中...' })
-
-  // 列表接口可能不返回完整 day_plan，需要获取详情
   let sourceItem = item
-  if (!item.day_plan || (typeof item.day_plan === 'object' && !Array.isArray(item.day_plan) && Object.keys(item.day_plan).length === 0)) {
+  if (!item.day_plan) {
     try {
       const detail = await getHistoryDetail(item.id)
-      if (detail && detail.id) {
-        sourceItem = detail
-        console.log('从详情接口获取完整数据', detail)
-      }
-    } catch (e) {
-      console.error('获取详情失败，使用列表数据', e)
-    }
+      if (detail?.id) sourceItem = detail
+    } catch (e) { /* ignore */ }
   }
 
-  // 从历史加载行程到store
   let dayPlanItinerary = []
-
-  // 优先处理数组格式（扁平列表）
   if (Array.isArray(sourceItem.day_plan)) {
-    dayPlanItinerary = sourceItem.day_plan.map((location, index) => ({
-      ...location,
-      sequence: (location.sequence !== undefined) ? location.sequence : (index + 1),
-    }))
-  }
-  // 处理对象分组格式 { '1': [...], '2': [...] }
-  else if (sourceItem.day_plan && typeof sourceItem.day_plan === 'object' && !Array.isArray(sourceItem.day_plan)) {
+    dayPlanItinerary = sourceItem.day_plan.map((loc, i) => ({ ...loc, sequence: loc.sequence ?? (i + 1) }))
+  } else if (sourceItem.day_plan && typeof sourceItem.day_plan === 'object') {
     for (const dayKey in sourceItem.day_plan) {
-      const dayItems = sourceItem.day_plan[dayKey]
-      if (Array.isArray(dayItems)) {
-        const dayNum = parseInt(dayKey)
-        dayItems.forEach((location, index) => {
-          dayPlanItinerary.push({
-            ...location,
-            day: dayNum,
-            sequence: (location.sequence !== undefined) ? location.sequence : (index + 1),
-          })
+      const items = sourceItem.day_plan[dayKey]
+      if (Array.isArray(items)) {
+        items.forEach((loc, i) => {
+          dayPlanItinerary.push({ ...loc, day: parseInt(dayKey), sequence: loc.sequence ?? (i + 1) })
         })
       }
     }
   }
-  // 兼容其他字段名
-  else if (Array.isArray(sourceItem.dayPlan) || Array.isArray(sourceItem.itinerary)) {
-    dayPlanItinerary = (sourceItem.dayPlan || sourceItem.itinerary || []).map((location, index) => ({
-      ...location,
-      sequence: (location.sequence !== undefined) ? location.sequence : (index + 1),
-    }))
-  }
 
   uni.hideLoading()
-
-  const planData = {
-    itinerarySummary: sourceItem.itinerary_summary || sourceItem.summary || sourceItem.user_input || '',
-    dayPlanItinerary: dayPlanItinerary,
-    socialRecommendations: sourceItem.social_recommendations || sourceItem.recommendations || [],
+  travelStore.currentPlan = {
+    itinerarySummary: sourceItem.itinerary_summary || sourceItem.summary || '',
+    dayPlanItinerary,
+    socialRecommendations: sourceItem.social_recommendations || [],
     evidence: sourceItem.evidence || [],
-    warnings: sourceItem.warnings || []
+    warnings: sourceItem.warnings || [],
+    isFromHistory: true,
+    historyId: sourceItem.id
   }
-
-  travelStore.currentPlan = planData
-  console.log('载入行程完毕，跳转到计划页面', planData)
-  uni.navigateTo({ url: '/pages/plan/plan' })
+  uni.reLaunch({ url: '/pages/index/index' })
 }
 
 const showDetails = async (item) => {
-  console.log('显示详情', item)
   try {
     uni.showLoading({ title: '加载中...' })
-    // 优先从API获取详细信息
     const detail = await getHistoryDetail(item.id)
     uni.hideLoading()
-    
-    if (detail && detail.id) {
-      console.log('详情从服务器加载成功', detail)
-      selectedDetail.value = detail
-    } else {
-      // API失败则使用原始项数据
-      console.log('从本地项加载详情', item)
-      selectedDetail.value = item
-    }
-    
+    selectedDetail.value = detail?.id ? detail : item
     showDetailPopup.value = true
-  } catch (e) {
-    console.error('获取详细信息失败', e)
+  } catch {
     uni.hideLoading()
-    // 使用原有数据展示
     selectedDetail.value = item
     showDetailPopup.value = true
   }
 }
 
-const closeDetailPopup = () => {
-  showDetailPopup.value = false
-}
+const closeDetailPopup = () => { showDetailPopup.value = false }
 
 const formatDate = (dateStr) => {
-  if (!dateStr) return '';
-  
+  if (!dateStr) return ''
   try {
-    // 如果是ISO格式的时间戳，则转换为易读格式
     if (typeof dateStr === 'string' && dateStr.includes('T')) {
-      const date = new Date(dateStr);
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      const hours = String(date.getHours()).padStart(2, '0');
-      const minutes = String(date.getMinutes()).padStart(2, '0');
-      
-      // 格式：2026-04-23 23:30
-      return `${year}-${month}-${day} ${hours}:${minutes}`;
+      const d = new Date(dateStr)
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
     }
-    return dateStr;
-  } catch (err) {
-    // 如果解析失败，直接返回原字符串
-    return dateStr;
-  }
+    return dateStr
+  } catch { return dateStr }
 }
 
 const loadDetailToPlan = () => {
-  console.log('点击载入详情', selectedDetail.value)
-  if (selectedDetail.value) {
-    // 处理详细 day_plan 数据结构
-    let dayPlanItinerary = []
-    
-    if (selectedDetail.value.day_plan) {
-      if (typeof selectedDetail.value.day_plan === 'object' && !Array.isArray(selectedDetail.value.day_plan)) {
-        // 如果是按天分组的字典格式
-        for (const dayKey in selectedDetail.value.day_plan) {
-          const dayItems = selectedDetail.value.day_plan[dayKey]
-          if (Array.isArray(dayItems)) {
-            const dayNum = parseInt(dayKey)
-            // 为每个项目添加天数信息
-            dayItems.forEach((location, index) => {
-              dayPlanItinerary.push({
-                ...location,
-                day: dayNum,
-                sequence: (location.sequence !== undefined) ? location.sequence : (index + 1),
-                name: location.name || location.title || '',
-                time: location.time,
-                lat: location.lat,
-                lng: location.lng,
-                description: location.description,
-                city: location.city || ''
-              })
+  if (!selectedDetail.value) return
+  let dayPlanItinerary = []
+  if (selectedDetail.value.day_plan) {
+    if (typeof selectedDetail.value.day_plan === 'object' && !Array.isArray(selectedDetail.value.day_plan)) {
+      for (const dayKey in selectedDetail.value.day_plan) {
+        const items = selectedDetail.value.day_plan[dayKey]
+        if (Array.isArray(items)) {
+          items.forEach((loc, i) => {
+            dayPlanItinerary.push({
+              ...loc, day: parseInt(dayKey), sequence: loc.sequence ?? (i + 1),
+              name: loc.name || loc.title || '', time: loc.time,
+              lat: loc.lat, lng: loc.lng, description: loc.description, city: loc.city || ''
             })
-          }
+          })
         }
-      } else if (Array.isArray(selectedDetail.value.day_plan)) {
-        // 如果是数组格式  
-        dayPlanItinerary = selectedDetail.value.day_plan.map((item, index) => ({
-          ...item,
-          day: item.day || 1,
-          sequence: item.sequence || (index + 1),
-          name: item.name || item.title,
-          city: item.city
-        }))
       }
+    } else if (Array.isArray(selectedDetail.value.day_plan)) {
+      dayPlanItinerary = selectedDetail.value.day_plan.map((item, i) => ({
+        ...item, day: item.day || 1, sequence: item.sequence || (i + 1), name: item.name || item.title, city: item.city
+      }))
     }
-
-    // 计算摘要
-    const itinerarySummary = selectedDetail.value.itinerary_summary || selectedDetail.value.summary || selectedDetail.value.user_input || '行程详情'
-
-    console.log('准备加载到行程:', {
-      itinerarySummary,
-      dayPlanItineraryLength: dayPlanItinerary.length,
-      socialRecommendationsLength: (selectedDetail.value.social_recommendations || selectedDetail.value.recommendations || []).length
-    })
-
-    travelStore.currentPlan = {
-      itinerarySummary: itinerarySummary,
-      dayPlanItinerary: dayPlanItinerary,
-      socialRecommendations: selectedDetail.value.social_recommendations || selectedDetail.value.recommendations || [],
-      evidence: selectedDetail.value.evidence || [],
-      warnings: selectedDetail.value.warnings || []
-    }
-    
-    console.log('准备跳转到Plan页面')
-    uni.navigateTo({ url: '/pages/plan/plan' })
-    closeDetailPopup()
-  } else {
-    console.error('没有选择的详细信息')
   }
-}
 
-// 切换收藏状态
-const toggleFavorite = async (id) => {
-  try {
-    const result = await toggleFavoriteApi(id)
-    // 更新本地数据
-    const item = historyList.value.find(item => item.id === id)
-    if (item) {
-      item.is_favorite = result
-    }
-  } catch (e) {
-    console.error('切换收藏状态失败', e)
+  travelStore.currentPlan = {
+    itinerarySummary: selectedDetail.value.itinerary_summary || selectedDetail.value.summary || '行程详情',
+    dayPlanItinerary,
+    socialRecommendations: selectedDetail.value.social_recommendations || [],
+    evidence: selectedDetail.value.evidence || [],
+    warnings: selectedDetail.value.warnings || [],
+    isFromHistory: true,
+    historyId: selectedDetail.value.id
   }
+  uni.reLaunch({ url: '/pages/index/index' })
+  closeDetailPopup()
 }
 
 const deleteHistory = (id) => {
   uni.showModal({
-    title: '确认删除',
-    content: '确定删除这条记录？',
+    title: '确认删除', content: '确定删除这条记录？',
     success: async (res) => {
       if (res.confirm) {
         try {
           await deleteHistoryApi(id)
-          showDetailPopup.value = false // 删除后关闭弹窗
-          console.log('删除成功')
-        } catch (e) {
-          console.log('删除失败', e)
+          uni.showToast({ title: '已删除', icon: 'success' })
+          loadHistoryList()
+        } catch {
+          uni.showToast({ title: '删除失败', icon: 'none' })
         }
-        loadHistoryList()
       }
     }
   })
 }
 
 const loadHistoryList = async () => {
-  console.log('开始加载历史记录列表')
   try {
     const data = await getHistoryList(1, 50, false)
-    if (data?.list) {
-      console.log('API返回历史数据', data.list.length, '条')
-      historyList.value = data.list
-    } else {
-      console.log('API返回空或无效数据结构', data)
-      historyList.value = []
-    }
-  } catch (e) {
-    console.error('API加载失败，尝试本地缓存', e)
-    
-    // 降级到本地存储
+    historyList.value = data?.list || []
+  } catch {
     try {
-      const localStr = uni.getStorageSync('travel_history') || '[]'
-      const localData = JSON.parse(localStr)
-      console.log('从本地缓存加载', localData.length, '条历史记录')
-      historyList.value = localData
-    } catch (parseError) {
-      console.error('本地存储解析失败', parseError)
-      historyList.value = []
-    }
+      const local = JSON.parse(uni.getStorageSync('travel_history') || '[]')
+      historyList.value = local
+    } catch { historyList.value = [] }
   }
 }
 </script>
 
 <style scoped>
-/* 根据 design.md 应用统一样式 */
-.page-container {
-  min-height: 100vh;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-}
-
+.history-page { min-height: 100vh; background: var(--color-surface); }
 .top-bar {
-  display: flex;
-  align-items: center;
-  padding: 32rpx 40rpx;
-  background: linear-gradient(135deg, #4285f4 0%, #5e9ae4 100%);
-  color: white;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 24rpx 40rpx 16rpx;
+  background: rgba(248,249,250,0.8); backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  border-bottom: 1px solid rgba(198,197,212,0.3);
+  position: sticky; top: 0; z-index: 10;
 }
-
 .back-btn {
-  width: 72rpx;
-  height: 72rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 40rpx;
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 50%;
+  width: 40px; height: 40px; display: flex; align-items: center;
+  justify-content: center; font-size: 20px; color: var(--color-primary);
 }
-
-.page-title {
-  flex: 1;
-  font-size: 40rpx;
-  font-weight: 700;
-  color: #ffffff;
-  text-align: center;
+.top-brand {
+  font-size: 24px; font-weight: 700; color: var(--color-primary);
+  letter-spacing: -0.01em; line-height: 32px;
 }
+.top-spacer { width: 40px; }
 
-.content {
-  padding: 32rpx;
-  padding-bottom: 120rpx;
-}
+.content { padding: 16rpx 40rpx 240rpx; }
 
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 160rpx 40rpx;
-  gap: 24rpx;
-}
-
-.empty-icon {
-  font-size: 80rpx;
-  opacity: 0.5;
-  color: #adb5bd;
-}
-
-.empty-text {
-  font-size: 28rpx;
-  color: #adb5bd;
-}
-
-.history-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 32rpx;
-  background: #ffffff;
-  border-radius: 24rpx;
-  margin-bottom: 24rpx;
-  box-shadow: 0rpx 2rpx 4rpx 0px rgba(0,0,0,0.08);
-  transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.history-item:active {
-  transform: scale(0.98);
-  box-shadow: 0rpx 8rpx 16rpx 0px rgba(0,0,0,0.12);
-}
-
-.history-info {
-  flex: 1;
-}
-
-.history-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12rpx;
-}
-
-.history-time {
-  font-size: 24rpx;
-  color: #6c757d;
+.section-overline {
   display: block;
+  font-size: 11px; font-weight: 700; color: var(--color-outline);
+  text-transform: uppercase; letter-spacing: 0.15em;
+  margin-bottom: 12px;
 }
 
-.history-favorite {
-  width: 56rpx;
-  height: 56rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(45deg, #fbc02d, #f57f17);
-  color: white;
-  border-radius: 50%;
-  font-size: 28rpx;
-  flex-shrink: 0;
+.empty-state { display: flex; flex-direction: column; align-items: center; padding: 160rpx 40rpx; gap: 12px; }
+.empty-icon-wrap {
+  width: 80px; height: 80px; border-radius: 50%;
+  background: var(--color-surface-container-low);
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 8px;
 }
+.empty-icon { font-size: 36px; }
+.empty-title { font-size: 18px; font-weight: 600; color: var(--color-on-surface); }
+.empty-desc { font-size: 14px; color: var(--color-outline); margin-top: 4px; }
 
-.history-prompt {
-  font-size: 28rpx;
-  color: #495057;
-  display: block;
-  line-height: 1.4;
-  word-break: break-word;
-  font-weight: 500;
+.history-card {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 40rpx; margin-bottom: 12px;
+  background: rgba(255,255,255,0.65); backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.5);
+  border-radius: 24px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.02);
+  transition: all var(--transition-fast);
 }
-
-.history-actions {
-  display: flex;
-  gap: 16rpx;
+.history-card:active { transform: scale(0.97); }
+.history-info { flex: 1; min-width: 0; }
+.history-meta { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.meta-left { display: flex; align-items: center; gap: 6px; }
+.history-time { font-size: 11px; font-weight: 600; color: var(--color-outline); letter-spacing: 0.05em; text-transform: uppercase; }
+.fav-badge text { font-size: 14px; }
+.history-tag {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.05em;
+  padding: 2px 10px; border-radius: 999px;
+  background: var(--color-primary-fixed); color: var(--color-primary);
 }
-
-.history-load {
-  padding: 16rpx 32rpx;
-  background: linear-gradient(135deg, #34a853 0%, #2e8a49 100%);
-  color: white;
-  border-radius: 50rpx;
-  font-size: 26rpx;
-  font-weight: 500;
+.history-preview {
+  font-size: 14px; color: var(--color-on-surface-variant);
+  line-height: 1.5; font-weight: 500; display: block;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-
-.history-delete {
-  width: 60rpx;
-  height: 60rpx;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #ea4335 0%, #d62828 100%);
-  color: white;
-  font-size: 28rpx;
-  padding: 0;
-  margin-left: 10rpx;
+.history-actions { display: flex; align-items: center; gap: 8px; margin-left: 12px; }
+.action-load {
+  padding: 8px 16px; border-radius: 999px;
+  background: linear-gradient(135deg, #000666 0%, #1a237e 100%);
+  color: #fff; font-size: 12px; font-weight: 600;
+  letter-spacing: 0.05em;
+  box-shadow: 0 4px 12px rgba(0,6,102,0.18);
 }
-
-.popup-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0,0,0,0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  backdrop-filter: blur(8rpx);
-  animation: fadeIn 0.3s ease-out;
+.action-load:active { transform: scale(0.95); }
+.action-delete {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: var(--color-surface-container-low);
+  border: 1px solid rgba(198,197,212,0.3);
+  display: flex; align-items: center; justify-content: center;
 }
+.del-icon { font-size: 16px; opacity: 0.6; }
 
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+.sheet-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(0,0,0,0.3); backdrop-filter: blur(6px);
+  display: flex; align-items: flex-end;
 }
-
-.popup-content {
-  width: 92%;
-  max-height: 85vh;
-  background: #ffffff;
-  border-radius: 24rpx;
-  display: flex;
-  flex-direction: column;
-  max-width: 800rpx;
-  box-shadow: 0rpx 20rpx 60rpx 0px rgba(0,0,0,0.2);
-  animation: scaleIn 0.3s cubic-bezier(0.25,0.8,0.25,1);
+.sheet-container {
+  width: 100%; max-height: 82vh;
+  background: rgba(255,255,255,0.85); backdrop-filter: blur(24px) saturate(200%);
+  -webkit-backdrop-filter: blur(24px) saturate(200%);
+  border-radius: 32px 32px 0 0;
+  box-shadow: 0 -8px 40px rgba(0,0,0,0.08);
+  display: flex; flex-direction: column;
   overflow: hidden;
 }
-
-@keyframes scaleIn {
-  from {
-    opacity: 0;
-    transform: scale(0.8) translateY(40rpx);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
+.sheet-handle {
+  width: 36px; height: 5px; border-radius: 999px;
+  background: var(--color-outline-variant); opacity: 0.5;
+  align-self: center; margin: 12px auto 4px;
 }
-
-.popup-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 32rpx;
-  background: linear-gradient(135deg, #4285f4 0%, #5e9ae4 100%);
-  color: white;
-  border-radius: 24rpx 24rpx 0 0;
-  flex-shrink: 0;
+.sheet-header {
+  padding: 32rpx 48rpx 40rpx;
+  background: linear-gradient(135deg, #000666 0%, #1a237e 100%);
+  color: #fff;
 }
-
-.popup-title {
-  font-size: 32rpx;
-  font-weight: bold;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  word-break: break-all;
-  flex: 1;
-  margin-right: 16rpx;
+.sheet-title {
+  font-size: 22px; font-weight: 700; line-height: 28px;
+  letter-spacing: -0.01em; margin-bottom: 16px;
 }
-
-.popup-close {
-  width: 56rpx;
-  height: 56rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255,255,255,0.2);
-  border-radius: 50%;
-  font-size: 28rpx;
-  font-weight: bold;
-  color: white;
-  flex-shrink: 0;
+.sheet-header-meta {
+  display: flex; gap: 24px;
 }
-
-.popup-body {
-  padding: 32rpx;
-  flex: 1;
-  overflow-y: auto;
-  max-height: 60vh;
+.sheet-meta-item { display: flex; flex-direction: column; gap: 2px; }
+.meta-label {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.05em;
+  text-transform: uppercase; opacity: 0.6;
 }
-
-.detail-section {
-  margin-bottom: 32rpx;
-  border-radius: 16rpx;
-  padding: 20rpx;
-  background: #f8f9fa;
+.meta-value { font-size: 13px; font-weight: 500; }
+.sheet-body { flex: 1; overflow-y: auto; padding: 40rpx 48rpx; }
+.sheet-section-label {
+  font-size: 11px; font-weight: 700; color: var(--color-outline);
+  text-transform: uppercase; letter-spacing: 0.15em;
+  margin-bottom: 12px;
 }
-
-.detail-label {
-  display: block;
-  font-size: 28rpx;
-  font-weight: bold;
-  color: #4285f4;
-  margin-bottom: 12rpx;
-  padding-bottom: 8rpx;
-  border-bottom: 1rpx solid #e9ecef;
+.sheet-summary { margin-bottom: 20px; }
+.summary-text {
+  font-size: 14px; line-height: 1.7; color: var(--color-on-surface);
+  background: var(--color-surface-container-low);
+  border-radius: 12px; padding: 16px;
 }
-
-.detail-value {
-  display: block;
-  font-size: 26rpx;
-  color: #6c757d;
-  word-break: break-word;
-  line-height: 1.5;
-  padding: 12rpx;
-  background: #ffffff;
-  border-radius: 12rpx;
-  border: 1rpx solid #e9ecef;
-  white-space: pre-wrap;
+.plan-loc-card {
+  display: flex; gap: 12px;
+  padding: 14px 0; border-bottom: 1px solid rgba(198,197,212,0.12);
 }
-
-.preview-text {
-  max-height: 150rpx;
-  overflow: hidden;
+.plan-loc-card:last-child { border-bottom: none; }
+.loc-badge {
+  width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+  background: var(--color-primary-fixed); color: var(--color-primary);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; margin-top: 2px;
 }
-
-.day-plan-container {
-  margin-top: 16rpx;
+.loc-content { flex: 1; }
+.loc-name { font-size: 15px; font-weight: 600; color: var(--color-on-surface); display: block; }
+.loc-time { font-size: 12px; color: var(--color-on-surface-variant); margin: 4px 0; display: block; }
+.loc-desc { font-size: 12px; color: var(--color-outline); line-height: 1.5; }
+.day-group-header {
+  font-size: 14px; font-weight: 700; color: var(--color-primary);
+  padding: 12px 0 8px; margin-top: 8px;
+  border-top: 2px dashed var(--color-outline-variant); opacity: 0.5;
 }
-
-.day-plan-group {
-  margin-bottom: 24rpx;
+.sheet-footer {
+  display: flex; gap: 12px;
+  padding: 32rpx 48rpx 56rpx;
+  border-top: 1px solid rgba(198,197,212,0.1);
 }
-
-.day-title {
-  display: block;
-  font-size: 30rpx;
-  font-weight: bold;
-  color: #4a5568;
-  margin: 24rpx 0 16rpx 0;
-  padding: 12rpx 16rpx;
-  background: linear-gradient(90deg, #e3f2fd 0%, #bbdefb 100%);
-  border-radius: 12rpx;
-  border-left: 5rpx solid #4285f4;
-  display: inline-block;
-  width: auto;
+.sheet-btn {
+  flex: 1; height: 50px; border-radius: 16px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 600;
 }
-
-.location-list {
-  padding-left: 16rpx;
-  margin-top: 8rpx;
+.sheet-btn-primary {
+  background: linear-gradient(135deg, #000666 0%, #1a237e 100%);
+  color: #fff; box-shadow: 0 8px 24px rgba(0,6,102,0.2);
 }
-
-.location-item {
-  margin: 24rpx 0;
-  padding: 24rpx;
-  border: 2rpx solid #e0f7fa;
-  border-radius: 16rpx;
-  background: #f0f9ff;
-  transition: box-shadow 0.2s;
+.sheet-btn-primary:active { transform: scale(0.97); }
+.sheet-btn-secondary {
+  background: rgba(255,255,255,0.7);
+  border: 1px solid rgba(255,255,255,0.5);
+  color: var(--color-on-surface-variant);
 }
-
-.location-item:hover {
-  box-shadow: 0rpx 4rpx 12rpx rgba(66, 133, 244, 0.1);
-}
-
-.location-name {
-  display: block;
-  font-size: 30rpx;
-  font-weight: bold;
-  color: #1a202c;
-  margin-bottom: 10rpx;
-}
-
-.location-time, .location-city {
-  display: block;
-  font-size: 26rpx;
-  color: #4a5568;
-  margin-bottom: 6rpx;
-  font-weight: 500;
-}
-
-.location-desc {
-  display: block;
-  font-size: 24rpx;
-  color: #718096;
-  line-height: 1.4;
-  margin: 8rpx 0;
-  padding: 8rpx 0 0;
-  border-top: 1rpx dashed #cbd5e0;
-}
-
-.location-coords {
-  display: block;
-  font-size: 22rpx;
-  color: #a0aec0;
-  margin-top: 8rpx;
-  font-family: monospace;
-  word-break: break-all;
-  background: #edf2f7;
-  padding: 4rpx 8rpx;
-  border-radius: 4rpx;
-}
-
-.popup-actions {
-  display: flex;
-  padding: 32rpx;
-  gap: 16rpx;
-  border-top: 1rpx solid #e9ecef;
-  flex-shrink: 0;
-  background: #f8f9fa;
-}
-
-.action-btn {
-  flex: 1;
-  height: 80rpx;
-  border-radius: 16rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 28rpx;
-  font-weight: 600;
-  border: none;
-  outline: none;
-  transition: transform 0.2s, opacity 0.2s;
-}
-
-.action-btn:active {
-  transform: scale(0.96);
-}
-
-.load-btn {
-  background: linear-gradient(135deg, #4285f4 0%, #3367d6 100%);
-  color: white;
-}
-
-.cancel-btn {
-  background: linear-gradient(135deg, #6c757d 0%, #545b62 100%);
-  color: white;
-}
-
-/* 阀止弹出层背景滚动 */
-page {
-  height: 100vh;
-  overflow: hidden;
-}
+.sheet-btn-secondary:active { transform: scale(0.97); }
 </style>

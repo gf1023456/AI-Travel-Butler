@@ -1,116 +1,107 @@
 <template>
   <view class="login-page">
-    <!-- 顶部导航栏 -->
-    <view class="top-bar">
-      <text class="top-close">✕</text>
-      <text class="top-title">AI Travel Companion</text>
-      <view class="top-spacer"></view>
+    <image class="bg-image" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBEB_brch-OcURAWfoHGV3sb169yQ2GF1GAns82mbKWokFqd7-GszkVAODPUwGjI3cPVu5yD2DgUwqadfdTjnhV8dO9qyowmE7t8UPprR-Mz3f-3IoZH237dltJLrIQsYvsnacRpbLFNRSVee5LJmwHjh27j6SMAYYA9kkCGzDS6tgQ1_tj_NCDAgC1bRdbhYWIS8XyY3dt905CIW6PM-7c4rkgAE4qYT6x2DAgLIAIuFoaephd8Bpw3YdVDGpg-IH6y7t20SuiwD8" mode="aspectFill" />
+    <view class="bg-overlay"></view>
+
+    <view class="close-btn" @click="handleClose">
+      <text class="close-icon">×</text>
     </view>
 
-    <view class="login-container">
-      <!-- Logo 区域 -->
-      <view class="logo-section">
-        <view class="logo-icon-wrapper">
-          <text class="logo-icon">🌍</text>
-          <view class="logo-badge">
-            <text class="logo-badge-icon">✨</text>
+    <view class="main-content">
+      <view class="brand-section">
+        <text class="brand-title">
+          <text class="brand-serif">行程</text><text class="brand-sans">一下</text>
+        </text>
+        <text class="brand-tagline">今天你行程了嘛？</text>
+      </view>
+
+      <view class="avatar-section">
+        <button class="avatar-btn" open-type="chooseAvatar" @chooseavatar="onChooseAvatar">
+          <image v-if="avatarUrl" class="avatar-img" :src="avatarUrl" mode="aspectFill" />
+          <text v-else class="avatar-placeholder">👤</text>
+          <view class="avatar-glass"></view>
+        </button>
+        <button class="avatar-camera" @click="triggerAvatar">
+          <text class="camera-icon">📷</text>
+        </button>
+      </view>
+
+      <view class="form-section">
+        <image class="form-logo" src="/static/tabbar/screen_compressed.png" mode="aspectFit" />
+        <view class="input-wrap">
+          <input class="nickname-input" type="nickname" v-model="nickname" @blur="onNicknameBlur" placeholder="输入微信昵称" maxlength="20" />
+          <view class="input-glow"></view>
+        </view>
+
+        <button class="login-btn" @click="handleWechatLogin" :disabled="loading">
+          <view class="btn-content">
+            <text class="btn-icon">💬</text>
+            <text class="btn-text">微信一键登录</text>
           </view>
-        </view>
-        <text class="brand-name">AI Travel Companion</text>
-        <text class="brand-subtitle">AI 智能旅行管家</text>
-      </view>
-
-      <!-- 登录按钮区域 -->
-      <view class="login-actions">
-        <!-- 头像选择 - 使用微信原生选择器 -->
-        <view class="avatar-section">
-          <button class="avatar-btn" open-type="chooseAvatar" @chooseavatar="onChooseAvatar">
-            <image class="avatar-preview" :src="avatarUrl || '/static/logo.png'" mode="aspectFill" />
-          </button>
-          <text class="avatar-tip">点击选择微信头像</text>
-        </view>
-
-        <!-- 昵称输入 -->
-        <input 
-          class="nickname-input" 
-          type="nickname" 
-          v-model="nickname" 
-          placeholder="请输入昵称" 
-          maxlength="20"
-        />
-
-        <button class="wechat-login-btn" @click="handleWechatLogin">
-          <text class="btn-icon">💬</text>
-          <text>微信一键登录</text>
-        </button>
-        <button class="phone-login-btn" @click="handlePhoneLogin">
-          <text>手机号登录</text>
         </button>
       </view>
 
-      <!-- 协议勾选 -->
-      <view class="agreement-section">
-        <checkbox-group @change="onAgreementChange">
-          <label class="agreement-label">
-            <checkbox value="agree" :checked="agreed" color="#4285F4" />
-            <text class="agreement-text">
-              我已阅读并同意
-              <text class="agreement-link">《用户协议》</text>
-              和
-              <text class="agreement-link">《隐私政策》</text>
-            </text>
-          </label>
-        </checkbox-group>
+      <view class="footer">
+        <text class="footer-text">登录即代表您同意</text>
+        <view class="footer-links">
+          <text class="footer-link" @click.stop="showAgreement('user')">用户协议</text>
+          <view class="footer-divider"></view>
+          <text class="footer-link" @click.stop="showAgreement('privacy')">隐私政策</text>
+        </view>
       </view>
-    </view>
-
-    <!-- 背景装饰 -->
-    <view class="bg-decoration">
-      <view class="bg-blob bg-blob-1"></view>
-      <view class="bg-blob bg-blob-2"></view>
     </view>
   </view>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import { wechatLogin } from '@/api/user.js'
 import { useUserStore } from '@/store/user.js'
-import { getQuota } from '@/api/quota.js'
 
-const agreed = ref(false)
 const loading = ref(false)
 const nickname = ref('')
 const avatarUrl = ref('')
 
-// 安全区域顶部高度
-const safeAreaTop = ref(0)
-
-// 手机号相关信息（使用全局变量保存）
-let globalPhoneNumber = ''
-let globalPhoneEncryptedData = ''
-let globalPhoneIv = ''
-
-const phoneNumber = ref('')
-const phoneEncryptedData = ref('')
-const phoneIv = ref('')
-
-const onAgreementChange = (e) => {
-  agreed.value = e.detail.value.length > 0
+const handleClose = () => {
+  uni.navigateBack({ fallback: () => uni.switchTab({ url: '/pages/index/index' }) })
 }
 
-// 微信头像选择（使用 open-type="chooseAvatar"）
+const triggerAvatar = () => {
+  uni.chooseImage({
+    count: 1,
+    success: (res) => {
+      if (res.tempFilePaths && res.tempFilePaths[0]) {
+        avatarUrl.value = res.tempFilePaths[0]
+      }
+    }
+  })
+}
+
 const onChooseAvatar = (e) => {
-  const url = e.detail.avatarUrl
-  if (url) {
-    avatarUrl.value = url
-    console.log('[Login] ✅ 微信头像选择成功:', url)
+  if (e.detail && e.detail.avatarUrl) {
+    avatarUrl.value = e.detail.avatarUrl
   }
 }
 
+const onNicknameBlur = (e) => {
+  if (e.detail && e.detail.value && !nickname.value) {
+    nickname.value = e.detail.value
+  }
+}
+
+const showAgreement = (type) => {
+  const url = type === 'user' ? '/pages/agreement/user' : '/pages/agreement/privacy'
+  uni.navigateTo({ url })
+}
+
 const handleWechatLogin = async () => {
-  if (!agreed.value) {
-    uni.showToast({ title: '请先同意用户协议', icon: 'none' })
+  if (!avatarUrl.value) {
+    uni.showToast({ title: '请选择头像', icon: 'none' })
+    return
+  }
+
+  if (!nickname.value) {
+    uni.showToast({ title: '请填写昵称', icon: 'none' })
     return
   }
 
@@ -120,369 +111,379 @@ const handleWechatLogin = async () => {
   try {
     uni.showLoading({ title: '登录中...' })
 
-    console.log('[Login] === 开始微信登录流程 ===')
-    
-    // 获取微信登录code
-    const loginCode = await new Promise((resolve, reject) => {
+    const code = await new Promise((resolve, reject) => {
       uni.login({
         provider: 'weixin',
-        success: (res) => {
-          console.log('[Login] ✅ 获取微信code成功:', res.code.substring(0, 20) + '...')
-          resolve(res.code)
-        },
-        fail: (err) => {
-          console.error('[Login] ❌ 获取微信code失败:', err)
-          reject(new Error('获取登录凭证失败'))
-        }
+        success: (res) => resolve(res.code),
+        fail: () => reject(new Error('获取登录凭证失败'))
       })
     })
-    
-    // 调用后端登录接口（传入 nickname 和 avatar_url）
-    console.log('[Login] 🚀 调用后端登录接口...')
+
     const loginData = await wechatLogin({
-      code: loginCode,
-      nickname: nickname.value || '微信用户',
-      avatar_url: avatarUrl.value || ''
+      code,
+      nickname: nickname.value,
+      avatar_url: avatarUrl.value
     })
 
-    console.log('[Login] ✅ 后端登录成功:', {
-      userId: loginData.user_id,
-      hasToken: !!loginData.access_token
-    })
-
-    // 保存登录信息
     const userStore = useUserStore()
-    userStore.saveToStorage()
-    
-    console.log('[Login] 💾 登录信息已保存到本地存储')
+    userStore.setLoginData(loginData)
+    userStore.setUserInfo({
+      nickname: loginData.nickname || nickname.value,
+      avatar_url: loginData.avatar_url || avatarUrl.value
+    })
 
     uni.hideLoading()
     uni.showToast({ title: '登录成功', icon: 'success' })
-
-    // 跳转到探索页面
     setTimeout(() => {
       uni.reLaunch({ url: '/pages/index/index' })
     }, 1000)
-
   } catch (error) {
-    console.error('[Login] ❌ 登录失败:', error)
     uni.hideLoading()
-    uni.showToast({ 
-      title: error.message || '登录失败，请重试', 
-      icon: 'none' 
-    })
+    uni.showToast({ title: error.message || '登录失败', icon: 'none' })
   } finally {
     loading.value = false
   }
 }
-
-// 处理手机号授权
-const onGetPhoneNumber = async (e) => {
-  console.log('[Login] 📱 手机号授权回调:', e)
-  
-  if (e.detail.errMsg === 'getPhoneNumber:ok') {
-    // 用户同意授权
-    console.log('[Login] ✅ 用户同意授权手机号')
-    console.log('[Login] code:', e.detail.code ? '已获取' : '未获取')
-    console.log('[Login] encryptedData:', e.detail.encryptedData ? '已获取' : '未获取')
-    console.log('[Login] iv:', e.detail.iv ? '已获取' : '未获取')
-    
-    // 保存到全局变量
-    globalPhoneNumber = e.detail.code
-    globalPhoneEncryptedData = e.detail.encryptedData
-    globalPhoneIv = e.detail.iv
-    
-    // 同时保存到响应式变量
-    phoneNumber.value = e.detail.code
-    phoneEncryptedData.value = e.detail.encryptedData
-    phoneIv.value = e.detail.iv
-    
-    console.log('[Login] ✅ 手机号信息已保存')
-  } else {
-    // 用户拒绝授权
-    console.warn('[Login] ⚠️ 用户拒绝授权手机号:', e.detail.errMsg)
-    // 清空全局变量
-    globalPhoneNumber = ''
-    globalPhoneEncryptedData = ''
-    globalPhoneIv = ''
-  }
-}
-
-const handlePhoneLogin = () => {
-  // 手机号登录逻辑
-  uni.showToast({ title: '手机号登录开发中', icon: 'none' })
-}
 </script>
 
 <style scoped>
-
+page {
+  background-color: #000000;
+}
 .login-page {
-  position: relative;
-  width: 100vw;
   min-height: 100vh;
-  background: #F8F9FA;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
-}
-
-/* 顶部导航栏 */
-.top-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 32rpx;
-  height: 112rpx;
-  background: #F8F9FA;
-  border-bottom: 1rpx solid #E8EAED;
-}
-
-.top-close {
-  font-size: 40rpx;
-  color: #4285F4;
-  width: 80rpx;
-  height: 80rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.top-title {
-  font-size: 32rpx;
-  font-weight: 700;
-  color: #4285F4;
-}
-
-.top-spacer {
-  width: 80rpx;
-}
-
-/* 登录容器 */
-.login-container {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  padding: 0 48rpx;
-  padding-top: 120rpx;
-  padding-bottom: 160rpx;
-}
-
-/* Logo 区域 */
-.logo-section {
+  background-color: #000000;
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-bottom: auto;
-  padding-top: 80rpx;
-}
-
-.logo-icon-wrapper {
   position: relative;
-  width: 160rpx;
-  height: 160rpx;
-  margin-bottom: 48rpx;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
 }
 
-.logo-icon {
-  width: 160rpx;
-  height: 160rpx;
-  font-size: 100rpx;
-  color: #ffffff;
-  background: #3367D6;
-  border-radius: 40rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 16rpx 40rpx rgba(30, 64, 175, 0.2);
-}
-
-.logo-badge {
+.bg-image {
   position: absolute;
-  bottom: -8rpx;
-  right: -8rpx;
-  width: 64rpx;
-  height: 64rpx;
-  background: #8ab4f8;
-  border-radius: 24rpx;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+
+.bg-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.2);
+  z-index: 1;
+}
+
+.close-btn {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  z-index: 10;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 8rpx solid #F8F9FA;
+  width: 32px;
+  height: 32px;
 }
 
-.logo-badge-icon {
-  font-size: 32rpx;
-  color: #003c70;
+.close-icon {
+  font-size: 24px;
+  font-weight: 300;
+  color: rgba(255,255,255,0.4);
+  line-height: 1;
 }
 
-.brand-name {
-  font-size: 48rpx;
-  font-weight: 800;
-  color: #4285F4;
-  margin-bottom: 16rpx;
-  letter-spacing: -1rpx;
-}
-
-.brand-subtitle {
-  font-size: 28rpx;
-  font-weight: 500;
-  color: #5F6368;
-  opacity: 0.8;
-  letter-spacing: 8rpx;
-}
-
-/* 登录按钮区域 */
-.login-actions {
+.main-content {
+  width: 100%;
+  max-width: 400px;
+  padding: 0 24px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 32rpx;
-  margin-bottom: 256rpx;
+  flex: 1;
+  z-index: 2;
+  padding-top: 80px;
+  padding-bottom: 48px;
 }
 
-/* 头像选择区域 */
+.brand-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 64px;
+}
+
+.brand-title {
+  font-size: 44px;
+  line-height: 1;
+  color: #ffffff;
+  letter-spacing: -0.02em;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.brand-serif {
+  font-family: 'Playfair Display', 'Times New Roman', serif;
+  font-weight: 400;
+  margin-right: 4px;
+}
+
+.brand-sans {
+  font-weight: 300;
+  letter-spacing: -0.04em;
+}
+
+.brand-tagline {
+  font-size: 12px;
+  font-weight: 300;
+  color: rgba(196,199,200,0.6);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  line-height: 1.6;
+}
+
 .avatar-section {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16rpx;
-  margin-bottom: 16rpx;
+  position: relative;
+  margin-bottom: 64px;
 }
 
 .avatar-btn {
+  position: relative;
+  width: 128px;
+  height: 128px;
+  border-radius: 50%;
   padding: 0;
   margin: 0;
-  background: transparent;
+  background: none;
   border: none;
-  line-height: normal;
+  outline: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
 }
 
 .avatar-btn::after {
   border: none;
 }
 
-.avatar-preview {
-  width: 160rpx;
-  height: 160rpx;
+.avatar-glass {
+  position: absolute;
+  inset: 0;
   border-radius: 50%;
-  background: #f0f0f0;
-  border: 4rpx solid #4285F4;
+  background: rgba(255,255,255,0.05);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 0.5px solid rgba(255,255,255,0.2);
+  box-shadow: inset 0 0 20px rgba(255,255,255,0.05), 0 0 40px rgba(255,255,255,0.02);
+  z-index: 1;
 }
 
-.avatar-tip {
-  font-size: 24rpx;
-  color: #666;
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  position: relative;
+  z-index: 2;
 }
 
-/* 昵称输入框 */
+.avatar-placeholder {
+  font-size: 64px;
+  font-weight: 100;
+  color: rgba(255,255,255,0.4);
+  position: relative;
+  z-index: 2;
+  line-height: 1;
+}
+
+.avatar-camera {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(53,52,55,0.8);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255,255,255,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  padding: 0;
+  margin: 0;
+  z-index: 3;
+}
+
+.avatar-camera::after {
+  border: none;
+}
+
+.camera-icon {
+  font-size: 18px;
+  font-weight: 300;
+  line-height: 1;
+}
+
+.form-section {
+  width: 100%;
+  max-width: 280px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 40px;
+}
+
+.form-logo {
+  width: 32px;
+  height: 32px;
+  opacity: 0.8;
+  margin-bottom: 8px;
+}
+
+.input-wrap {
+  width: 100%;
+  position: relative;
+}
+
 .nickname-input {
   width: 100%;
-  height: 96rpx;
-  background: #ffffff;
-  border: 2rpx solid #E8EAED;
-  border-radius: 24rpx;
-  padding: 0 32rpx;
-  font-size: 32rpx;
-  color: #333;
+  background: transparent;
+  border: none;
+  border-bottom: 0.5px solid rgba(255,255,255,0.2);
+  text-align: center;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.6;
+  color: #ffffff;
+  padding: 12px 0;
+  outline: none;
+  letter-spacing: 0.1em;
+  transition: border-color 0.5s;
+  position: relative;
+  z-index: 1;
+}
+
+.nickname-input::placeholder {
+  color: rgba(255,255,255,0.6);
+  font-weight: 300;
 }
 
 .nickname-input:focus {
-  border-color: #4285F4;
+  border-bottom-color: rgba(255,255,255,0.6);
 }
 
-.wechat-login-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 24rpx;
-  height: 112rpx;
-  background: #4285F4;
-  color: #ffffff;
+.input-glow {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(255,255,255,0.4), transparent);
+  transform: scaleX(0);
+  transition: transform 0.7s;
+  transform-origin: center;
+  z-index: 2;
+}
+
+.input-wrap:focus-within .input-glow {
+  transform: scaleX(1);
+}
+
+.login-btn {
+  position: relative;
+  width: 100%;
+  height: 52px;
+  border-radius: 9999px;
+  overflow: hidden;
+  padding: 0;
+  margin: 0;
+  background: none;
   border: none;
-  border-radius: 24rpx;
-  font-size: 32rpx;
-  font-weight: 700;
-  box-shadow: 0 8rpx 24rpx rgba(0, 40, 142, 0.1);
+  outline: none;
+  background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+  box-shadow: 0 8px 24px rgba(79,70,229,0.4);
+  transition: transform 0.5s, opacity 0.3s;
+  margin-top: 16px;
 }
 
-.wechat-login-btn:active {
+.login-btn::after {
+  border: none;
+}
+
+.login-btn:active {
   transform: scale(0.95);
 }
 
-.btn-icon {
-  font-size: 40rpx;
+.login-btn[disabled] {
+  opacity: 0.6;
 }
 
-.phone-login-btn {
+.btn-content {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 96rpx;
-  background: transparent;
-  color: #5F6368;
-  border: none;
-  font-size: 28rpx;
-  font-weight: 600;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
 }
 
-.phone-login-btn:active {
-  color: #4285F4;
+.btn-icon {
+  font-size: 20px;
+  font-weight: 300;
+  line-height: 1;
 }
 
-/* 协议区域 */
-.agreement-section {
-  margin-top: auto;
+.btn-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: #ffffff;
+  letter-spacing: 0.15em;
+  line-height: 1;
 }
 
-.agreement-label {
+.footer {
+  width: 100%;
   display: flex;
-  align-items: flex-start;
-  gap: 24rpx;
-  padding: 0 32rpx;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  margin-top: auto;
+  padding-top: 64px;
 }
 
-.agreement-text {
-  font-size: 24rpx;
-  color: #5F6368;
-  line-height: 1.5;
-  flex: 1;
-}
-
-.agreement-link {
-  color: #4285F4;
+.footer-text {
+  font-size: 10px;
   font-weight: 600;
+  color: rgba(255,255,255,0.3);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  line-height: 1;
 }
 
-/* 背景装饰 */
-.bg-decoration {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  overflow: hidden;
-  pointer-events: none;
+.footer-links {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
-.bg-blob {
-  position: absolute;
-  border-radius: 50%;
+.footer-link {
+  font-size: 11px;
+  font-weight: 300;
+  color: rgba(255,255,255,0.5);
+  letter-spacing: 0.15em;
+  line-height: 1;
 }
 
-.bg-blob-1 {
-  width: 1000rpx;
-  height: 1000rpx;
-  background: rgba(30, 64, 175, 0.05);
-  top: -200rpx;
-  right: -200rpx;
-  filter: blur(200rpx);
-}
-
-.bg-blob-2 {
-  width: 800rpx;
-  height: 800rpx;
-  background: rgba(100, 168, 254, 0.05);
-  bottom: -200rpx;
-  left: -200rpx;
-  filter: blur(160rpx);
+.footer-divider {
+  width: 1px;
+  height: 12px;
+  background: rgba(255,255,255,0.2);
 }
 </style>

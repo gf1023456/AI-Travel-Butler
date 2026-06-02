@@ -59,8 +59,12 @@ async def use_quota(authorization: str = Header(None)):
         return {"code": 401, "msg": "登录已过期"}
     
     quota_before = db.check_user_quota(current_user_id)
+    max_free = quota_before.get("max", 10)
     if not quota_before.get("can_use", True):
         return {"code": 1001, "data": quota_before, "msg": "今日次数已用完"}
     
+    # increment_usage 内部已计算 remaining，直接使用返回值
     quota_after = db.increment_usage(current_user_id)
+    quota_after["can_use"] = quota_after.get("remaining", 0) > 0
+    
     return {"code": 0, "data": quota_after, "msg": "配额已使用"}

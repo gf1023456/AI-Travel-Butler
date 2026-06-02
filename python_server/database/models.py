@@ -304,7 +304,7 @@ class Database:
             }
     
     def increment_usage(self, user_id: int) -> dict:
-        """增加用户今日使用次数"""
+        """增加用户今日使用次数，优先扣减 bonus，再扣减免费额度"""
         from datetime import date
         
         today = date.today()
@@ -315,16 +315,21 @@ class Database:
                 UserDailyUsage.usage_date == today
             ).with_for_update().first()
             
-            if usage:
-                usage.plan_count += 1
+            # 优先扣减 bonus，bonus 用完后再扣减免费额度
+            if usage and usage.bonus_count > 0:
+                usage.bonus_count -= 1
             else:
-                usage = UserDailyUsage(
-                    user_id=user_id,
-                    usage_date=today,
-                    plan_count=1,
-                    bonus_count=0
-                )
-                session.add(usage)
+                # 没有 bonus 或 bonus 已用完，增加 plan_count
+                if usage:
+                    usage.plan_count += 1
+                else:
+                    usage = UserDailyUsage(
+                        user_id=user_id,
+                        usage_date=today,
+                        plan_count=1,
+                        bonus_count=0
+                    )
+                    session.add(usage)
             
             session.flush()
             session.refresh(usage)
@@ -334,10 +339,15 @@ class Database:
             ).first()
             max_free = int(config.config_value) if config and config.config_value else 10
             
+            # 计算 remaining：免费剩余 + bonus
+            free_remaining = max_free - usage.plan_count
+            remaining = max(0, free_remaining) + usage.bonus_count
+            
             return {
                 "used": usage.plan_count,
                 "bonus": usage.bonus_count,
-                "max": max_free
+                "max": max_free,
+                "remaining": remaining
             }
     
     def add_bonus(self, user_id: int, bonus_type: str = "share") -> bool:

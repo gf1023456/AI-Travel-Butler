@@ -1,123 +1,153 @@
 <template>
-  <view class="page-container">
-    <!-- 顶部导航 -->
-    <view class="top-bar" :style="'padding-top:' + (safeAreaTop + 32) + 'px'">
-      <view class="back-btn" @click="goBack">
-        <text>←</text>
+  <view class="explore-page" :class="themeClass">
+    <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
+    <header class="top-bar">
+      <view class="top-left">
+        <button class="top-back" @click="goBack">
+          <text>←</text>
+        </button>
+        <image class="top-avatar" :src="userAvatar" mode="aspectFill" />
+        <text class="top-brand">{{ userNickname }}</text>
       </view>
-      <text class="page-title">灵感探索</text>
-    </view>
-
-    <scroll-view scroll-y class="content">
-      <!-- 模式切换 -->
-      <view class="section">
-        <view class="mode-card">
-          <view class="mode-content">
-            <view class="mode-info">
-              <text class="mode-name">{{ isPlannerMode ? '深度排期' : '快速探索' }}</text>
-              <text class="mode-hint">{{ isPlannerMode ? '完整行程规划 · 多日安排' : '景点发现 · 轻量推荐' }}</text>
-            </view>
-            <switch :checked="isPlannerMode" @change="onModeToggle" color="#4285F4" />
-          </view>
-        </view>
-      </view>
-
-      <!-- 旅行风格 -->
-      <view class="section" v-if="isPlannerMode">
-        <text class="section-label">旅行风格</text>
+      <button class="top-notif">
+        <text class="notif-icon">🔔</text>
+      </button>
+    </header>
+    <scroll-view scroll-y class="content" show-scrollbar="false">
+      <section class="section">
+        <text class="section-overline">旅行风格</text>
         <view class="style-grid">
           <view
-            v-for="(option, idx) in travelModeOptions"
+            v-for="(style, idx) in travelStyles"
             :key="idx"
-            :class="['style-item', travelModeIndex === idx ? 'style-active' : '']"
+            :class="['style-card', travelModeIndex === idx ? 'style-selected' : '']"
             @click="travelModeIndex = idx"
           >
-            <text class="style-icon">{{ option.label.split(' ')[0] }}</text>
-            <text class="style-name">{{ option.label.split(' ').slice(1).join(' ') }}</text>
+            <image class="style-img" :src="style.image" mode="aspectFill" />
+            <view class="style-overlay"></view>
+            <view class="style-label">
+              <text class="style-icon">{{ style.icon }}</text>
+              <text class="style-name">{{ style.name }}</text>
+            </view>
           </view>
         </view>
-      </view>
+      </section>
 
-      <!-- 输入区域 -->
-      <view class="section section-main">
+      <section class="section">
+        <view class="input-header">
+          <text class="section-overline">告诉我你的想法</text>
+          <view class="input-badge">
+            <text>✨ 深度定制</text>
+          </view>
+        </view>
         <view class="input-card">
           <textarea
-            class="main-input"
+            class="main-textarea"
             v-model="userInput"
-            placeholder="描述你的旅行想法，例如：我想去云南，5 天时间，喜欢自然风光和美食..."
-            :auto-height="true"
+            placeholder="想去上海看展，住在外滩附近，对法租界的咖啡馆感兴趣..."
             :maxlength="500"
+            :auto-height="true"
           />
           <view class="input-footer">
             <text class="char-count">{{ charCount }} / 500</text>
           </view>
         </view>
-      </view>
+        
+        <!-- 骨架状态提示 -->
+        <view class="skeleton-status" v-if="isSkeletonPhase">
+          <view class="skeleton-icon">🧠</view>
+          <view class="skeleton-info">
+            <text class="skeleton-title">{{ skeletonStatusText }}</text>
+            <text class="skeleton-sub" v-if="skeletonElapsed">耗时: {{ skeletonElapsed }}s</text>
+          </view>
+        </view>
+        <view class="tag-chips">
+          <text class="tag-chip" @click="userInput = '上海 3天 深度游'">上海 3天</text>
+          <text class="tag-chip" @click="userInput = '东京 樱花季 4天'">东京 樱花季</text>
+          <text class="tag-chip" @click="userInput = '成都 美食之旅 3天'">成都 美食</text>
+        </view>
+      </section>
 
-      <!-- 生成按钮 -->
-      <button
-        class="generate-btn"
-        :loading="travelStore.loading"
-        :disabled="travelStore.loading || !userInput.trim()"
-        @click="handleGenerate"
-      >
-        <text>{{ isPlannerMode ? '生成完整行程' : '开始探索' }}</text>
-      </button>
-
-      <!-- 底部提示 -->
-      <view class="section section-hint">
-        <text class="hint-text">💡 慧游将根据你的描述，智能推荐最佳行程方案</text>
-      </view>
+      <section class="section action-section">
+        <button
+          class="generate-btn"
+          :disabled="travelStore.loading || !userInput.trim()"
+          @click="handleGenerate"
+        >
+          <text class="gen-icon">✨</text>
+          <text>开始灵感生成</text>
+        </button>
+        <text class="agreement-hint">点击生成即代表同意 慧游旅行服务协议</text>
+      </section>
     </scroll-view>
   </view>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useTravelStore } from '@/store/travel.js'
 import { useUserStore } from '@/store/user.js'
 import { getCurrentModel } from '@/api/travel.js'
-import { saveHistory } from '@/api/history.js'
+import { useSafeArea } from '@/utils/safeArea.js'
+import { themeClass } from '@/utils/theme.js'
 
 const travelStore = useTravelStore()
 const userStore = useUserStore()
+const userAvatar = computed(() => userStore.avatarUrl || 'https://ui-avatars.com/api/?name=慧游&background=1a237e&color=fff&size=64')
+const userNickname = computed(() => userStore.nickname || '慧游')
+const { statusBarHeight } = useSafeArea()
+
+onMounted(() => { userStore.restoreFromStorage() })
+
+const goBack = () => uni.navigateBack()
 
 const userInput = ref('')
-const isPlannerMode = ref(false)
 const travelModeIndex = ref(0)
-const currentModelName = ref('GPT-4o')
 
-// 安全区域顶部高度
-const safeAreaTop = ref(0)
+// 骨架状态
+const isSkeletonPhase = ref(false)
+const skeletonStatusText = ref('正在生成行程骨架...')
+const skeletonElapsed = ref(0)
+let skeletonStartTime = 0
 
-const travelModeOptions = [
-  { label: '🏃 轻装上阵', value: 'light' },
-  { label: '📸 深度打卡', value: 'deep' },
-  { label: '🍜 美食之旅', value: 'food' },
-  { label: '🏔️ 户外探索', value: 'outdoor' }
+// 监听 loading 状态变化
+watch(() => travelStore.loading, (loading) => {
+  if (loading && !isSkeletonPhase.value) {
+    isSkeletonPhase.value = true
+    skeletonStartTime = Date.now()
+    skeletonStatusText.value = '正在生成行程骨架...'
+    updateSkeletonPhase()
+  }
+})
+
+const updateSkeletonPhase = () => {
+  if (!isSkeletonPhase.value) return
+  skeletonElapsed.value = Math.round((Date.now() - skeletonStartTime) / 1000)
+  if (skeletonElapsed.value > 0) {
+    skeletonStatusText.value = `正在生成行程骨架... ${skeletonElapsed.value}s`
+  }
+  // 每秒更新一次
+  if (isSkeletonPhase.value) {
+    setTimeout(updateSkeletonPhase, 1000)
+  }
+}
+
+const travelStyles = [
+  { name: '轻装上阵', icon: '🌤️', image: 'https://tonystark-ai.ccwu.cc/png/d852559c-ac19-43e1-ab02-78e1f529c25c.png' },
+  { name: '深度打卡', icon: '📍', image: 'https://tonystark-ai.ccwu.cc/png/4d94c032-2cd5-4e00-8771-b1cd89cb0850.png' },
+  { name: '美食之旅', icon: '🍜', image: 'https://tonystark-ai.ccwu.cc/png/1aaa9239-ca21-4e2d-a661-04ac864d9918.png' },
+  { name: '户外探索', icon: '🏔️', image: 'https://tonystark-ai.ccwu.cc/png/f02f9327-4f1e-4a51-bfdd-5dd343151fb8.png' }
 ]
 
 const charCount = computed(() => userInput.value.length)
 
-const onModeToggle = (e) => {
-  isPlannerMode.value = e.detail.value
-}
-
-const goBack = () => {
-  uni.navigateBack()
-}
-
 const handleGenerate = async () => {
-  // 检查登录状态
   userStore.restoreFromStorage()
   if (!userStore.hasToken) {
     uni.showToast({ title: '请先登录', icon: 'none' })
-    setTimeout(() => {
-      uni.reLaunch({ url: '/pages/login/index' })
-    }, 1500)
+    setTimeout(() => uni.reLaunch({ url: '/pages/login/index' }), 1500)
     return
   }
-  
   if (!userInput.value.trim()) {
     uni.showToast({ title: '请输入旅行描述', icon: 'none' })
     return
@@ -125,225 +155,175 @@ const handleGenerate = async () => {
 
   try {
     uni.showLoading({ title: '规划中...' })
-    
-    const result = await travelStore.createPlan({
+    isSkeletonPhase.value = false // 重置状态
+    // 使用 V4 骨架优先方案（支持完整状态流转：pending → running → skeleton_ready → completed）
+    const result = await travelStore.createPlanV4({
       userInput: userInput.value,
       modelType: 'auto',
-      isPlannerMode: isPlannerMode.value,
-      travelMode: travelModeOptions[travelModeIndex.value].value
+      travelMode: travelStyles[travelModeIndex.value].name
     })
-
+    // 无论骨架还是完整结果，都跳转
     uni.hideLoading()
-
-    if (result) {
-      // 不自动保存，让用户在plan页面手动保存
-      console.log('行程已生成，准备查看')
-      
+    isSkeletonPhase.value = false
+    if (result && result.dayPlanItinerary && result.dayPlanItinerary.length > 0) {
+      // 骨架阶段也可以跳转，让用户先看到行程列表
       uni.showToast({ title: '行程已生成', icon: 'success' })
-      uni.navigateTo({ url: '/pages/plan/plan' })
+      uni.reLaunch({ url: '/pages/index/index' })
     }
   } catch (error) {
     uni.hideLoading()
-    uni.showToast({ title: error.message || '生成失败', icon: 'none' })
+    isSkeletonPhase.value = false
+    uni.showToast({ title: '生成失败，请稍后重试', icon: 'none' })
   }
 }
-
-onMounted(async () => {
-  // 获取安全区域
-  try {
-    const systemInfo = uni.getSystemInfoSync()
-    safeAreaTop.value = systemInfo.safeAreaInsets?.top || 0
-    console.log('[Explore] 安全区域顶部:', safeAreaTop.value)
-  } catch (e) {
-    console.error('[Explore] 获取安全区域失败:', e)
-    safeAreaTop.value = 0
-  }
-  
-  try {
-    const result = await getCurrentModel()
-    if (result?.modelName) {
-      currentModelName.value = result.modelName
-    }
-  } catch (e) {
-    console.log('获取模型失败', e)
-  }
-})
 </script>
 
 <style scoped>
-.page-container {
+.explore-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #F8F9FA 0%, #FAFBFC 100%);
-  display: flex;
-  flex-direction: column;
+  background: var(--color-surface);
 }
-
 .top-bar {
-  display: flex;
-  align-items: center;
-  padding: 32rpx 40rpx;
-  gap: 20rpx;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 24rpx 40rpx 16rpx;
+  background: rgba(248,249,250,0.8);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  border-bottom: 1px solid rgba(198,197,212,0.3);
+  position: sticky; top: 0; z-index: 10;
 }
-
-.back-btn {
-  width: 72rpx;
-  height: 72rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 40rpx;
-  color: #404040;
+.top-left { display: flex; align-items: center; gap: 12px; }
+.top-back {
+  width: 40px; height: 40px; display: flex; align-items: center;
+  justify-content: center; font-size: 20px; color: var(--color-primary);
 }
-
-.page-title {
-  flex: 1;
-  font-size: 40rpx;
-  font-weight: 700;
-  color: #202124;
+.top-avatar {
+  width: 40px; height: 40px; border-radius: 50%;
+  border: 1px solid var(--color-outline-variant);
+  box-shadow: 0 0 0 3px var(--color-surface);
 }
-
-.model-tag {
-  padding: 12rpx 24rpx;
-  background: rgba(99, 102, 241, 0.1);
-  border-radius: 16rpx;
-  font-size: 24rpx;
-  color: #4285F4;
-  font-weight: 500;
+.top-brand {
+  font-size: 24px; font-weight: 700; color: var(--color-primary);
+  letter-spacing: -0.01em; line-height: 32px;
 }
-
+.top-notif {
+  width: 40px; height: 40px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+.notif-icon { font-size: 20px; }
 .content {
-  flex: 1;
-  padding: 0 40rpx;
+  padding: 16rpx 40rpx 240rpx;
 }
-
-.section {
-  margin-bottom: 40rpx;
-}
-
-.section-label {
+.section { margin-bottom: 24px; }
+.section-overline {
   display: block;
-  font-size: 28rpx;
-  font-weight: 600;
-  color: #404040;
-  margin-bottom: 24rpx;
-}
-
-.mode-card {
-  background: #fff;
-  border-radius: 24rpx;
-  padding: 32rpx;
-  box-shadow: 0 4rpx 24rpx rgba(0, 0, 0, 0.04);
-}
-
-.mode-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.mode-info {
-  flex: 1;
-}
-
-.mode-name {
-  display: block;
-  font-size: 32rpx;
-  font-weight: 600;
-  color: #202124;
-  margin-bottom: 8rpx;
-}
-
-.mode-hint {
-  display: block;
-  font-size: 26rpx;
-  color: #737373;
+  font-size: 11px; font-weight: 700; color: var(--color-outline);
+  text-transform: uppercase; letter-spacing: 0.15em;
+  margin-bottom: 8px;
 }
 
 .style-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20rpx;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
 }
-
-.style-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 32rpx;
-  background: #fff;
-  border-radius: 24rpx;
-  border: 2rpx solid transparent;
-  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.04);
+.style-card {
+  border-radius: 16px; overflow: hidden;
+  position: relative; height: 180px;
+  background: rgba(255,255,255,0.6);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.5);
+  display: flex; flex-direction: column; justify-content: flex-end;
+  padding: 12px;
+  transition: all var(--transition-fast);
 }
-
-.style-active {
-  border-color: #4285F4;
-  background: rgba(99, 102, 241, 0.05);
+.style-card:active { transform: scale(0.95); }
+.style-selected { border-color: var(--color-primary-container); }
+.style-img {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  z-index: 0;
 }
-
-.style-icon {
-  font-size: 48rpx;
-  margin-bottom: 12rpx;
+.style-overlay {
+  position: absolute; inset: 0; z-index: 1;
+  background: linear-gradient(to top, rgba(0,6,102,0.7) 0%, rgba(0,6,102,0.15) 50%, transparent 100%);
 }
-
+.style-label {
+  position: relative; z-index: 2;
+  display: flex; align-items: center; gap: 6px;
+}
+.style-icon { font-size: 18px; }
 .style-name {
-  font-size: 28rpx;
-  font-weight: 500;
-  color: #404040;
-}
-
-.input-card {
-  background: #fff;
-  border-radius: 24rpx;
-  padding: 32rpx;
-  box-shadow: 0 4rpx 24rpx rgba(0, 0, 0, 0.04);
-}
-
-.main-input {
-  width: 100%;
-  min-height: 200rpx;
-  font-size: 30rpx;
-  line-height: 1.6;
-  color: #202124;
-}
-
-.input-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 20rpx;
-}
-
-.char-count {
-  font-size: 24rpx;
-  color: #a1a1a1;
-}
-
-.generate-btn {
-  width: 100%;
-  height: 96rpx;
-  background: linear-gradient(135deg, #4285F4 0%, #5E97F6 50%, #7BAAF7 100%);
-  border-radius: 24rpx;
-  font-size: 32rpx;
-  font-weight: 600;
+  font-size: 12px; font-weight: 600; letter-spacing: 0.05em;
   color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 8rpx 24rpx rgba(99, 102, 241, 0.25);
 }
 
-.generate-btn[disabled] {
-  opacity: 0.6;
+.input-header {
+  display: flex; align-items: center; justify-content: space-between; padding: 0 4px;
+}
+.input-badge {
+  display: flex; align-items: center; gap: 6px;
+  color: var(--color-primary); opacity: 0.7;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.05em;
+}
+.input-card {
+  background: rgba(255,255,255,0.6);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.5);
+  border-radius: 24px; padding: 40rpx; margin-top: 8px;
+  box-shadow: 0 12px 24px rgba(0,0,0,0.02);
+}
+.main-textarea {
+  width: 100%; min-height: 90px;
+  background: transparent; border: none; resize: none;
+  margin: 0; padding: 0;
+  font-size: 16px; line-height: 26px;
+  color: var(--color-on-surface);
+}
+.main-textarea::placeholder { color: var(--color-on-surface-variant); opacity: 0.3; }
+.input-footer {
+  display: flex; justify-content: flex-end;
+  padding-top: 8px; margin-top: 8px;
+  border-top: 1px solid rgba(198,197,212,0.1);
+}
+.char-count { font-size: 11px; font-weight: 500; color: var(--color-outline); opacity: 0.6; }
+
+.tag-chips {
+  display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;
+}
+.tag-chip {
+  padding: 8px 16px; border-radius: 999px;
+  border: 1px solid var(--color-outline-variant); opacity: 0.3;
+  font-size: 12px; font-weight: 600; letter-spacing: 0.05em;
+  color: var(--color-on-surface-variant);
+  background: rgba(243,244,245,0.5);
 }
 
-.section-hint {
+.skeleton-status {
+  display: flex; align-items: center; gap: 12px;
+  padding: 32rpx 40rpx; margin-top: 12px;
+  background: rgba(0,102,153,0.1); border-radius: 16px;
+  border: 1px solid rgba(0,102,153,0.2);
+}
+.skeleton-icon { font-size: 24px; }
+.skeleton-info { flex: 1; }
+.skeleton-title { font-size: 14px; font-weight: 600; color: #006699; }
+.skeleton-sub { font-size: 12px; color: #999; margin-top: 2px; }
+
+.action-section { margin-top: 16px; display: flex; flex-direction: column; align-items: center; }
+.generate-btn {
+  width: 100%; height: 64px;
+  background: linear-gradient(135deg, #000666 0%, #1a237e 100%);
+  border-radius: 24px; color: #fff;
+  font-size: 20px; font-weight: 600; line-height: 28px;
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  box-shadow: 0 12px 32px rgba(0,6,102,0.25);
+  position: relative; overflow: hidden;
+}
+.generate-btn[disabled] { opacity: 0.5; }
+.gen-icon { font-size: 24px; }
+.agreement-hint {
+  margin-top: 24px;
+  font-size: 11px; font-weight: 500; color: var(--color-outline); opacity: 0.5;
   text-align: center;
-  padding: 40rpx;
-}
-
-.hint-text {
-  font-size: 26rpx;
-  color: #a1a1aa;
 }
 </style>

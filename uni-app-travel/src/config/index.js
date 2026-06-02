@@ -4,7 +4,8 @@
  */
 
 // ==================== 环境配置 ====================
-const isDevelopment = process.env.NODE_ENV === 'development'
+//const isDevelopment = process.env.NODE_ENV === 'development'
+  const isDevelopment = process.env.NODE_ENV === 'pord'
 
 // ==================== 后端服务配置 ====================
 export const API_CONFIG = {
@@ -32,7 +33,7 @@ export const API_CONFIG = {
 // ==================== 业务配置 ====================
 export const APP_CONFIG = {
   // 应用名称
-  NAME: 'AI Travel Pro',
+  NAME: '慧游',
   
   // 版本
   VERSION: '1.0.0',

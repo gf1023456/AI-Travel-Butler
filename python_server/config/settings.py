@@ -52,6 +52,8 @@ class ExternalApiSettings(BaseModel):
     amap_api_key: str = ""
     weather_api_key: str = ""
     tdt_api_key: str = "97f9870fb795ba80ef201d6edae71d73"
+    pixabay_api_key: str = "55871092-ce4b6588eec534eb37300c1f9"
+    serper_api_key: str = "0d140f37f3fad88ad695861df408a63b91394b1d"
 
 
 class WeChatSettings(BaseModel):
@@ -60,10 +62,12 @@ class WeChatSettings(BaseModel):
 
 
 class DatabaseSettings(BaseModel):
-    host: str = "localhost"
-    port: int = 5432
+   # host: str = "localhost"
+    host: str = "47.108.24.14"
+    port: int = 15477
     username: str = "postgres"
-    password: str = "147258"
+    password: str = "postgres123"
+   # password: str = "147258"
     name: str = "ai_travel_butler"
     url: str = ""  # 直接指定数据库URL
 

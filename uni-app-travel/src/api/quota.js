@@ -23,24 +23,41 @@ export async function checkQuota() {
  * 获取配额信息
  */
 export async function getQuota() {
-  const data = await request({
-    url: '/quota/check',
-    method: 'GET'
-  })
-  
-  console.log('getQuota raw:', data)
-  
-  let quotaData = data
-  if (data && data.code === 0 && data.data) {
-    quotaData = data.data
+  console.log('[quota.js] getQuota 开始请求')
+  try {
+    const data = await request({
+      url: '/quota/check',
+      method: 'GET'
+    })
+    
+    console.log('[quota.js] getQuota raw:', JSON.stringify(data))
+    
+    // 处理返回数据格式：可能是 {code: 0, data: {...}} 或直接返回 {...}
+    let quotaData = null
+    if (data && typeof data === 'object') {
+      // 情况1: {code: 0, data: {...}} -> 取 data
+      if (data.code === 0 && data.data) {
+        quotaData = data.data
+      }
+      // 情况2: 直接返回 {...} -> 直接使用
+      else if (data.remaining !== undefined || data.max !== undefined) {
+        quotaData = data
+      }
+    }
+    
+    console.log('[quota.js] getQuota parsed:', JSON.stringify(quotaData))
+    
+    // 保存到 store
+    const userStore = useUserStore()
+    if (quotaData) {
+      userStore.setQuota(quotaData)
+    }
+    
+    return quotaData
+  } catch (error) {
+    console.error('[quota.js] getQuota 请求失败:', error)
+    throw error
   }
-  
-  console.log('getQuota parsed:', quotaData)
-  
-  const userStore = useUserStore()
-  userStore.setQuota(quotaData)
-  
-  return quotaData
 }
 
 /**

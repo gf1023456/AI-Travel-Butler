@@ -151,6 +151,7 @@ export const useUserStore = defineStore('user', {
         uni.removeStorageSync('user_token')
         uni.removeStorageSync('user_refresh_token')
         uni.removeStorageSync('user_info')
+        uni.removeStorageSync('weather_cache')
       } catch (e) {
         console.error('清除用户信息失败:', e)
       }

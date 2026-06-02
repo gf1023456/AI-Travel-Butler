@@ -3,8 +3,9 @@
     {
       "path": "pages/index/index",
       "style": {
-        "navigationBarTitleText": "AI旅行助手",
-        "enablePullDownRefresh": false
+        "navigationBarTitleText": "慧游",
+        "enablePullDownRefresh": false,
+        "navigationStyle": "custom"
       }
     },
     {
@@ -24,15 +25,17 @@
     {
       "path": "pages/plan/plan",
       "style": {
-        "navigationBarTitleText": "行程规划",
-        "enablePullDownRefresh": false
+        "navigationBarTitleText": "行程详情",
+        "enablePullDownRefresh": false,
+        "navigationStyle": "custom"
       }
     },
     {
       "path": "pages/refine/refine",
       "style": {
         "navigationBarTitleText": "行程优化",
-        "enablePullDownRefresh": false
+        "enablePullDownRefresh": false,
+        "navigationStyle": "custom"
       }
     },
     {
@@ -48,13 +51,23 @@
         "navigationBarTitleText": "历史记录",
         "navigationStyle": "custom"
       }
+    },
+    {
+      "path": "pages/settings/index",
+      "style": {
+        "navigationBarTitleText": "设置",
+        "navigationStyle": "custom"
+      }
     }
   ],
   "globalStyle": {
     "navigationBarTextStyle": "black",
-    "navigationBarTitleText": "AI旅行助手",
-    "navigationBarBackgroundColor": "#F8F8F8",
-    "backgroundColor": "#F8F8F8"
+    "navigationBarTitleText": "慧游",
+    "navigationBarBackgroundColor": "#F8F9FA",
+    "backgroundColor": "#F8F9FA",
+    "app-plus": {
+      "safeArea": "auto"
+    }
   },
   "uniIdRouter": {}
 }

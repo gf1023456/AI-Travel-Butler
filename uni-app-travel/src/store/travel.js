@@ -52,7 +52,7 @@ export const useTravelStore = defineStore('travel', {
           throw new Error('请输入旅行需求')
         }
         if (!params.modelType || typeof params.modelType !== 'string') {
-          throw new Error('请选择AI模型')
+          throw new Error('请选择模型')
         }
 
         // 先检查配额是否足够
@@ -61,7 +61,7 @@ export const useTravelStore = defineStore('travel', {
           console.log('[TravelStore] 配额检查:', quotaData)
           
           // 解析配额数据
-          const remaining = quotaData?.remaining ?? quotaData?.data?.remaining ?? 0
+          const remaining = (quotaData && quotaData.remaining) || (quotaData && quotaData.data && quotaData.data.remaining) || 0
           console.log('[TravelStore] 剩余配额:', remaining)
           
           if (remaining <= 0) {
@@ -134,6 +134,543 @@ export const useTravelStore = defineStore('travel', {
     },
 
     /**
+     * 创建行程（V2 异步轮询方案）
+     */
+    async createPlanV2(params) {
+      this.loading = true
+      this.error = null
+      try {
+        if (!params.userInput || typeof params.userInput !== 'string') {
+          throw new Error('请输入旅行需求')
+        }
+
+        // 先检查配额是否足够
+        try {
+          const quotaData = await getQuota()
+          console.log('[TravelStore] 配额检查:', quotaData)
+          const remaining = (quotaData && quotaData.remaining) || (quotaData && quotaData.data && quotaData.data.remaining) || 0
+          console.log('[TravelStore] 剩余配额:', remaining)
+          if (remaining <= 0) {
+            this.loading = false
+            uni.showModal({
+              title: '配额不足',
+              content: '今日生成次数已用完，观看广告可获取额外配额',
+              confirmText: '去看广告',
+              cancelText: '关闭',
+              success: (res) => {
+                if (res.confirm) {
+                  uni.showToast({ title: '广告功能开发中', icon: 'none' })
+                }
+              }
+            })
+            this.error = '今日配额已用完'
+            return null
+          }
+        } catch (quotaError) {
+          console.error('[TravelStore] 配额检查失败:', quotaError.message || quotaError)
+          this.loading = false
+          uni.showToast({ title: '无法检查配额，请稍后重试', icon: 'none' })
+          this.error = '配额检查失败'
+          return null
+        }
+
+        // 1. 创建异步任务（立即返回 taskId）
+        const createRes = await travelApi.createPlanV2({
+          userInput: params.userInput,
+          modelType: params.modelType || 'auto',
+          travelMode: params.travelMode || 'deep'
+        }).catch((apiError) => {
+          const errorMsg = apiError.message || ''
+          if (errorMsg.includes('quota') || errorMsg.includes('配额') || errorMsg.includes('次数')) {
+            uni.showModal({
+              title: '配额不足',
+              content: '今日生成次数已用完，请明天再来或分享获取额外配额',
+              showCancel: false,
+              confirmText: '我知道了'
+            })
+            this.error = '今日配额已用完'
+            return null
+          }
+          throw apiError
+        })
+
+        if (!createRes || !createRes.taskId) {
+          this.loading = false
+          throw new Error('创建任务失败，未返回 taskId')
+        }
+        const taskId = createRes.taskId
+
+        // 2. 轮询状态
+        const pollInterval = 2000  // 每 2 秒查一次
+        const maxWaitTime = 240000 // 最多等 120 秒
+
+        return new Promise((resolve, reject) => {
+          const startTime = Date.now()
+
+          const poll = async () => {
+            try {
+              const elapsed = Date.now() - startTime
+              if (elapsed > maxWaitTime) {
+                this.loading = false
+                this.error = '任务处理超时，请稍后到历史记录查看'
+                reject(new Error('任务超时'))
+                return
+              }
+
+              const statusRes = await travelApi.getPlanStatus(taskId)
+              const status = statusRes.status
+
+              if (status === 'completed') {
+                const result = await travelApi.getPlanResult(taskId)
+                this.currentPlan = result
+                this.planHistory.push(result)
+                this.loading = false
+
+                // 生成成功后自动扣减配额
+                try {
+                  await useQuota()
+                  console.log('[TravelStore] 配额已扣减')
+                } catch (quotaError) {
+                  console.error('[TravelStore] 配额扣减失败:', quotaError)
+                }
+
+                resolve(result)
+              } else if (status === 'failed') {
+                this.loading = false
+                this.error = statusRes.error || '任务执行失败'
+                reject(new Error(this.error))
+              } else {
+                // pending 或 running，继续轮询
+                setTimeout(poll, pollInterval)
+              }
+            } catch (err) {
+              this.loading = false
+              this.error = err.message || '查询任务状态失败'
+              reject(err)
+            }
+          }
+
+          poll()
+        })
+      } catch (error) {
+        this.loading = false
+        this.error = error.message || '创建行程失败'
+        throw error
+      }
+    },
+
+    /**
+     * 创建行程（V3 骨架优先 + 完整状态流转）
+     * 状态流转：pending → running → skeleton_ready → filling → completed
+     * V3 与 V4 的区别：V3 增加了 filling 状态，填充阶段也能实时更新 UI
+     */
+    async createPlanV3(params) {
+      this.loading = true
+      this.error = null
+      try {
+        if (!params.userInput || typeof params.userInput !== 'string') {
+          throw new Error('请输入旅行需求')
+        }
+
+        // 检查配额
+        try {
+          const quotaData = await getQuota()
+          const remaining = (quotaData && quotaData.remaining) || (quotaData && quotaData.data && quotaData.data.remaining) || 0
+          if (remaining <= 0) {
+            this.loading = false
+            uni.showModal({
+              title: '配额不足',
+              content: '今日生成次数已用完',
+              showCancel: false,
+              confirmText: '我知道了'
+            })
+            this.error = '今日配额已用完'
+            return null
+          }
+        } catch (quotaError) {
+          this.loading = false
+          uni.showToast({ title: '无法检查配额，请稍后重试', icon: 'none' })
+          this.error = '配额检查失败'
+          return null
+        }
+
+        // 1. 创建异步任务
+        const createRes = await travelApi.createPlanV3({
+          userInput: params.userInput,
+          modelType: params.modelType || 'auto',
+          travelMode: params.travelMode || 'deep'
+        }).catch((apiError) => {
+          const errorMsg = apiError.message || ''
+          if (errorMsg.includes('quota') || errorMsg.includes('配额') || errorMsg.includes('次数')) {
+            uni.showModal({
+              title: '配额不足',
+              content: '今日生成次数已用完',
+              showCancel: false,
+              confirmText: '我知道了'
+            })
+            this.error = '今日配额已用完'
+            return null
+          }
+          throw apiError
+        })
+
+        if (!createRes || !createRes.taskId) {
+          this.loading = false
+          throw new Error('创建任务失败')
+        }
+        const taskId = createRes.taskId
+
+        // 2. 轮询状态（支持完整 5 个状态流转）
+        const pollInterval = 3000
+        const maxWaitTime = 240000
+
+        return new Promise((resolve, reject) => {
+          const startTime = Date.now()
+
+          const poll = async () => {
+            try {
+              const elapsed = Date.now() - startTime
+              if (elapsed > maxWaitTime) {
+                this.loading = false
+                this.error = '任务超时'
+                reject(new Error('任务超时'))
+                return
+              }
+
+              const statusRes = await travelApi.getPlanV3Status(taskId)
+              const status = statusRes.status
+              console.log('[TravelStore V3] Status:', status)
+
+              // pending / running: 任务创建或正在生成骨架
+              if (status === 'pending' || status === 'running') {
+                // 更新 loading 提示
+                uni.showLoading({ title: '正在规划...' })
+                setTimeout(poll, pollInterval)
+                return
+              }
+
+              // skeleton_ready: 骨架已就绪，存储骨架数据
+              if (status === 'skeleton_ready') {
+                const skeleton = await travelApi.getPlanV3Result(taskId)
+                console.log('[TravelStore V3] Skeleton ready, locations:', (skeleton.dayPlanItinerary && skeleton.dayPlanItinerary.length) || 0)
+                
+                // 存储骨架数据（不在 store 内部跳转，让调用方处理）
+                this.currentPlan = skeleton
+                this.planHistory.push(skeleton)
+                
+                // 继续后台轮询直到完成
+                this._v3BackgroundPoll(taskId)
+                resolve(skeleton)
+                return
+              }
+
+              // filling: 正在填充详细信息（V3 特有状态）
+              if (status === 'filling') {
+                // 尝试获取最新结果（可能包含部分填充数据）
+                try {
+                  const result = await travelApi.getPlanV3Result(taskId)
+                  // 更新当前数据，让页面实时显示填充进度
+                  this.currentPlan = result
+                  console.log('[TravelStore V3] Filling phase, updated data')
+                } catch (e) {
+                  console.log('[TravelStore V3] Filling phase result fetch failed')
+                }
+                setTimeout(poll, pollInterval)
+                return
+              }
+
+              // completed: 任务完成
+              if (status === 'completed') {
+                const result = await travelApi.getPlanV3Result(taskId)
+                this.currentPlan = result
+                this.planHistory.push(result)
+                this.loading = false
+
+                try {
+                  await useQuota()
+                  console.log('[TravelStore V3] 配额已扣减')
+                } catch (quotaError) {
+                  console.error('[TravelStore V3] 配额扣减失败:', quotaError)
+                }
+
+                resolve(result)
+              } else if (status === 'failed') {
+                this.loading = false
+                this.error = statusRes.error || '任务执行失败'
+                reject(new Error(this.error))
+              } else {
+                // 其他状态，继续轮询
+                setTimeout(poll, pollInterval)
+              }
+            } catch (err) {
+              this.loading = false
+              this.error = err.message || '查询任务状态失败'
+              reject(err)
+            }
+          }
+
+          poll()
+        })
+      } catch (error) {
+        this.loading = false
+        this.error = error.message || '创建行程失败'
+        throw error
+      }
+    },
+
+    /**
+     * 后台轮询更新 V3 骨架数据（支持 filling 状态）
+     */
+    _v3BackgroundPoll(taskId) {
+      const pollInterval = 3000
+      const maxWaitTime = 240000
+      const startTime = Date.now()
+      
+      const doPoll = async () => {
+        try {
+          const elapsed = Date.now() - startTime
+          if (elapsed > maxWaitTime) {
+            console.warn('[TravelStore V3] 后台轮询超时')
+            return
+          }
+
+          const statusRes = await travelApi.getPlanV3Status(taskId)
+          const status = statusRes.status
+          console.log('[TravelStore V3] Background poll - status:', status)
+
+          if (status === 'filling') {
+            // filling 状态也更新数据
+            try {
+              const result = await travelApi.getPlanV3Result(taskId)
+              this.currentPlan = result
+              console.log('[TravelStore V3] Filling - updated with partial data')
+            } catch (e) {
+              console.log('[TravelStore V3] Filling phase fetch failed')
+            }
+            setTimeout(doPoll, pollInterval)
+            return
+          }
+
+          if (status === 'completed') {
+            const result = await travelApi.getPlanV3Result(taskId)
+            this.currentPlan = result
+            console.log('[TravelStore V3] 后台轮询完成，数据已更新')
+            uni.showToast({ title: '行程详情已生成', icon: 'success', duration: 2000 })
+            return
+          }
+
+          if (status === 'failed') {
+            console.warn('[TravelStore V3] 后台任务失败:', statusRes.error)
+            return
+          }
+
+          // pending / running / skeleton_ready，继续轮询
+          setTimeout(doPoll, pollInterval)
+        } catch (err) {
+          console.error('[TravelStore V3] 后台轮询出错:', err)
+          setTimeout(doPoll, pollInterval)
+        }
+      }
+
+      doPoll()
+    },
+
+    async createPlanV4(params) {
+      this.loading = true
+      this.error = null
+      try {
+        if (!params.userInput || typeof params.userInput !== 'string') {
+          throw new Error('请输入旅行需求')
+        }
+
+        // 检查配额
+        try {
+          const quotaData = await getQuota()
+          const remaining = (quotaData && quotaData.remaining) || (quotaData && quotaData.data && quotaData.data.remaining) || 0
+          if (remaining <= 0) {
+            this.loading = false
+            uni.showModal({
+              title: '配额不足',
+              content: '今日生成次数已用完',
+              showCancel: false,
+              confirmText: '我知道了'
+            })
+            this.error = '今日配额已用完'
+            return null
+          }
+        } catch (quotaError) {
+          this.loading = false
+          uni.showToast({ title: '无法检查配额，请稍后重试', icon: 'none' })
+          this.error = '配额检查失败'
+          return null
+        }
+
+        // 1. 创建异步任务
+        const createRes = await travelApi.createPlanV4({
+          userInput: params.userInput,
+          modelType: params.modelType || 'auto',
+          travelMode: params.travelMode || 'deep'
+        }).catch((apiError) => {
+          const errorMsg = apiError.message || ''
+          if (errorMsg.includes('quota') || errorMsg.includes('配额') || errorMsg.includes('次数')) {
+            uni.showModal({
+              title: '配额不足',
+              content: '今日生成次数已用完',
+              showCancel: false,
+              confirmText: '我知道了'
+            })
+            this.error = '今日配额已用完'
+            return null
+          }
+          throw apiError
+        })
+
+        if (!createRes || !createRes.taskId) {
+          this.loading = false
+          throw new Error('创建任务失败')
+        }
+        const taskId = createRes.taskId
+
+        // 2. 轮询状态（支持骨架优先）
+        const pollInterval = 3000
+        const maxWaitTime = 240000
+
+        return new Promise((resolve, reject) => {
+          const startTime = Date.now()
+
+          const poll = async () => {
+            try {
+              const elapsed = Date.now() - startTime
+              if (elapsed > maxWaitTime) {
+                this.loading = false
+                this.error = '任务超时'
+                reject(new Error('任务超时'))
+                return
+              }
+
+              const statusRes = await travelApi.getPlanV4Status(taskId)
+              const status = statusRes.status
+              console.log('[TravelStore V4] Status:', status)
+
+              if (status === 'skeleton_ready') {
+                // 骨架已就绪，立即存储并跳转，让用户有感知
+                const skeleton = await travelApi.getPlanV4Result(taskId)
+                console.log('[TravelStore V4] Skeleton ready, locations:', (skeleton.dayPlanItinerary && skeleton.dayPlanItinerary.length) || 0)
+                
+                // 先存储骨架数据，让前端可以立即展示
+                this.currentPlan = skeleton
+                this.planHistory.push(skeleton)
+                
+                // 骨架阶段就先跳转页面，用户可以看到行程列表
+                uni.hideLoading()
+                this.loading = false // 重置 loading 状态
+                uni.showToast({ title: '骨架已生成，正在填充详情...', icon: 'none', duration: 2000 })
+                uni.reLaunch({ url: '/pages/index/index' })
+                
+                // 继续在后台轮询直到完成（不影响用户操作）
+                this._v4BackgroundPoll(taskId)
+                resolve(skeleton)
+                return
+              }
+
+              if (status === 'completed') {
+                const result = await travelApi.getPlanV4Result(taskId)
+                this.currentPlan = result
+                this.planHistory.push(result)
+                this.loading = false // 重置 loading 状态
+
+                try {
+                  await useQuota()
+                  console.log('[TravelStore V4] 配额已扣减')
+                } catch (quotaError) {
+                  console.error('[TravelStore V4] 配额扣减失败:', quotaError)
+                }
+
+                resolve(result)
+              } else if (status === 'failed') {
+                this.loading = false // 重置 loading 状态
+                this.error = '生成失败，请稍后重试'
+                reject(new Error(this.error))
+              } else {
+                // pending 或 running，继续轮询
+                setTimeout(poll, pollInterval)
+              }
+            } catch (err) {
+              this.loading = false
+              this.error = err.message || '查询任务状态失败'
+              reject(err)
+            }
+          }
+
+          poll()
+        })
+      } catch (error) {
+        this.loading = false
+        const errMsg = error.message || ''
+        if (errMsg.includes('骨架') || errMsg.includes('模型') || errMsg.includes('为空')) {
+          this.error = '服务繁忙，请稍后重试'
+        } else {
+          this.error = error.message || '创建行程失败'
+        }
+        throw new Error(this.error)
+      }
+    },
+
+    /**
+     * 后台轮询更新 V4 骨架数据（骨架阶段后继续更新）
+     */
+    _v4BackgroundPoll(taskId) {
+      const pollInterval = 3000
+      const maxWaitTime = 240000
+      const startTime = Date.now()
+      
+      const doPoll = async () => {
+        try {
+          const elapsed = Date.now() - startTime
+          if (elapsed > maxWaitTime) {
+            console.warn('[TravelStore V4] 后台轮询超时')
+            return
+          }
+
+          const statusRes = await travelApi.getPlanV4Status(taskId)
+          const status = statusRes.status
+          console.log('[TravelStore V4] Background poll - status:', status)
+
+          if (status === 'completed') {
+            const result = await travelApi.getPlanV4Result(taskId)
+            // 更新完整数据
+            this.currentPlan = result
+            console.log('[TravelStore V4] 后台轮询完成，数据已更新')
+            uni.showToast({ title: '行程详情已生成', icon: 'success', duration: 2000 })
+            // 扣减配额
+            try {
+              await useQuota()
+              console.log('[TravelStore V4] 后台轮询完成，配额已扣减')
+            } catch (quotaError) {
+              console.error('[TravelStore V4] 后台轮询配额扣减失败:', quotaError)
+            }
+            return
+          }
+
+          if (status === 'failed') {
+            console.warn('[TravelStore V4] 后台任务失败:', statusRes.error)
+            uni.showToast({ title: '填充详情失败，请稍后重试', icon: 'none' })
+            return
+          }
+
+          // 继续轮询
+          setTimeout(doPoll, pollInterval)
+        } catch (err) {
+          console.error('[TravelStore V4] 后台轮询出错:', err)
+          // 出错也继续轮询几次
+          setTimeout(doPoll, pollInterval)
+        }
+      }
+
+      doPoll()
+    },
+
+    /**
      * 优化行程
      */
     async refinePlan(params) {
@@ -153,8 +690,8 @@ export const useTravelStore = defineStore('travel', {
         this.planHistory.push(result)
         return result
       } catch (error) {
-        this.error = error.message || '优化行程失败'
-        throw error
+        this.error = '优化失败，请稍后重试'
+        throw new Error(this.error)
       } finally {
         this.loading = false
       }

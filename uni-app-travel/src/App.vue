@@ -7,6 +7,7 @@
 <script setup>
 import { onLaunch, onShow } from '@dcloudio/uni-app'
 import { useUserStore } from './store/user.js'
+import { initTheme } from './utils/theme.js'
 
 // 添加更多的公共无需登录页面到白名单
 const whiteList = [
@@ -15,7 +16,21 @@ const whiteList = [
 ]
 
 onLaunch(() => {
-  console.log('App Launch')
+  const systemInfo = uni.getSystemInfoSync()
+  uni.$systemInfo = systemInfo
+
+  // 初始化主题
+  initTheme()
+
+  // #ifdef H5
+  try {
+    if (typeof document !== 'undefined' && document.documentElement) {
+      const safeAreaBottom = Math.max(0, systemInfo.screenHeight - (systemInfo.safeArea?.bottom || systemInfo.screenHeight))
+      document.documentElement.style.setProperty('--status-bar-height', systemInfo.statusBarHeight + 'px')
+      document.documentElement.style.setProperty('--safe-area-bottom', safeAreaBottom + 'px')
+    }
+  } catch (e) { /* ignore */ }
+  // #endif
 })
 
 onShow(() => {
@@ -62,8 +77,8 @@ const checkAuth = () => {
 }
 
 page {
-  background-color: var(--bg-base);
-  font-family: 'PingFang SC', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+  background-color: var(--color-surface);
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

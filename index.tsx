@@ -220,9 +220,15 @@ async function handleRequest() {
   getEl('loading-overlay').classList.add('active');
 
   try {
-    const usedBackend = await tryBackendPlan(userInput, modelType, isPlannerMode, travelMode);
+    // 优先使用 plan_v4 骨架优先方案
+    const usedBackend = await tryBackendPlanV4(userInput, modelType, isPlannerMode, travelMode);
+    
     if (!usedBackend) {
-      throw new Error('后端规划服务不可用，请检查 server 是否启动');
+      // fallback 尝试旧的 v2 接口
+      const fallback = await tryBackendPlan(userInput, modelType, isPlannerMode, travelMode);
+      if (!fallback) {
+        throw new Error('后端规划服务不可用，请检查 server 是否启动');
+      }
     }
 
     renderAll();
@@ -307,11 +313,246 @@ async function tryBackendPlan(userInput: string, modelType: string, isPlannerMod
     socialRecommendations = Array.isArray(data.socialRecommendations) ? data.socialRecommendations : [];
     itinerarySummary = data.itinerarySummary || '排期已生成';
     itineraryEvidence = Array.isArray(data.evidence) ? data.evidence : [];
-    verifierWarnings = Array.isArray(data.verifierWarnings) ? data.verifierWarnings : [];
+    verifierWarnings = Array.isArray(data.warnings) ? data.warnings : [];
     return true;
   } catch (error) {
     console.warn('Backend planner unavailable.', error);
     return false;
+  }
+}
+
+// ========== plan_v3/v4 骨架优先轮询方案（适配完整状态）==========
+
+// 可通过配置切换 plan_v3 或 plan_v4
+const PLAN_API_VERSION = 'v3'; // 默认使用 v3，支持完整状态流转
+
+async function tryBackendPlanV4(userInput: string, modelType: string, isPlannerMode: boolean, travelMode: string): Promise<boolean> {
+  try {
+    // 步骤1：创建任务
+    const createRes = await fetch(`${BACKEND_BASE_URL}/api/plan/${PLAN_API_VERSION}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userInput, modelType, isPlannerMode, travelMode })
+    });
+
+    if (!createRes.ok) {
+      const text = await createRes.text();
+      throw new Error(`创建任务失败: ${text}`);
+    }
+
+    const { taskId } = await createRes.json();
+    console.log(`[PlanV4] Task created: ${taskId}`);
+
+    // 更新初始状态显示
+    updateLoadingPhase('creating');
+
+    // 步骤2：轮询状态
+    const maxPolls = 60;
+    let pollCount = 0;
+    let finalData: any = null;
+    let lastSkeletonData: any = null;
+
+    while (pollCount < maxPolls) {
+      await new Promise(r => setTimeout(r, 3000));
+
+      const statusRes = await fetch(`${BACKEND_BASE_URL}/api/plan/${PLAN_API_VERSION}/status/${taskId}`);
+      const statusData = await statusRes.json();
+
+      console.log(`[PlanV4] Poll #${pollCount + 1}: status=${statusData.status}`);
+
+      // pending / running: 任务创建或正在生成骨架
+      if (statusData.status === 'pending' || statusData.status === 'running') {
+        updateLoadingPhase('running', statusData);
+        pollCount++;
+        continue;
+      }
+
+      // skeleton_ready: 骨架已生成，可以渲染时间轴
+      if (statusData.status === 'skeleton_ready') {
+        const resultRes = await fetch(`${BACKEND_BASE_URL}/api/plan/${PLAN_API_VERSION}/result/${taskId}`);
+        const resultData = await resultRes.json();
+        lastSkeletonData = resultData;
+        renderSkeletonPhase(resultData, statusData);
+        pollCount++;
+        continue;
+      }
+
+      // filling: 正在填充详细信息（plan_v3 特有状态）
+      if (statusData.status === 'filling') {
+        try {
+          const resultRes = await fetch(`${BACKEND_BASE_URL}/api/plan/${PLAN_API_VERSION}/result/${taskId}`);
+          if (resultRes.ok) {
+            const resultData = await resultRes.json();
+            lastSkeletonData = resultData;
+            renderFillingPhase(resultData);
+          }
+        } catch (e) {
+          console.log('[PlanV4] Filling phase result fetch failed, continue polling');
+        }
+        pollCount++;
+        continue;
+      }
+
+      // completed: 任务完成，获取完整结果
+      if (statusData.status === 'completed') {
+        const resultRes = await fetch(`${BACKEND_BASE_URL}/api/plan/${PLAN_API_VERSION}/result/${taskId}`);
+        finalData = await resultRes.json();
+        break;
+      }
+
+      // failed: 任务失败
+      if (statusData.status === 'failed') {
+        throw new Error(`任务失败: ${statusData.error || '未知错误'}`);
+      }
+
+      pollCount++;
+    }
+
+    if (!finalData) {
+      if (lastSkeletonData) {
+        finalData = lastSkeletonData;
+      } else {
+        throw new Error('轮询超时，未获取到结果');
+      }
+    }
+
+    // 步骤3：提取数据填充全局变量
+    dayPlanItinerary = Array.isArray(finalData.dayPlanItinerary) ? finalData.dayPlanItinerary : [];
+    socialRecommendations = Array.isArray(finalData.socialRecommendations) ? finalData.socialRecommendations : [];
+    itinerarySummary = finalData.itinerarySummary || '排期已生成';
+    itineraryEvidence = Array.isArray(finalData.evidence) ? finalData.evidence : [];
+    verifierWarnings = Array.isArray(finalData.warnings) ? finalData.warnings : [];
+
+    return true;
+  } catch (error) {
+    console.warn('PlanV4 failed, falling back to v2:', error);
+    return false;
+  }
+}
+
+// 更新加载阶段显示
+function updateLoadingPhase(phase: 'creating' | 'running', statusData?: any) {
+  const container = getEl('timeline-content');
+  
+  if (phase === 'creating') {
+    container.innerHTML = `
+      <div class="timeline-card" style="border-left: 5px solid #FF9500;">
+        <h5 style="color:#FF9500;">⏳ 正在创建任务</h5>
+        <p style="color:#8E8E93; font-size:12px;">正在连接服务器...</p>
+      </div>
+    `;
+  } else if (phase === 'running') {
+    const skeletonInfo = statusData?.skeleton_elapsed_ms 
+      ? `骨架生成耗时: ${(statusData.skeleton_elapsed_ms / 1000).toFixed(1)}s`
+      : '正在生成行程骨架...';
+    container.innerHTML = `
+      <div class="timeline-card" style="border-left: 5px solid #FF9500;">
+        <h5 style="color:#FF9500;">🧠 AI 智能规划中</h5>
+        <p style="color:#8E8E93; font-size:12px;">${skeletonInfo}</p>
+      </div>
+    `;
+  }
+}
+
+// 渲染骨架阶段
+function renderSkeletonPhase(data: any, statusData?: any) {
+  const container = getEl('timeline-content');
+  
+  const skeletonElapsed = statusData?.skeleton_elapsed_ms 
+    ? `骨架生成完成 (${(statusData.skeleton_elapsed_ms / 1000).toFixed(1)}s)`
+    : '骨架已就绪';
+  
+  container.innerHTML = `
+    <div class="timeline-card" style="border-left: 5px solid #007AFF;">
+      <h5 style="color:#007AFF;">📍 行程骨架已生成</h5>
+      <p style="color:#8E8E93; font-size:12px;">${skeletonElapsed}，正在填充详细信息...</p>
+    </div>
+  `;
+  
+  // 清理旧地图标记
+  mapLayers.forEach(layer => map.removeLayer(layer));
+  mapLayers = [];
+  
+  // 更新地图标记
+  data.dayPlanItinerary?.forEach((item: any) => {
+    if (item.lat && item.lng && parseFloat(item.lat) !== 0 && parseFloat(item.lng) !== 0) {
+      const latlng = L.latLng(parseFloat(item.lat), parseFloat(item.lng));
+      const marker = L.circleMarker(latlng, {
+        radius: 10,
+        fillColor: '#007AFF',
+        color: '#fff',
+        weight: 2,
+        fillOpacity: 0.7
+      }).addTo(map);
+      
+      const hasDescription = item.description && item.description.length > 10;
+      const popupContent = hasDescription 
+        ? `<b>${item.name}</b><br/><span style="color:#666;">${item.description.substring(0, 50)}...</span>`
+        : `<b>${item.name}</b><br/><span style="color:#8E8E93;">等待详情...</span>`;
+      
+      marker.bindPopup(popupContent);
+      mapLayers.push(marker);
+    }
+  });
+
+  const validPoints = data.dayPlanItinerary?.filter((i: any) => i.lat && i.lng && parseFloat(i.lat) !== 0) || [];
+  if (validPoints.length > 0) {
+    const bounds = L.latLngBounds(validPoints.map((i: any) => [parseFloat(i.lat), parseFloat(i.lng)]));
+    map.fitBounds(bounds, { padding: [50, 50] });
+  }
+}
+
+// 渲染填充阶段（plan_v3 filling 状态）
+function renderFillingPhase(data: any) {
+  const container = getEl('timeline-content');
+  
+  const total = data.dayPlanItinerary?.length || 0;
+  const filledCount = data.dayPlanItinerary?.filter((item: any) => 
+    item.description && item.description.length > 10
+  ).length || 0;
+  const fillProgress = total > 0 ? Math.round((filledCount / total) * 100) : 0;
+  
+  container.innerHTML = `
+    <div class="timeline-card" style="border-left: 5px solid #34C759;">
+      <h5 style="color:#34C759;">🔄 正在填充详细信息</h5>
+      <p style="color:#8E8E93; font-size:12px;">
+        进度: ${fillProgress}% (${filledCount}/${total})
+      </p>
+      <div style="margin-top: 8px; height: 4px; background: #E5E5EA; border-radius: 2px;">
+        <div style="width: ${fillProgress}%; height: 100%; background: #34C759; border-radius: 2px; transition: width 0.3s;"></div>
+      </div>
+    </div>
+  `;
+  
+  // 更新地图
+  data.dayPlanItinerary?.forEach((item: any) => {
+    if (item.lat && item.lng && parseFloat(item.lat) !== 0 && parseFloat(item.lng) !== 0) {
+      const latlng = L.latLng(parseFloat(item.lat), parseFloat(item.lng));
+      const hasDescription = item.description && item.description.length > 10;
+      
+      const marker = L.circleMarker(latlng, {
+        radius: 12,
+        fillColor: hasDescription ? '#34C759' : '#8E8E93',
+        color: '#fff',
+        weight: 2,
+        fillOpacity: 0.8
+      }).addTo(map);
+      
+      const statusIcon = hasDescription ? '✓' : '⏳';
+      const popupContent = `
+        <b>${statusIcon} ${item.name}</b><br/>
+        <span style="color:#8E8E93;">Day ${item.day} · ${item.time}</span><br/>
+        ${item.description ? `<span style="color:#666;">${item.description.substring(0, 60)}...</span>` : '<span style="color:#8E8E93;">详细信息填充中...</span>'}
+      `;
+      marker.bindPopup(popupContent);
+      mapLayers.push(marker);
+    }
+  });
+
+  const validPoints = data.dayPlanItinerary?.filter((i: any) => i.lat && i.lng && parseFloat(i.lat) !== 0) || [];
+  if (validPoints.length > 0) {
+    const bounds = L.latLngBounds(validPoints.map((i: any) => [parseFloat(i.lat), parseFloat(i.lng)]));
+    map.fitBounds(bounds, { padding: [50, 50] });
   }
 }
 

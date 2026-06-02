@@ -26,22 +26,31 @@ export async function wechatLogin(params = {}) {
         
         console.log('[WeChat] 登录凭证:', loginRes.code)
         
-        // 2. 构建用户信息
-        const userInfoData = {
-          nickname: params.nickname || '微信用户',
-          avatar_url: params.avatar_url || '',
-          phone: params.phone || '',
-          gender: 0,
-          country: '',
-          province: '',
-          city: '',
-          language: 'zh_CN'
-        }
-        
-        // 3. 构建请求数据
-        const requestData = { 
-          code: loginRes.code,
-          user_info: userInfoData
+        // 2. 构建请求数据，只传 code，不传 user_info
+        // 避免后端用默认值覆盖数据库已有配置
+        const requestData = { code: loginRes.code }
+
+        // 只有当用户主动填写了昵称或头像时，才传给后端
+        // 这样后端可以判断：有 user_info 且用户不存在时创建；已存在时不覆盖
+        const hasCustomInfo = (params.nickname && params.nickname !== '微信用户') ||
+                               (params.avatar_url && params.avatar_url.trim() !== '')
+        if (hasCustomInfo) {
+          const userInfo = {
+            phone: params.phone || '',
+            gender: 0,
+            country: '',
+            province: '',
+            city: '',
+            language: 'zh_CN'
+          }
+          // 只传用户实际填写的字段，不传空值覆盖数据库
+          if (params.nickname && params.nickname !== '微信用户') {
+            userInfo.nickname = params.nickname
+          }
+          if (params.avatar_url && params.avatar_url.trim() !== '') {
+            userInfo.avatar_url = params.avatar_url
+          }
+          requestData.user_info = userInfo
         }
         
         // 4. 如果有手机号授权信息，添加到请求中
@@ -68,9 +77,11 @@ export async function wechatLogin(params = {}) {
           if (result.code === 0) {
             const userStore = useUserStore()
             userStore.setLoginData(result.data)
+            // 优先使用后端数据库配置，其次使用本次传入的参数
             userStore.setUserInfo({
-              nickname: userInfoData.nickname,
-              avatar_url: userInfoData.avatar_url
+              nickname: result.data.nickname || params.nickname,
+              avatar_url: result.data.avatar_url || params.avatar_url,
+              id: result.data.user_id || result.data.id || (requestData.user_info && requestData.user_info.id)
             })
             resolve(result.data)
           } else {

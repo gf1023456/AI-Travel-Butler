@@ -73,7 +73,7 @@ async def get_history_list(
             query = query.filter(TravelPlan.is_favorite == True)  # 只获取收藏的 
 
         total = query.count()
-        plans_raw = query.offset(offset).limit(page_size).all()
+        plans_raw = query.order_by(TravelPlan.created_at.desc()).offset(offset).limit(page_size).all()
 
         # 在session作用域内将所有数据库对象转换为原始值类型
         # 防止 DetachedInstanceError 错误
