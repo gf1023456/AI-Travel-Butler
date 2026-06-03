@@ -1,0 +1,49 @@
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 8787,
+    "request_timeout_ms": 120000,
+    "max_retries": 3
+  },
+  "ai_providers": {
+    "gemini": {
+      "enabled": false,
+      "model": "gemini-2.0-flash",
+      "temperature": 0.7
+    },
+    "deepseek": {
+      "enabled": false,
+      "model": "deepseek-v4-pro",
+      "temperature": 0.7
+    },
+    "zhipu": {
+      "enabled": false,
+      "model": "glm-4",
+      "temperature": 0.7
+    },
+    "dashscope": {
+      "enabled": true,
+      "model": "qwen-max",
+      "temperature": 0.7
+    },
+    "mimo": {
+      "enabled": true,
+      "model": "MiMo-V2.5-Pro",
+      "temperature": 0.7
+    }
+  },
+  "external_apis": {
+    "amap": {
+      "enabled": false
+    },
+    "weather": {
+      "enabled": false
+    },
+    "tdt": {
+      "enabled": true
+    }
+  },
+  "frontend": {
+    "backend_url": "http://localhost:8787"
+  }
+}

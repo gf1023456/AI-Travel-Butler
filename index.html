@@ -1,0 +1,214 @@
+
+<!doctype html>
+<html>
+  <head>
+    <title>AI Travel Pro - 深度智游</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="./index.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "@google/genai": "https://esm.sh/@google/genai@^0.7.0",
+          "leaflet": "https://esm.sh/leaflet@1.9.4"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <!-- Login Overlay Removed -->
+
+    <!-- Main App Shell -->
+    <div class="app-shell" id="main-app">
+      
+      <!-- Top Bar -->
+      <div class="top-bar glass-panel">
+         <div class="top-search-trigger" id="top-search-trigger">
+            <i class="fas fa-search"></i>
+            <span>输入旅行灵感...</span>
+         </div>
+         <div id="user-profile" class="user-avatar-mini">
+            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="User">
+         </div>
+      </div>
+
+      <!-- Map Base -->
+      <main class="main-canvas">
+        <div id="map"></div>
+      </main>
+
+      <!-- Sheet: Explore (Input) -->
+      <div class="sheet-panel" id="sheet-explore">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+          <div class="brand"><i class="fas fa-magic"></i><span>灵感探索</span></div>
+          <button class="close-sheet-btn" data-target="sheet-explore"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="sheet-content">
+          <div class="settings-group">
+            <label>AI 决策引擎</label>
+            <div class="ios-select-wrapper">
+              <select id="model-selector" disabled>
+                <option value="auto" selected>模型由后端环境变量配置</option>🧠 Gemini 3 Pro (推荐)</option>
+                <option value="gemini-3-flash-preview">⚡ Gemini 3 Flash</option>
+                <option value="deepseek-chat">🤖 DeepSeek V3</option>
+                <option value="glm-4.6v">🇨🇳 智谱 GLM-GLM-4.7</option>
+                <option value="qwen3.5-plus">🇨🇳 通义千问 Plus</option>
+                <option value="kimi-k2.5">kimi-k2</option> -->
+              </select>
+                <i class="fas fa-chevron-down"></i>
+            </div>
+          </div>
+
+          <!-- Mode Toggle -->
+          <div class="settings-group card-group">
+            <div class="flex-row-center">
+                <div>
+                <div style="font-weight: 700; font-size: 15px; color: var(--text-title);">生成模式</div>
+                <div id="mode-label-text" style="font-size: 12px; color: #64748b; margin-top:2px;">🔍 景点发现 (轻量)</div>
+                </div>
+                <label class="switch">
+                <input type="checkbox" id="planner-mode-toggle">
+                <span class="slider"></span>
+                </label>
+            </div>
+          </div>
+          
+          <!-- Style Selector -->
+          <div class="settings-group hidden" id="style-selector-group">
+            <label>核心旅行风格</label>
+            <div class="ios-select-wrapper">
+                <select id="travel-mode-selector">
+                <option value="deep">🍵 深度文化慢游</option>
+                <option value="special">🔥 特种兵极限打卡</option>
+                <option value="relax">🏖️ 躺平休闲度假</option>
+                <option value="photo">📸 摄影出片之旅</option>
+                </select>
+                 <i class="fas fa-chevron-down"></i>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <div class="prompt-box-v3">
+              <textarea id="prompt-input" placeholder="我想去..."></textarea>
+              <div class="action-bar">
+                <button id="generate" class="btn-generate">
+                    <i class="fas fa-paper-plane"></i> 开始规划
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sheet: Plan (Itinerary) -->
+      <div class="sheet-panel" id="sheet-plan">
+        <div class="sheet-handle"></div>
+        <div class="sheet-header">
+          <div class="brand"><i class="fas fa-map-marked-alt"></i><span>行程方案</span></div>
+          <div style="display:flex; gap:12px;">
+             <button id="save-itinerary-btn" class="icon-btn" title="保存"><i class="fas fa-save"></i></button>
+             <button id="share-btn" class="icon-btn" title="复制"><i class="fas fa-copy"></i></button>
+             <button id="export-file-btn" class="icon-btn" title="导出"><i class="fas fa-file-download"></i></button>
+             <button class="close-sheet-btn" data-target="sheet-plan"><i class="fas fa-times"></i></button>
+          </div>
+        </div>
+        <div class="sheet-content" id="timeline-content">
+            <div class="empty-state">
+                <i class="fas fa-route"></i>
+                <p>暂无行程，请先在“探索”中生成</p>
+            </div>
+        </div>
+      </div>
+
+      <!-- Bottom Dock -->
+      <nav class="bottom-dock glass-panel">
+        <button class="dock-item" id="nav-explore">
+            <i class="fas fa-compass"></i>
+            <span>探索</span>
+        </button>
+        <button class="dock-item" id="nav-plan">
+            <i class="fas fa-calendar-alt"></i>
+            <span>行程</span>
+        </button>
+        <button class="dock-item" id="nav-layers">
+            <i class="fas fa-layer-group"></i>
+            <span>卫星</span>
+        </button>
+        <button class="dock-item" id="nav-history">
+            <i class="fas fa-clock"></i>
+            <span>历史</span>
+        </button>
+        <button class="dock-item" id="nav-settings">
+            <i class="fas fa-cog"></i>
+            <span>设置</span>
+        </button>
+      </nav>
+
+      <!-- Settings Modal -->
+      <div id="settings-modal" class="modal-overlay">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3>设置</h3>
+            <button id="close-settings" class="close-modal-btn">&times;</button>
+          </div>
+          
+          <!-- 天地图 Key 已从环境变量配置，不再允许用户修改 -->
+          <div class="settings-group">
+            <label>天地图 Key</label>
+            <input type="text" class="ios-input" value="已由后端配置（环境变量）" readonly disabled style="opacity:0.6">
+            <div style="font-size:12px;color:#888;margin-top:4px">💡 通过环境变量 TDT_API_KEY 配置</div>
+          </div>
+
+          <!-- API Key 已从环境变量配置，不再允许用户修改 -->
+          <div class="settings-group">
+             <label>AI Provider Key</label>
+             <input type="text" class="ios-input" value="已由后端统一管理" readonly disabled style="opacity:0.6">
+             <div style="font-size:12px;color:#888;margin-top:4px">💡 通过环境变量 GEMINI_API_KEY 等配置</div>
+          </div>
+
+          <!-- 模型选择已从环境变量配置 -->
+          <div class="settings-group">
+             <label>AI 模型</label>
+             <input type="text" class="ios-input" value="已由后端配置" readonly disabled style="opacity:0.6">
+             <div style="font-size:12px;color:#888;margin-top:4px">💡 通过环境变量 GEMINI_MODEL 等配置</div>
+          </div>
+
+          <div class="settings-group" style="opacity:0.6">
+            <label>当前配置（仅供参考）</label>
+            <div id="current-config-info" style="font-size:13px;color:#666;padding:8px;background:#f5f5f5;border-radius:8px">
+              Provider: 加载中...<br>
+              Model: 加载中...
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- History Modal -->
+      <div id="history-modal" class="modal-overlay">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3>历史记录</h3>
+            <button id="close-history" class="close-modal-btn">&times;</button>
+          </div>
+          <div id="history-list" class="scroll-list"></div>
+        </div>
+      </div>
+
+      <!-- Loading Overlay -->
+      <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-content">
+          <div class="loading-icon">
+            <i class="fas fa-spinner fa-spin"></i>
+          </div>
+          <div class="loading-text">
+            <h3>Thinking...</h3>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="./index.tsx"></script>
+  </body>
+</html>

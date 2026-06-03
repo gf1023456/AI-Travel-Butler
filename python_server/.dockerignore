@@ -1,0 +1,13 @@
+__pycache__
+*.pyc
+*.pyo
+.env
+data/
+.git/
+.gitignore
+*.md
+build.sh
+run.sh
+test_login.sh
+export.sh
+init_db.sh

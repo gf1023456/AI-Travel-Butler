@@ -1,0 +1,22 @@
+{
+  "name": "ai-travel-butler",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:server": "node server/app.mjs",
+    "build": "vite build",
+    "preview": "vite preview",
+    "mcp:test": "echo \"Test MCP tools\""
+  },
+  "dependencies": {
+    "@google/genai": "^0.7.0",
+    "leaflet": "1.9.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
+  }
+}
