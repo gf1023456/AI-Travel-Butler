@@ -23,7 +23,7 @@
       <view class="nav-left">
         <image class="nav-avatar" :src="userAvatar" mode="aspectFill" />
         <view class="nav-location">
-          <text class="nav-brand">{{ userNickname }}</text>
+          <text class="nav-brand">📍 当前位置</text>
           <view class="location-row">
             <text class="loc-icon">📍</text>
             <text class="loc-text">{{ locationName }}</text>
@@ -95,20 +95,7 @@
     </button>
 
     <!-- Bottom Navigation -->
-    <nav class="bottom-nav" :style="{ bottom: (32 + safeAreaBottom) + 'px' }">
-      <button :class="['nav-item', 'nav-active']" @click="goExplore">
-        <text class="nav-item-icon">🧭</text>
-        <text class="nav-item-label">探索</text>
-      </button>
-      <button class="nav-item" @click="goPlan">
-        <text class="nav-item-icon">📅</text>
-        <text class="nav-item-label">行程</text>
-      </button>
-      <button class="nav-item" @click="goMine">
-        <text class="nav-item-icon">👤</text>
-        <text class="nav-item-label">我的</text>
-      </button>
-    </nav>
+    <BottomNav current-item="explore" explore-path="/pages/explore/index" />
 
     <!-- Detail Bottom Sheet -->
     <view v-if="showDetail" class="sheet-overlay" @click="closeDetail">
@@ -188,8 +175,10 @@ import { computed } from 'vue'
 import { getWeatherNow } from '@/api/weather.js'
 import { useSafeArea } from '@/utils/safeArea.js'
 import { themeClass } from '@/utils/theme.js'
+import BottomNav from '@/components/BottomNav.vue'
 
 export default {
+  components: { BottomNav },
   data() {
     return {
       center: [34.3416, 108.9398],
@@ -738,29 +727,6 @@ export default {
 }
 .ai-icon { font-size: 22px; }
 .ai-text { font-size: 14px; font-weight: 600; line-height: 22px; white-space: nowrap; }
-
-.bottom-nav {
-  position: fixed; left: 48rpx; right: 48rpx; z-index: 10;
-  display: flex; align-items: center; justify-content: space-around;
-  height: 72px; padding: 0 8px;
-  background: rgba(255,255,255,0.7); backdrop-filter: blur(30px);
-  -webkit-backdrop-filter: blur(30px);
-  border: 1px solid rgba(255,255,255,0.5);
-  border-radius: 999px;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-}
-.nav-item {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  padding: 8px 24px; border-radius: 999px;
-  color: var(--color-on-surface-variant); opacity: 0.6;
-}
-.nav-active {
-  background: var(--color-primary-container);
-  color: var(--color-on-primary-container); opacity: 1;
-  box-shadow: 0 4px 12px rgba(0,6,102,0.15);
-}
-.nav-item-icon { font-size: 22px; margin-bottom: 2px; }
-.nav-item-label { font-size: 10px; font-weight: 700; letter-spacing: 0.02em; }
 
 .sheet-overlay {
   position: fixed; inset: 0; z-index: 100;

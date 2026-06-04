@@ -1,14 +1,6 @@
 <template>
   <view class="settings-page" :class="themeClass">
-    <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
-    <header class="top-bar">
-      <view class="top-left">
-        <button class="back-btn" @click="goBack">
-          <text>←</text>
-        </button>
-        <text class="top-title">设置</text>
-      </view>
-    </header>
+    <NavBar show-back title="设置" placeholder />
 
     <scroll-view scroll-y class="content" show-scrollbar="false">
       <!-- Account & Security -->
@@ -155,6 +147,7 @@ import { useUserStore } from '@/store/user.js'
 import { useSafeArea } from '@/utils/safeArea.js'
 import { APP_CONFIG } from '@/config/index.js'
 import { getCurrentTheme, setTheme, isFollowSystem, setFollowSystem, themeClass } from '@/utils/theme.js'
+import NavBar from '@/components/NavBar.vue'
 
 const userStore = useUserStore()
 const { statusBarHeight } = useSafeArea()
@@ -296,24 +289,6 @@ const clearLocalData = () => {
 
 <style scoped>
 .settings-page { min-height: 100vh; background: var(--color-surface); }
-
-.status-bar { background: rgba(255,255,255,0.7); backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px); }
-.top-bar {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 24rpx 40rpx 24rpx;
-  background: rgba(255,255,255,0.7); backdrop-filter: blur(40px);
-  -webkit-backdrop-filter: blur(40px);
-  border-bottom: 1px solid rgba(255,255,255,0.2);
-  position: sticky; top: 0; z-index: 10;
-}
-.top-left { display: flex; align-items: center; gap: 12px; }
-.back-btn {
-  width: 36px; height: 36px; display: flex; align-items: center;
-  justify-content: center; font-size: 20px; color: var(--color-primary);
-  background: transparent; border: none; padding: 0;
-}
-.back-btn::after { border: none; }
-.top-title { font-size: 24px; font-weight: 700; color: var(--color-primary); letter-spacing: -0.01em; line-height: 32px; }
 
 .content { padding: 16rpx 40rpx 80rpx; }
 

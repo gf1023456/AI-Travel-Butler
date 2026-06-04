@@ -1,14 +1,8 @@
 <template>
   <view class="refine-page" :class="themeClass">
-    <header class="top-bar" :style="{ paddingTop: (12 + statusBarHeight) + 'px' }">
-      <view class="top-left">
-        <button class="back-btn" @click="goBack"><text>←</text></button>
-        <text class="top-title">行程优化</text>
-      </view>
-      <button class="more-btn"><text>⋯</text></button>
-    </header>
+    <NavBar show-back title="行程优化" placeholder />
 
-    <scroll-view scroll-y class="content" :style="{ paddingTop: (80 + statusBarHeight) + 'px' }">
+    <scroll-view scroll-y class="content">
       <!-- Trip Summary -->
       <section class="section">
         <view class="section-header">
@@ -84,15 +78,29 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useTravelStore } from '@/store/travel.js'
 import { useSafeArea } from '@/utils/safeArea.js'
 import { themeClass } from '@/utils/theme.js'
+import NavBar from '@/components/NavBar.vue'
 
 const travelStore = useTravelStore()
 const { statusBarHeight } = useSafeArea()
 const refineRequest = ref('')
 const charCount = computed(() => refineRequest.value.length)
+
+// 从 plan 页面跳转过来时预填充景点名称
+onMounted(() => {
+  const pages = getCurrentPages()
+  if (pages.length > 0) {
+    const currentPage = pages[pages.length - 1]
+    const options = currentPage.options || currentPage.$page?.options || {}
+    const focus = options.focus
+    if (focus) {
+      refineRequest.value = `请优化「${decodeURIComponent(focus)}」这个景点的安排`
+    }
+  }
+})
 
 const currentTitle = computed(() => {
   return travelStore.currentPlan?.itinerarySummary?.substring(0, 20) || '京都秋意之旅'
@@ -113,8 +121,6 @@ const suggestions = [
   { icon: '🚶', text: '减少步行距离' },
   { icon: '📸', text: '增加网红打卡' }
 ]
-
-const goBack = () => uni.navigateBack()
 
 const handleRefine = async () => {
   if (!refineRequest.value.trim()) {
@@ -146,20 +152,7 @@ const handleRefine = async () => {
 <style scoped>
 .refine-page { min-height: 100vh; background: var(--color-surface); }
 
-.top-bar {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 10;
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 24rpx 40rpx 24rpx;
-  background: var(--color-surface); opacity: 0.95;
-  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-  border-bottom: 1px solid rgba(255,255,255,0.2);
-}
-.top-left { display: flex; align-items: center; gap: 12px; }
-.back-btn { font-size: 20px; color: var(--color-primary); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
-.top-title { font-size: 20px; font-weight: 600; color: var(--color-primary); line-height: 28px; }
-.more-btn { font-size: 24px; color: var(--color-on-surface-variant); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
-
-.content { padding: 160rpx 40rpx 64rpx; }
+.content { padding: 24rpx 40rpx 64rpx; }
 
 .section { margin-bottom: 80rpx; }
 .section-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }

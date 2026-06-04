@@ -1,18 +1,8 @@
 <template>
   <view class="history-page" :class="themeClass">
-    <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
-    <header class="top-bar">
-      <button class="back-btn" @click="goBack"><text>←</text></button>
-      <text class="top-brand">慧游</text>
-      <view class="top-spacer"></view>
-    </header>
-
+    <NavBar show-back title="历史记录" />
     <scroll-view scroll-y class="content">
-      <view v-if="historyList.length === 0" class="empty-state">
-        <view class="empty-icon-wrap"><text class="empty-icon">📭</text></view>
-        <text class="empty-title">暂无历史记录</text>
-        <text class="empty-desc">你的旅行方案将显示在这里</text>
-      </view>
+      <EmptyState v-if="historyList.length === 0" icon="📭" title="暂无历史记录" description="你的旅行方案将显示在这里" />
 
       <view class="history-section" v-else>
         <text class="section-overline">旅行记录</text>
@@ -47,35 +37,27 @@
       <view class="sheet-container" @click.stop>
         <view class="sheet-handle"></view>
         <view class="sheet-header">
-          <text class="sheet-title">{{ selectedDetail.itinerary_summary?.substring(0, 24) || '行程详情' }}</text>
+          <text class="sheet-title">{{ selectedDetail.itinerary_summary?.substring(0, 30) || '行程详情' }}{{ (selectedDetail.itinerary_summary?.length || 0) > 30 ? '...' : '' }}</text>
           <view class="sheet-header-meta">
             <view class="sheet-meta-item">
-              <text class="meta-label">创建时间</text>
+              <text class="meta-icon">📅</text>
               <text class="meta-value">{{ formatDate(selectedDetail.created_at) }}</text>
-            </view>
-            <view class="sheet-meta-item">
-              <text class="meta-label">模型</text>
-              <text class="meta-value">{{ selectedDetail.model_type || 'N/A' }}</text>
-            </view>
-            <view class="sheet-meta-item">
-              <text class="meta-label">提供商</text>
-              <text class="meta-value">{{ selectedDetail.provider || 'N/A' }}</text>
             </view>
           </view>
         </view>
         <scroll-view scroll-y class="sheet-body">
           <view v-if="selectedDetail.itinerary_summary" class="sheet-summary">
-            <view class="sheet-section-label">行程摘要</view>
+            <view class="sheet-section-label">📝 行程摘要</view>
             <text class="summary-text">{{ selectedDetail.itinerary_summary.substring(0, 500) }}</text>
           </view>
           <view v-if="selectedDetail.day_plan" class="sheet-plan">
-            <view class="sheet-section-label">行程计划</view>
+            <view class="sheet-section-label">📍 行程计划</view>
             <view v-if="Array.isArray(selectedDetail.day_plan)">
               <view v-for="(loc, i) in selectedDetail.day_plan" :key="i" class="plan-loc-card">
                 <view class="loc-badge">{{ i + 1 }}</view>
                 <view class="loc-content">
                   <text class="loc-name">{{ loc.name || loc.title || '未知地点' }}</text>
-                  <text class="loc-time" v-if="loc.time">{{ loc.time }}</text>
+                  <text class="loc-time" v-if="loc.time">🕐 {{ loc.time }}</text>
                   <text class="loc-desc" v-if="loc.description">{{ loc.description }}</text>
                 </view>
               </view>
@@ -83,12 +65,12 @@
             <view v-else>
               <view v-for="(locs, dayKey) in selectedDetail.day_plan" :key="dayKey">
                 <view v-if="Array.isArray(locs)">
-                  <view class="day-group-header">Day {{ dayKey }}</view>
+                  <view class="day-group-header">✨ Day {{ dayKey }}</view>
                   <view v-for="(loc, i) in locs" :key="i" class="plan-loc-card">
                     <view class="loc-badge">{{ i + 1 }}</view>
                     <view class="loc-content">
                       <text class="loc-name">{{ loc.name || loc.title || '未知地点' }}</text>
-                      <text class="loc-time" v-if="loc.time">{{ loc.time }}</text>
+                      <text class="loc-time" v-if="loc.time">🕐 {{ loc.time }}</text>
                       <text class="loc-desc" v-if="loc.description">{{ loc.description }}</text>
                     </view>
                   </view>
@@ -113,6 +95,8 @@ import { useUserStore } from '@/store/user.js'
 import { getHistoryList, deleteHistory as deleteHistoryApi, getHistoryDetail } from '@/api/history.js'
 import { useSafeArea } from '@/utils/safeArea.js'
 import { themeClass } from '@/utils/theme.js'
+import NavBar from '@/components/NavBar.vue'
+import EmptyState from '@/components/EmptyState.vue'
 
 const travelStore = useTravelStore()
 const userStore = useUserStore()
@@ -127,7 +111,7 @@ const getPreviewText = (item) => {
   return text.substring(0, 50) + (text.length > 50 ? '...' : '')
 }
 
-const goBack = () => uni.reLaunch({ url: '/pages/index/index' })
+const goBack = () => uni.navigateBack()
 
 onMounted(() => {
   userStore.restoreFromStorage()
@@ -272,77 +256,50 @@ const loadHistoryList = async () => {
 
 <style scoped>
 .history-page { min-height: 100vh; background: var(--color-surface); }
-.top-bar {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 24rpx 40rpx 16rpx;
-  background: rgba(248,249,250,0.8); backdrop-filter: blur(40px);
-  -webkit-backdrop-filter: blur(40px);
-  border-bottom: 1px solid rgba(198,197,212,0.3);
-  position: sticky; top: 0; z-index: 10;
-}
-.back-btn {
-  width: 40px; height: 40px; display: flex; align-items: center;
-  justify-content: center; font-size: 20px; color: var(--color-primary);
-}
-.top-brand {
-  font-size: 24px; font-weight: 700; color: var(--color-primary);
-  letter-spacing: -0.01em; line-height: 32px;
-}
-.top-spacer { width: 40px; }
 
 .content { padding: 16rpx 40rpx 240rpx; }
 
 .section-overline {
   display: block;
-  font-size: 11px; font-weight: 700; color: var(--color-outline);
+  font-size: 12px; font-weight: 700; color: var(--color-outline);
   text-transform: uppercase; letter-spacing: 0.15em;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
-
-.empty-state { display: flex; flex-direction: column; align-items: center; padding: 160rpx 40rpx; gap: 12px; }
-.empty-icon-wrap {
-  width: 80px; height: 80px; border-radius: 50%;
-  background: var(--color-surface-container-low);
-  display: flex; align-items: center; justify-content: center;
-  margin-bottom: 8px;
-}
-.empty-icon { font-size: 36px; }
-.empty-title { font-size: 18px; font-weight: 600; color: var(--color-on-surface); }
-.empty-desc { font-size: 14px; color: var(--color-outline); margin-top: 4px; }
 
 .history-card {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 40rpx; margin-bottom: 12px;
-  background: rgba(255,255,255,0.65); backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255,255,255,0.5);
-  border-radius: 24px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.02);
+  padding: 32rpx; margin-bottom: 16px;
+  background: rgba(255,255,255,0.7); backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255,255,255,0.4);
+  border-radius: 20px;
+  box-shadow: 0 4px 20px rgba(0,6,102,0.04);
   transition: all var(--transition-fast);
 }
 .history-card:active { transform: scale(0.97); }
 .history-info { flex: 1; min-width: 0; }
 .history-meta { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .meta-left { display: flex; align-items: center; gap: 6px; }
-.history-time { font-size: 11px; font-weight: 600; color: var(--color-outline); letter-spacing: 0.05em; text-transform: uppercase; }
+.history-time { font-size: 12px; font-weight: 600; color: var(--color-outline); letter-spacing: 0.05em; }
 .fav-badge text { font-size: 14px; }
 .history-tag {
-  font-size: 10px; font-weight: 700; letter-spacing: 0.05em;
-  padding: 2px 10px; border-radius: 999px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+  padding: 3px 12px; border-radius: 999px;
   background: var(--color-primary-fixed); color: var(--color-primary);
+  border: 1px solid rgba(0,6,102,0.08);
 }
 .history-preview {
-  font-size: 14px; color: var(--color-on-surface-variant);
-  line-height: 1.5; font-weight: 500; display: block;
+  font-size: 15px; color: var(--color-on-surface);
+  line-height: 1.6; font-weight: 500; display: block;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.history-actions { display: flex; align-items: center; gap: 8px; margin-left: 12px; }
+.history-actions { display: flex; align-items: center; gap: 8px; margin-left: 12px; flex-shrink: 0; }
 .action-load {
-  padding: 8px 16px; border-radius: 999px;
+  padding: 10px 20px; border-radius: 999px;
   background: linear-gradient(135deg, #000666 0%, #1a237e 100%);
-  color: #fff; font-size: 12px; font-weight: 600;
+  color: #fff; font-size: 13px; font-weight: 600;
   letter-spacing: 0.05em;
-  box-shadow: 0 4px 12px rgba(0,6,102,0.18);
+  box-shadow: 0 6px 16px rgba(0,6,102,0.2);
 }
 .action-load:active { transform: scale(0.95); }
 .action-delete {
@@ -360,72 +317,78 @@ const loadHistoryList = async () => {
 }
 .sheet-container {
   width: 100%; max-height: 82vh;
-  background: rgba(255,255,255,0.85); backdrop-filter: blur(24px) saturate(200%);
-  -webkit-backdrop-filter: blur(24px) saturate(200%);
+  background: rgba(255,255,255,0.9); backdrop-filter: blur(30px) saturate(200%);
+  -webkit-backdrop-filter: blur(30px) saturate(200%);
   border-radius: 32px 32px 0 0;
-  box-shadow: 0 -8px 40px rgba(0,0,0,0.08);
+  box-shadow: 0 -12px 48px rgba(0,0,0,0.12);
   display: flex; flex-direction: column;
   overflow: hidden;
 }
 .sheet-handle {
   width: 36px; height: 5px; border-radius: 999px;
-  background: var(--color-outline-variant); opacity: 0.5;
-  align-self: center; margin: 12px auto 4px;
+  background: var(--color-outline-variant); opacity: 0.4;
+  align-self: center; margin: 14px auto 6px;
 }
 .sheet-header {
-  padding: 32rpx 48rpx 40rpx;
+  padding: 32rpx 48rpx 32rpx;
   background: linear-gradient(135deg, #000666 0%, #1a237e 100%);
   color: #fff;
 }
 .sheet-title {
-  font-size: 22px; font-weight: 700; line-height: 28px;
-  letter-spacing: -0.01em; margin-bottom: 16px;
+  font-size: 20px; font-weight: 700; line-height: 28px;
+  letter-spacing: -0.01em; margin-bottom: 12px;
 }
 .sheet-header-meta {
-  display: flex; gap: 24px;
+  display: flex; gap: 16px;
 }
-.sheet-meta-item { display: flex; flex-direction: column; gap: 2px; }
-.meta-label {
-  font-size: 10px; font-weight: 600; letter-spacing: 0.05em;
-  text-transform: uppercase; opacity: 0.6;
+.sheet-meta-item {
+  display: flex; align-items: center; gap: 6px;
 }
-.meta-value { font-size: 13px; font-weight: 500; }
+.meta-icon { font-size: 14px; }
+.meta-value { font-size: 13px; font-weight: 500; opacity: 0.85; }
 .sheet-body { flex: 1; overflow-y: auto; padding: 40rpx 48rpx; }
 .sheet-section-label {
-  font-size: 11px; font-weight: 700; color: var(--color-outline);
-  text-transform: uppercase; letter-spacing: 0.15em;
-  margin-bottom: 12px;
+  font-size: 13px; font-weight: 700; color: var(--color-primary);
+  letter-spacing: 0.05em; margin-bottom: 12px;
 }
-.sheet-summary { margin-bottom: 20px; }
+.sheet-summary { margin-bottom: 24px; }
 .summary-text {
-  font-size: 14px; line-height: 1.7; color: var(--color-on-surface);
-  background: var(--color-surface-container-low);
-  border-radius: 12px; padding: 16px;
+  font-size: 14px; line-height: 1.8; color: var(--color-on-surface);
+  background: var(--color-surface-container);
+  border-radius: 16px; padding: 20px;
+  border: 1px solid rgba(255,255,255,0.5);
 }
 .plan-loc-card {
-  display: flex; gap: 12px;
-  padding: 14px 0; border-bottom: 1px solid rgba(198,197,212,0.12);
+  display: flex; gap: 14px; align-items: flex-start;
+  padding: 16px; margin-bottom: 10px;
+  background: rgba(255,255,255,0.5); backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 14px; border: 1px solid rgba(255,255,255,0.3);
 }
-.plan-loc-card:last-child { border-bottom: none; }
+.plan-loc-card:last-child { margin-bottom: 0; }
 .loc-badge {
-  width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
-  background: var(--color-primary-fixed); color: var(--color-primary);
+  width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+  background: var(--color-primary-container); color: var(--color-on-primary-container);
   display: flex; align-items: center; justify-content: center;
   font-size: 12px; font-weight: 700; margin-top: 2px;
 }
-.loc-content { flex: 1; }
-.loc-name { font-size: 15px; font-weight: 600; color: var(--color-on-surface); display: block; }
+.loc-content { flex: 1; min-width: 0; }
+.loc-name { font-size: 15px; font-weight: 700; color: var(--color-primary); display: block; }
 .loc-time { font-size: 12px; color: var(--color-on-surface-variant); margin: 4px 0; display: block; }
-.loc-desc { font-size: 12px; color: var(--color-outline); line-height: 1.5; }
+.loc-desc {
+  font-size: 13px; color: var(--color-on-surface-variant);
+  line-height: 1.6; margin-top: 4px;
+}
 .day-group-header {
-  font-size: 14px; font-weight: 700; color: var(--color-primary);
-  padding: 12px 0 8px; margin-top: 8px;
-  border-top: 2px dashed var(--color-outline-variant); opacity: 0.5;
+  font-size: 15px; font-weight: 700; color: var(--color-primary);
+  padding: 16px 0 10px; margin-top: 12px;
+  border-top: 2px dashed var(--color-primary-fixed);
 }
 .sheet-footer {
   display: flex; gap: 12px;
   padding: 32rpx 48rpx 56rpx;
   border-top: 1px solid rgba(198,197,212,0.1);
+  background: rgba(255,255,255,0.5);
 }
 .sheet-btn {
   flex: 1; height: 50px; border-radius: 16px;
@@ -434,7 +397,7 @@ const loadHistoryList = async () => {
 }
 .sheet-btn-primary {
   background: linear-gradient(135deg, #000666 0%, #1a237e 100%);
-  color: #fff; box-shadow: 0 8px 24px rgba(0,6,102,0.2);
+  color: #fff; box-shadow: 0 8px 24px rgba(0,6,102,0.25);
 }
 .sheet-btn-primary:active { transform: scale(0.97); }
 .sheet-btn-secondary {

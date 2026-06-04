@@ -79,6 +79,13 @@
         "navigationBarTitleText": "隐私政策",
         "navigationStyle": "custom"
       }
+    },
+    {
+      "path": "pages/guide/index",
+      "style": {
+        "navigationBarTitleText": "欢迎",
+        "navigationStyle": "custom"
+      }
     }
   ],
   "globalStyle": {

@@ -1,18 +1,8 @@
 <template>
   <view class="plan-page" :class="themeClass">
-    <header class="top-bar" :style="{ paddingTop: (12 + statusBarHeight) + 'px' }">
-      <view class="top-left">
-        <button class="back-btn" @click="goBack">
-          <text>←</text>
-        </button>
-        <text class="top-title">行程详情</text>
-      </view>
-      <button class="top-avatar-btn">
-        <image class="top-avatar" :src="userAvatar" mode="aspectFill" />
-      </button>
-    </header>
+    <NavBar show-back title="行程详情" back-url="/pages/index/index" placeholder />
 
-    <scroll-view scroll-y class="content" :style="{ paddingTop: (80 + statusBarHeight) + 'px' }">
+    <scroll-view scroll-y class="content">
       <section class="hero-card" v-if="travelStore.currentPlan">
         <image class="hero-img" src="https://tonystark-ai.ccwu.cc/png/fed79683-fbb6-44ac-9327-44c2f269cc47.png" mode="aspectFill" />
         <view class="hero-overlay"></view>
@@ -22,23 +12,16 @@
           <view class="hero-badge">
             <text>商务休闲</text>
           </view>
-          <!-- 填充进度提示 -->
-          <view class="fill-progress" v-if="isFilling">
-            <text class="fill-icon">🔄</text>
-            <text class="fill-text">{{ fillProgressText }}</text>
-            <view class="fill-bar">
-              <view class="fill-bar-inner" :style="{ width: fillProgress + '%' }"></view>
-            </view>
-          </view>
+          <!-- 骨架填充进度 - 使用 Skeleton 组件 -->
+          <Skeleton v-if="isFilling" type="inline" icon="🔄" :status-text="fillProgressText" :progress="fillProgress" />
         </view>
       </section>
 
-      <section class="empty-state" v-if="!travelStore.currentPlan">
-        <text class="empty-icon">✨</text>
-        <text class="empty-title">快去生成你的专属方案吧</text>
-        <button class="empty-btn" @click="goExplore">
-          <text>开始探索</text>
-        </button>
+      <EmptyState v-if="!travelStore.currentPlan" icon="✨" title="快去生成你的专属方案吧" action-text="开始探索" @action="goExplore" />
+
+      <!-- 骨架屏占位 - 等待数据填充 -->
+      <section v-if="travelStore.currentPlan && isFilling && !days.length" class="timeline">
+        <Skeleton type="timeline" :count="3" />
       </section>
 
       <section class="timeline" v-if="travelStore.currentPlan && days.length">
@@ -50,11 +33,11 @@
             <text class="day-title">{{ getDayTitle(dayKey) }}</text>
           </view>
           <view class="day-items">
-            <view v-for="(item, idx) in dayItems" :key="idx" class="timeline-item">
+            <view v-for="(item, idx) in dayItems" :key="idx" class="timeline-item" :class="{ 'editing': isEditing }">
               <view class="timeline-dot">
                 <view :class="['dot', idx === 0 ? 'dot-active' : '']"></view>
               </view>
-              <view class="item-card">
+              <view class="item-card" @longpress="onItemLongPress(item, dayKey, idx)">
                 <view class="item-img-wrap" @click="previewImage(item.image || getPlaceholderImg(idx))">
                   <image class="item-img" :src="item.image || getPlaceholderImg(idx)" mode="aspectFill" />
                 </view>
@@ -63,11 +46,33 @@
                     <text class="item-name">{{ item.name || '景点' }}</text>
                     <text class="item-weather" v-if="item.weather_icon">{{ item.weather_icon }} {{ item.temperature }}</text>
                   </view>
-                  <view class="item-time">
+                  <view class="item-time" v-if="!editingTimeItem || editingTimeItem !== item" @click="startEditTime(item)">
                     <text>🕐</text>
                     <text>{{ item.time || '全天' }}</text>
                   </view>
-                  <text class="item-desc">{{ item.description }}</text>
+                  <view class="item-time-edit" v-if="editingTimeItem === item">
+                    <picker mode="time" :value="item.time || '09:00'" @change="onTimeChange($event, item)">
+                      <view class="time-picker-display">
+                        <text>🕐</text>
+                        <text class="time-editing-text">{{ item.time || '09:00' }}</text>
+                        <text class="time-edit-hint">点击修改</text>
+                      </view>
+                    </picker>
+                  </view>
+                  <text class="item-desc" v-if="item.description">{{ item.description }}</text>
+                  <text class="item-desc skeleton-text" v-else-if="isFilling">正在生成详情...</text>
+                </view>
+                <!-- 编辑模式下的操作按钮 -->
+                <view class="item-edit-actions" v-if="isEditing">
+                  <button class="edit-action-btn move-up" v-if="idx > 0" @click.stop="moveItem(dayKey, idx, -1)">
+                    <text>↑</text>
+                  </button>
+                  <button class="edit-action-btn move-down" v-if="idx < dayItems.length - 1" @click.stop="moveItem(dayKey, idx, 1)">
+                    <text>↓</text>
+                  </button>
+                  <button class="edit-action-btn delete-btn" @click.stop="deleteItem(dayKey, idx)">
+                    <text>🗑</text>
+                  </button>
                 </view>
               </view>
             </view>
@@ -83,13 +88,13 @@
 
     <!-- Bottom Action Bar -->
     <view class="action-bar" :style="{ bottom: safeAreaBottom + 'px' }" v-if="travelStore.currentPlan">
+      <button class="action-btn action-outline" @click="toggleEdit">
+        <text>{{ isEditing ? '✅' : '✏️' }}</text>
+        <text>{{ isEditing ? '完成编辑' : '编辑行程' }}</text>
+      </button>
       <button class="action-btn action-outline" @click="generateBackendLongPoster">
         <text>📤</text>
         <text>分享行程</text>
-      </button>
-      <button class="action-btn action-outline" @click="copyToClipboard">
-        <text>📋</text>
-        <text>复制方案</text>
       </button>
       <button class="action-btn action-primary" @click="saveToHistory" v-if="!travelStore.currentPlan.isFromHistory">
         <text>💾</text>
@@ -101,6 +106,24 @@
     <button class="ai-bubble" @click="goRefine" :style="{ bottom: (112 + safeAreaBottom) + 'px' }" v-if="travelStore.currentPlan">
       <text>💡</text>
     </button>
+
+    <!-- 景点操作菜单 -->
+    <view v-if="showItemMenu" class="sheet-overlay" @click="showItemMenu = false">
+      <view class="item-menu" @click.stop>
+        <view class="menu-header">
+          <text class="menu-title">{{ selectedItem?.name || '景点操作' }}</text>
+        </view>
+        <button class="menu-option" @click="editItemTime">
+          <text>🕐</text><text>修改时间</text>
+        </button>
+        <button class="menu-option" @click="refineSingleItem">
+          <text>✨</text><text>AI 优化此景点</text>
+        </button>
+        <button class="menu-option danger" @click="confirmDeleteItem">
+          <text>🗑️</text><text>删除此景点</text>
+        </button>
+      </view>
+    </view>
 
     <!-- 隐藏 Canvas 用于生成分享图片 -->
     <canvas canvas-id="shareCanvas" id="shareCanvas" style="position: fixed; left: -9999px; top: -9999px; width: 750px; height: 1200px;"></canvas>
@@ -116,10 +139,12 @@ import { generatePoster as generateBackendPoster, downloadPoster } from '@/api/p
 import { useSafeArea } from '@/utils/safeArea.js'
 import { themeClass } from '@/utils/theme.js'
 import PosterGenerator from '@/utils/poster.js'
+import NavBar from '@/components/NavBar.vue'
+import EmptyState from '@/components/EmptyState.vue'
+import Skeleton from '@/components/Skeleton.vue'
 
 const travelStore = useTravelStore()
 const userStore = useUserStore()
-const userAvatar = computed(() => userStore.avatarUrl || 'https://ui-avatars.com/api/?name=慧游&background=1a237e&color=fff&size=64')
 const { statusBarHeight, safeAreaBottom } = useSafeArea()
 const instance = getCurrentInstance()
 const posterGen = new PosterGenerator({ canvasId: 'shareCanvas', instance })
@@ -132,6 +157,14 @@ const officialImagePath = ref('')
 const isFilling = ref(false)
 const fillProgress = ref(0)
 const fillProgressText = ref('正在加载...')
+
+// 行程编辑相关状态
+const isEditing = ref(false)
+const editingTimeItem = ref(null)
+const showItemMenu = ref(false)
+const selectedItem = ref(null)
+const selectedDayKey = ref('')
+const selectedIdx = ref(-1)
 
 // 监听 currentPlan 变化，骨架填充完成后自动更新页面
 watch(() => travelStore.currentPlan, (newPlan) => {
@@ -170,6 +203,9 @@ const updateFillProgress = () => {
   // 每500ms更新一次
   if (isFilling.value && fillProgress.value < 100) {
     setTimeout(updateFillProgress, 500)
+  }
+  if (fillProgress.value >= 100) {
+    isFilling.value = false
   }
 }
 
@@ -243,9 +279,110 @@ const getPlaceholderImg = (idx) => {
   return imgs[idx % imgs.length]
 }
 
-const goBack = () => uni.redirectTo({ url: '/pages/index/index' })
 const goExplore = () => uni.navigateTo({ url: '/pages/explore/index' })
 const goRefine = () => uni.navigateTo({ url: '/pages/refine/refine' })
+
+// ============ 行程编辑功能 ============
+
+// 切换编辑模式
+const toggleEdit = () => {
+  isEditing.value = !isEditing.value
+  if (!isEditing.value) {
+    // 退出编辑模式时保存到 store
+    syncToStore()
+  }
+}
+
+// 长按景点弹出操作菜单
+const onItemLongPress = (item, dayKey, idx) => {
+  if (isEditing.value) return // 编辑模式下不弹菜单
+  selectedItem.value = item
+  selectedDayKey.value = dayKey
+  selectedIdx.value = idx
+  showItemMenu.value = true
+}
+
+// 移动景点（上/下）
+const moveItem = (dayKey, idx, direction) => {
+  const items = daysByDay.value[dayKey]
+  const newIdx = idx + direction
+  if (newIdx < 0 || newIdx >= items.length) return
+
+  // 交换在 dayPlanItinerary 中的位置
+  const day = parseInt(dayKey)
+  const dayItems = dayPlanItinerary.value.filter(i => i.day === day)
+  const otherItems = dayPlanItinerary.value.filter(i => i.day !== day)
+  
+  // 交换
+  const temp = dayItems[idx]
+  dayItems[idx] = dayItems[newIdx]
+  dayItems[newIdx] = temp
+  
+  // 更新 sequence
+  dayItems.forEach((item, i) => { item.sequence = i + 1 })
+  
+  dayPlanItinerary.value = [...otherItems, ...dayItems].sort((a, b) => (a.day - b.day) || (a.sequence - b.sequence))
+}
+
+// 删除景点
+const deleteItem = (dayKey, idx) => {
+  const day = parseInt(dayKey)
+  const target = daysByDay.value[dayKey][idx]
+  dayPlanItinerary.value = dayPlanItinerary.value.filter(item => item !== target)
+  // 重新编号 sequence
+  let seq = 1
+  dayPlanItinerary.value.filter(i => i.day === day).forEach(item => { item.sequence = seq++ })
+  syncToStore()
+}
+
+// 菜单中的删除确认
+const confirmDeleteItem = () => {
+  showItemMenu.value = false
+  if (!selectedItem.value) return
+  const day = parseInt(selectedDayKey.value)
+  dayPlanItinerary.value = dayPlanItinerary.value.filter(item => item !== selectedItem.value)
+  let seq = 1
+  dayPlanItinerary.value.filter(i => i.day === day).forEach(item => { item.sequence = seq++ })
+  syncToStore()
+  uni.showToast({ title: '已删除', icon: 'success' })
+}
+
+// 修改时间
+const startEditTime = (item) => {
+  editingTimeItem.value = item
+}
+
+const onTimeChange = (e, item) => {
+  item.time = e.detail.value
+  editingTimeItem.value = null
+  syncToStore()
+  uni.showToast({ title: '时间已更新', icon: 'success' })
+}
+
+const editItemTime = () => {
+  showItemMenu.value = false
+  if (selectedItem.value) {
+    editingTimeItem.value = selectedItem.value
+  }
+}
+
+// 单景点AI优化
+const refineSingleItem = () => {
+  showItemMenu.value = false
+  if (!selectedItem.value) return
+  uni.navigateTo({
+    url: `/pages/refine/refine?focus=${encodeURIComponent(selectedItem.value.name || '')}`
+  })
+}
+
+// 同步修改到 store
+const syncToStore = () => {
+  if (travelStore.currentPlan) {
+    travelStore.currentPlan.dayPlanItinerary = [...dayPlanItinerary.value]
+  }
+}
+
+// ============ 以下为原有功能 ============
 
 const previewImage = (current) => {
   const urls = []
@@ -608,34 +745,7 @@ const generateBackendLongPoster = async () => {
 <style scoped>
 .plan-page { min-height: 100vh; background: var(--color-surface); }
 
-.top-bar {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 10;
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 24rpx 40rpx 24rpx;
-  background: rgba(255,255,255,0.7); backdrop-filter: blur(40px);
-  -webkit-backdrop-filter: blur(40px);
-  border-bottom: 1px solid rgba(255,255,255,0.2);
-}
-.top-left { display: flex; align-items: center; gap: 12px; }
-.back-btn {
-  width: 36px; height: 36px; display: flex; align-items: center;
-  justify-content: center; font-size: 20px; color: var(--color-primary);
-}
-.top-title { font-size: 24px; font-weight: 700; color: var(--color-primary); letter-spacing: -0.01em; line-height: 32px; }
-.top-avatar { width: 32px; height: 32px; border-radius: 50%; }
-
-.content { padding: 160rpx 40rpx 280rpx; }
-
-.empty-btn {
-  margin-top: 16px;
-  padding: 12px 32px;
-  border-radius: 999px;
-  background: linear-gradient(135deg, #000666 0%, #343d96 100%);
-  color: #fff;
-  font-size: 16px;
-  font-weight: 600;
-  box-shadow: 0 8px 20px rgba(0,6,102,0.25);
-}
+.content { padding: 24rpx 40rpx 280rpx; }
 
 .disclaimer {
   text-align: center;
@@ -667,22 +777,6 @@ const generateBackendLongPoster = async () => {
   padding: 6px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.3);
 }
 
-.fill-progress {
-  display: flex; align-items: center; gap: 8px; margin-top: 12px;
-}
-.fill-icon { font-size: 14px; }
-.fill-text { font-size: 12px; color: rgba(255,255,255,0.9); }
-.fill-bar {
-  flex: 1; height: 4px; background: rgba(255,255,255,0.3); border-radius: 2px; overflow: hidden;
-}
-.fill-bar-inner {
-  height: 100%; background: #34C759; border-radius: 2px; transition: width 0.3s;
-}
-
-.empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 160rpx 40rpx; gap: 16px; }
-.empty-icon { font-size: 64px; opacity: 0.5; }
-.empty-title { font-size: 20px; font-weight: 700; color: var(--color-on-surface); }
-
 .timeline { padding-bottom: 32px; }
 .day-group { margin-bottom: 48px; }
 .day-header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
@@ -701,6 +795,7 @@ const generateBackendLongPoster = async () => {
 .day-items { padding: 0; }
 
 .timeline-item { display: flex; gap: 12px; margin-bottom: 24px; position: relative; }
+.timeline-item.editing .item-card { border-color: var(--color-primary); border-style: dashed; }
 .timeline-dot { display: flex; flex-direction: column; align-items: center; padding-top: 8px; width: 20px; flex-shrink: 0; }
 .dot {
   width: 16px; height: 16px; border-radius: 50%;
@@ -717,15 +812,65 @@ const generateBackendLongPoster = async () => {
   border: 1px solid rgba(255,255,255,0.5);
   border-radius: 16px; padding: 16px;
   box-shadow: 0 8px 24px rgba(0,6,102,0.04);
+  transition: border-color 0.2s ease;
 }
 .item-img-wrap { width: 96px; height: 96px; border-radius: 12px; overflow: hidden; flex-shrink: 0; }
 .item-img { width: 100%; height: 100%; }
-.item-info { flex: 1; }
+.item-info { flex: 1; min-width: 0; }
 .item-header { display: flex; justify-content: space-between; align-items: flex-start; }
 .item-name { font-size: 16px; font-weight: 700; color: var(--color-primary); }
 .item-weather { font-size: 12px; font-weight: 500; color: var(--color-secondary); }
 .item-time { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--color-on-surface-variant); margin-top: 4px; }
 .item-desc { font-size: 13px; color: var(--color-on-surface-variant); margin-top: 8px; line-height: 1.5; }
+.item-desc.skeleton-text { opacity: 0.4; font-style: italic; }
+
+/* 时间编辑 */
+.item-time-edit { margin-top: 4px; }
+.time-picker-display {
+  display: flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: 8px;
+  background: var(--color-primary-fixed); font-size: 12px;
+}
+.time-editing-text { color: var(--color-primary); font-weight: 600; }
+.time-edit-hint { font-size: 10px; color: var(--color-outline); margin-left: 4px; }
+
+/* 编辑模式操作按钮 */
+.item-edit-actions {
+  display: flex; flex-direction: column; gap: 6px;
+  margin-left: 8px; flex-shrink: 0; justify-content: center;
+}
+.edit-action-btn {
+  width: 32px; height: 32px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; background: var(--color-surface-container-low);
+  border: 1px solid var(--color-outline-variant);
+  transition: all 0.15s ease;
+}
+.edit-action-btn:active { transform: scale(0.9); }
+.edit-action-btn.delete-btn { color: var(--color-error); }
+
+/* 景点操作菜单 */
+.sheet-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(0,0,0,0.3); backdrop-filter: blur(6px);
+  display: flex; align-items: flex-end;
+}
+.item-menu {
+  width: 100%; padding: 32rpx 48rpx 64rpx;
+  background: rgba(255,255,255,0.95); backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 24px 24px 0 0;
+  box-shadow: 0 -8px 40px rgba(0,0,0,0.1);
+}
+.menu-header { margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--color-outline-variant); }
+.menu-title { font-size: 18px; font-weight: 700; color: var(--color-primary); }
+.menu-option {
+  display: flex; align-items: center; gap: 14px;
+  padding: 16px 8px; font-size: 16px; font-weight: 500;
+  color: var(--color-on-surface); border-radius: 12px;
+}
+.menu-option:active { background: var(--color-surface-container); }
+.menu-option.danger { color: var(--color-error); }
 
 .action-bar {
   position: fixed; left: 0; right: 0; z-index: 10;

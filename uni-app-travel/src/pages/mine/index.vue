@@ -1,16 +1,6 @@
 <template>
   <view class="mine-page" :class="themeClass">
-    <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
-    <header class="top-bar">
-      <view class="top-left">
-        <image class="top-avatar" :src="userAvatar" mode="aspectFill" />
-        <text class="top-brand">{{ userNickname }}</text>
-      </view>
-      <button class="top-notif">
-        <text>🔔</text>
-      </button>
-    </header>
-
+    <NavBar show-avatar title="我的" show-notif />
     <scroll-view scroll-y class="content" show-scrollbar="false">
       <!-- Profile Header -->
       <section class="profile-section">
@@ -113,20 +103,7 @@
     </scroll-view>
 
     <!-- Bottom Navigation -->
-    <nav class="bottom-nav" :style="{ bottom: (24 + safeAreaBottom) + 'px' }">
-      <button class="nav-item" @click="reLaunch('/pages/index/index')">
-        <text class="nav-item-icon">🧭</text>
-        <text class="nav-item-label">探索</text>
-      </button>
-      <button class="nav-item" @click="reLaunch('/pages/plan/plan')">
-        <text class="nav-item-icon">📅</text>
-        <text class="nav-item-label">行程</text>
-      </button>
-      <button class="nav-item nav-active">
-        <text class="nav-item-icon">👤</text>
-        <text class="nav-item-label">我的</text>
-      </button>
-    </nav>
+    <BottomNav current-item="mine" />
   </view>
 </template>
 
@@ -137,11 +114,11 @@ import { getUserInfo, updateUserInfo, verifyToken } from '@/api/user.js'
 import { getQuota } from '@/api/quota.js'
 import { useSafeArea } from '@/utils/safeArea.js'
 import { themeClass } from '@/utils/theme.js'
+import NavBar from '@/components/NavBar.vue'
+import BottomNav from '@/components/BottomNav.vue'
 
 const userStore = useUserStore()
 const defaultAvatar = 'https://ui-avatars.com/api/?name=慧游&background=1a237e&color=fff&size=256'
-const userAvatar = computed(() => userStore.avatarUrl || defaultAvatar)
-const userNickname = computed(() => userStore.nickname || '慧游')
 
 const userInfo = ref({ nickname: '', avatar: '', id: '' })
 const quotaInfo = ref({ used: 0, bonus: 0, max: 10, remaining: 10 })
@@ -275,29 +252,11 @@ const focusNickname = () => {
 }
 
 const goTo = (url) => uni.navigateTo({ url })
-const reLaunch = (url) => uni.reLaunch({ url })
 const showDevToast = () => uni.showToast({ title: '页面开发中', icon: 'none' })
 </script>
 
 <style scoped>
 .mine-page { min-height: 100vh; background: var(--color-surface); }
-
-.top-bar {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 24rpx 40rpx 24rpx;
-  background: rgba(255,255,255,0.7); backdrop-filter: blur(40px);
-  -webkit-backdrop-filter: blur(40px);
-  border-bottom: 1px solid rgba(255,255,255,0.2);
-  position: sticky; top: 0; z-index: 10;
-}
-.top-left { display: flex; align-items: center; gap: 12px; }
-.top-avatar { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--color-outline-variant); box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
-.top-brand { font-size: 24px; font-weight: 700; color: var(--color-primary); letter-spacing: -0.01em; line-height: 32px; }
-.top-notif {
-  width: 40px; height: 40px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 20px; color: var(--color-primary);
-}
 
 .content { padding: 16rpx 40rpx 280rpx; }
 
@@ -425,28 +384,4 @@ const showDevToast = () => uni.showToast({ title: '页面开发中', icon: 'none
   box-shadow: 0 8px 32px rgba(31,38,135,0.07), inset 0 0 0 1px rgba(255,255,255,0.2);
 }
 .logout-icon { font-size: 20px; }
-
-.bottom-nav {
-  position: fixed; left: 40rpx; right: 40rpx; z-index: 10;
-  display: flex; align-items: center; justify-content: space-around;
-  height: 80px; padding: 0 8px;
-  background: rgba(255,255,255,0.7); backdrop-filter: blur(30px);
-  -webkit-backdrop-filter: blur(30px);
-  border: 1px solid rgba(255,255,255,0.4);
-  border-radius: 999px;
-  box-shadow: 0 20px 50px rgba(0,0,0,0.1);
-}
-.nav-item {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  padding: 8px 24px; border-radius: 999px;
-  color: var(--color-on-secondary-container); opacity: 0.5;
-}
-.nav-active {
-  background: var(--color-primary-container);
-  color: var(--color-on-primary-container); opacity: 1;
-  box-shadow: 0 4px 12px rgba(0,6,102,0.15);
-  padding: 14px 32px;
-}
-.nav-item-icon { font-size: 22px; margin-bottom: 2px; }
-.nav-item-label { font-size: 12px; font-weight: 700; letter-spacing: 0.05em; }
 </style>

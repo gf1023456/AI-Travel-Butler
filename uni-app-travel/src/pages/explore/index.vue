@@ -1,18 +1,6 @@
 <template>
   <view class="explore-page" :class="themeClass">
-    <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
-    <header class="top-bar">
-      <view class="top-left">
-        <button class="top-back" @click="goBack">
-          <text>←</text>
-        </button>
-        <image class="top-avatar" :src="userAvatar" mode="aspectFill" />
-        <text class="top-brand">{{ userNickname }}</text>
-      </view>
-      <button class="top-notif">
-        <text class="notif-icon">🔔</text>
-      </button>
-    </header>
+    <NavBar show-back show-avatar show-notif title="灵感探索" />
     <scroll-view scroll-y class="content" show-scrollbar="false">
       <section class="section">
         <text class="section-overline">旅行风格</text>
@@ -53,14 +41,8 @@
           </view>
         </view>
         
-        <!-- 骨架状态提示 -->
-        <view class="skeleton-status" v-if="isSkeletonPhase">
-          <view class="skeleton-icon">🧠</view>
-          <view class="skeleton-info">
-            <text class="skeleton-title">{{ skeletonStatusText }}</text>
-            <text class="skeleton-sub" v-if="skeletonElapsed">耗时: {{ skeletonElapsed }}s</text>
-          </view>
-        </view>
+        <!-- 骨架状态提示 - 使用 Skeleton 组件 -->
+        <Skeleton v-if="isSkeletonPhase" type="inline" icon="🧠" :status-text="skeletonStatusText" :elapsed="skeletonElapsed" />
         <view class="tag-chips">
           <text class="tag-chip" @click="userInput = '上海 3天 深度游'">上海 3天</text>
           <text class="tag-chip" @click="userInput = '东京 樱花季 4天'">东京 樱花季</text>
@@ -90,16 +72,14 @@ import { useUserStore } from '@/store/user.js'
 import { getCurrentModel } from '@/api/travel.js'
 import { useSafeArea } from '@/utils/safeArea.js'
 import { themeClass } from '@/utils/theme.js'
+import NavBar from '@/components/NavBar.vue'
+import Skeleton from '@/components/Skeleton.vue'
 
 const travelStore = useTravelStore()
 const userStore = useUserStore()
-const userAvatar = computed(() => userStore.avatarUrl || 'https://ui-avatars.com/api/?name=慧游&background=1a237e&color=fff&size=64')
-const userNickname = computed(() => userStore.nickname || '慧游')
 const { statusBarHeight } = useSafeArea()
 
 onMounted(() => { userStore.restoreFromStorage() })
-
-const goBack = () => uni.navigateBack()
 
 const userInput = ref('')
 const travelModeIndex = ref(0)
@@ -154,24 +134,19 @@ const handleGenerate = async () => {
   }
 
   try {
-    uni.showLoading({ title: '规划中...' })
-    isSkeletonPhase.value = false // 重置状态
+    // 不用 uni.showLoading，让骨架屏组件负责视觉反馈
     // 使用 V4 骨架优先方案（支持完整状态流转：pending → running → skeleton_ready → completed）
     const result = await travelStore.createPlanV4({
       userInput: userInput.value,
       modelType: 'auto',
       travelMode: travelStyles[travelModeIndex.value].name
     })
-    // 无论骨架还是完整结果，都跳转
-    uni.hideLoading()
     isSkeletonPhase.value = false
     if (result && result.dayPlanItinerary && result.dayPlanItinerary.length > 0) {
-      // 骨架阶段也可以跳转，让用户先看到行程列表
       uni.showToast({ title: '行程已生成', icon: 'success' })
       uni.reLaunch({ url: '/pages/index/index' })
     }
   } catch (error) {
-    uni.hideLoading()
     isSkeletonPhase.value = false
     uni.showToast({ title: '生成失败，请稍后重试', icon: 'none' })
   }
@@ -183,34 +158,6 @@ const handleGenerate = async () => {
   min-height: 100vh;
   background: var(--color-surface);
 }
-.top-bar {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 24rpx 40rpx 16rpx;
-  background: rgba(248,249,250,0.8);
-  backdrop-filter: blur(40px);
-  -webkit-backdrop-filter: blur(40px);
-  border-bottom: 1px solid rgba(198,197,212,0.3);
-  position: sticky; top: 0; z-index: 10;
-}
-.top-left { display: flex; align-items: center; gap: 12px; }
-.top-back {
-  width: 40px; height: 40px; display: flex; align-items: center;
-  justify-content: center; font-size: 20px; color: var(--color-primary);
-}
-.top-avatar {
-  width: 40px; height: 40px; border-radius: 50%;
-  border: 1px solid var(--color-outline-variant);
-  box-shadow: 0 0 0 3px var(--color-surface);
-}
-.top-brand {
-  font-size: 24px; font-weight: 700; color: var(--color-primary);
-  letter-spacing: -0.01em; line-height: 32px;
-}
-.top-notif {
-  width: 40px; height: 40px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-}
-.notif-icon { font-size: 20px; }
 .content {
   padding: 16rpx 40rpx 240rpx;
 }
@@ -298,16 +245,7 @@ const handleGenerate = async () => {
   background: rgba(243,244,245,0.5);
 }
 
-.skeleton-status {
-  display: flex; align-items: center; gap: 12px;
-  padding: 32rpx 40rpx; margin-top: 12px;
-  background: rgba(0,102,153,0.1); border-radius: 16px;
-  border: 1px solid rgba(0,102,153,0.2);
-}
-.skeleton-icon { font-size: 24px; }
-.skeleton-info { flex: 1; }
-.skeleton-title { font-size: 14px; font-weight: 600; color: #006699; }
-.skeleton-sub { font-size: 12px; color: #999; margin-top: 2px; }
+
 
 .action-section { margin-top: 16px; display: flex; flex-direction: column; align-items: center; }
 .generate-btn {

@@ -22,6 +22,16 @@ onLaunch(() => {
   // 初始化主题
   initTheme()
 
+  // 检查是否首次启动（未完成引导）
+  const onboardingCompleted = uni.getStorageSync('onboarding_completed')
+  if (!onboardingCompleted) {
+    // 延迟跳转，避免与首页冲突
+    setTimeout(() => {
+      uni.reLaunch({ url: '/pages/guide/index' })
+    }, 100)
+    return
+  }
+
   // #ifdef H5
   try {
     if (typeof document !== 'undefined' && document.documentElement) {
