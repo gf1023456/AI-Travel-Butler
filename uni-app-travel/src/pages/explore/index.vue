@@ -77,7 +77,7 @@
           <text class="gen-icon">✨</text>
           <text>开始灵感生成</text>
         </button>
-        <text class="agreement-hint">点击生成即代表同意 慧游旅行服务协议</text>
+        <text class="agreement-hint">点击生成即代表同意 行程一下旅行服务协议</text>
       </section>
     </scroll-view>
   </view>
@@ -93,8 +93,8 @@ import { themeClass } from '@/utils/theme.js'
 
 const travelStore = useTravelStore()
 const userStore = useUserStore()
-const userAvatar = computed(() => userStore.avatarUrl || 'https://ui-avatars.com/api/?name=慧游&background=1a237e&color=fff&size=64')
-const userNickname = computed(() => userStore.nickname || '慧游')
+const userAvatar = computed(() => userStore.avatarUrl || 'https://ui-avatars.com/api/?name=行程一下&background=0F4C5C&color=fff&size=64')
+const userNickname = computed(() => userStore.nickname || '行程一下')
 const { statusBarHeight } = useSafeArea()
 
 onMounted(() => { userStore.restoreFromStorage() })
@@ -245,7 +245,7 @@ const handleGenerate = async () => {
 }
 .style-overlay {
   position: absolute; inset: 0; z-index: 1;
-  background: linear-gradient(to top, rgba(0,6,102,0.7) 0%, rgba(0,6,102,0.15) 50%, transparent 100%);
+  background: linear-gradient(to top, rgba(15,76,92,0.7) 0%, rgba(15,76,92,0.15) 50%, transparent 100%);
 }
 .style-label {
   position: relative; z-index: 2;
@@ -312,11 +312,11 @@ const handleGenerate = async () => {
 .action-section { margin-top: 16px; display: flex; flex-direction: column; align-items: center; }
 .generate-btn {
   width: 100%; height: 64px;
-  background: linear-gradient(135deg, #000666 0%, #1a237e 100%);
+  background: linear-gradient(135deg, #0F4C5C 0%, #14B8A6 100%);
   border-radius: 24px; color: #fff;
   font-size: 20px; font-weight: 600; line-height: 28px;
   display: flex; align-items: center; justify-content: center; gap: 12px;
-  box-shadow: 0 12px 32px rgba(0,6,102,0.25);
+  box-shadow: 0 12px 32px rgba(15,76,92,0.25);
   position: relative; overflow: hidden;
 }
 .generate-btn[disabled] { opacity: 0.5; }

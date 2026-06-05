@@ -119,7 +119,7 @@ import PosterGenerator from '@/utils/poster.js'
 
 const travelStore = useTravelStore()
 const userStore = useUserStore()
-const userAvatar = computed(() => userStore.avatarUrl || 'https://ui-avatars.com/api/?name=慧游&background=1a237e&color=fff&size=64')
+const userAvatar = computed(() => userStore.avatarUrl || 'https://ui-avatars.com/api/?name=行程一下&background=0F4C5C&color=fff&size=64')
 const { statusBarHeight, safeAreaBottom } = useSafeArea()
 const instance = getCurrentInstance()
 const posterGen = new PosterGenerator({ canvasId: 'shareCanvas', instance })
@@ -279,7 +279,7 @@ const wrapText = (ctx, text, x, y, maxWidth, lineHeight, maxLines) => {
 }
 
 const generateTags = () => {
-  const tags = ['慧游', '旅行']
+  const tags = ['行程一下', '旅行']
   if (days.value.length <= 3) tags.push('短途旅行')
   else if (days.value.length <= 7) tags.push('中途旅行')
   else tags.push('长途旅行')
@@ -306,11 +306,11 @@ const generateShareImageForOfficial = (callback) => {
   let currentY = 60
   ctx.setFillStyle('#FFFFFF')
   ctx.fillRect(0, 0, canvasWidth, 1600)
-  ctx.setFillStyle('#000666')
+  ctx.setFillStyle('#0F4C5C')
   ctx.fillRect(0, 0, canvasWidth, 180)
   ctx.setFillStyle('#FFFFFF')
   ctx.setFontSize(52)
-  ctx.fillText('慧游行程', padding, 90)
+  ctx.fillText('行程一下', padding, 90)
   ctx.setFontSize(28)
   ctx.fillText(`📅 ${new Date().toLocaleDateString()}`, padding, 145)
   currentY = 220
@@ -322,7 +322,7 @@ const generateShareImageForOfficial = (callback) => {
   })
   Object.keys(daysMap).sort().forEach(day => {
     ctx.setFontSize(36)
-    ctx.setFillStyle('#000666')
+    ctx.setFillStyle('#0F4C5C')
     ctx.fillText(`【Day ${day}】`, padding, currentY)
     currentY += 60
     daysMap[day].forEach(item => {
@@ -348,7 +348,7 @@ const generateShareImageForOfficial = (callback) => {
   ctx.setFontSize(24)
   ctx.setFillStyle('#AAAAAA')
   ctx.textAlign = 'center'
-  ctx.fillText('慧游 AI 旅行助手 · 智能规划您的旅程', canvasWidth / 2, currentY + 80)
+  ctx.fillText('行程一下 AI 旅行助手 · 智能规划您的旅程', canvasWidth / 2, currentY + 80)
   ctx.textAlign = 'left'
   ctx.draw(false, () => {
     setTimeout(() => {
@@ -419,7 +419,7 @@ const shareToOfficial = () => {
     return
   }
 
-  const title = `🌍 ${itinerarySummary.value || '慧游智能行程'}`.substring(0, 50)
+  const title = `🌍 ${itinerarySummary.value || '行程一下智能行程'}`.substring(0, 50)
   const content = generateText()
   const tags = generateTags()
 
@@ -524,7 +524,7 @@ const exportToFile = () => {
 }
 
 const generateText = () => {
-  let text = `🌍 慧游 行程指南\n📅 ${new Date().toLocaleString()}\n\n`
+  let text = `🌍 行程一下 行程指南\n📅 ${new Date().toLocaleString()}\n\n`
   if (itinerarySummary.value) text += `📝 ${itinerarySummary.value}\n\n`
   const days = {}
   dayPlanItinerary.value.forEach(item => {
@@ -630,11 +630,11 @@ const generateBackendLongPoster = async () => {
   margin-top: 16px;
   padding: 12px 32px;
   border-radius: 999px;
-  background: linear-gradient(135deg, #000666 0%, #343d96 100%);
+  background: linear-gradient(135deg, #0F4C5C 0%, #14B8A6 100%);
   color: #fff;
   font-size: 16px;
   font-weight: 600;
-  box-shadow: 0 8px 20px rgba(0,6,102,0.25);
+  box-shadow: 0 8px 20px rgba(15,76,92,0.25);
 }
 
 .disclaimer {
@@ -647,7 +647,7 @@ const generateBackendLongPoster = async () => {
 .hero-card {
   position: relative; overflow: hidden; border-radius: 16px;
   height: 200px; margin-bottom: 48px;
-  box-shadow: 0 12px 32px rgba(0,6,102,0.08);
+  box-shadow: 0 12px 32px rgba(15,76,92,0.08);
 }
 .hero-img { position: absolute; inset: 0; width: 100%; height: 100%; }
 .hero-overlay {
@@ -691,10 +691,10 @@ const generateBackendLongPoster = async () => {
   background: var(--color-secondary-container);
   display: flex; align-items: center; justify-content: center;
   font-size: 14px; font-weight: 700; color: var(--color-primary);
-  box-shadow: 0 4px 12px rgba(0,6,102,0.15);
+  box-shadow: 0 4px 12px rgba(15,76,92,0.15);
 }
 .day-active {
-  background: linear-gradient(135deg, #000666 0%, #343d96 100%);
+  background: linear-gradient(135deg, #0F4C5C 0%, #14B8A6 100%);
   color: #fff;
 }
 .day-title { font-size: 20px; font-weight: 600; color: var(--color-primary); letter-spacing: -0.01em; }
@@ -716,7 +716,7 @@ const generateBackendLongPoster = async () => {
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255,255,255,0.5);
   border-radius: 16px; padding: 16px;
-  box-shadow: 0 8px 24px rgba(0,6,102,0.04);
+  box-shadow: 0 8px 24px rgba(15,76,92,0.04);
 }
 .item-img-wrap { width: 96px; height: 96px; border-radius: 12px; overflow: hidden; flex-shrink: 0; }
 .item-img { width: 100%; height: 100%; }
@@ -732,7 +732,7 @@ const generateBackendLongPoster = async () => {
   display: flex; gap: 12px; padding: 40rpx;
   background: rgba(255,255,255,0.85); backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  border-top: 1px solid rgba(0,6,102,0.08);
+  border-top: 1px solid rgba(15,76,92,0.08);
 }
 .action-btn {
   flex: 1; height: 48px; border-radius: 999px;
@@ -744,16 +744,16 @@ const generateBackendLongPoster = async () => {
 }
 .action-primary {
   flex: 1.5;
-  background: linear-gradient(135deg, #000666 0%, #343d96 100%);
-  color: #fff; box-shadow: 0 8px 20px rgba(0,6,102,0.25);
+  background: linear-gradient(135deg, #0F4C5C 0%, #14B8A6 100%);
+  color: #fff; box-shadow: 0 8px 20px rgba(15,76,92,0.25);
 }
 
 .ai-bubble {
   position: fixed; right: 48rpx; z-index: 10;
   width: 56px; height: 56px; border-radius: 50%;
-  background: linear-gradient(135deg, #000666 0%, #343d96 100%);
+  background: linear-gradient(135deg, #0F4C5C 0%, #14B8A6 100%);
   display: flex; align-items: center; justify-content: center;
   font-size: 28px; color: #fff;
-  box-shadow: 0 8px 24px rgba(0,6,102,0.3);
+  box-shadow: 0 8px 24px rgba(15,76,92,0.3);
 }
 </style>

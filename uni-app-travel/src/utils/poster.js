@@ -11,7 +11,7 @@ export default class PosterGenerator {
     this.P = 32
     this.C = {
       surface: '#F8F9FA',
-      primary: '#1A237E',
+      primary: '#0F4C5C',
       onSurface: '#191C1D',
       onSurfaceVariant: '#454652',
       outline: '#767683',
@@ -361,11 +361,11 @@ export default class PosterGenerator {
     ctx.textAlign = 'center'
     ctx.fillText('🧭', P + logoSize / 2, y + 28)
 
-    // 品牌名 "慧游"
+    // 品牌名 "行程一下"
     ctx.setFillStyle(C.primary)
     ctx.setFontSize(28)
     ctx.textAlign = 'left'
-    ctx.fillText('慧游', P + logoSize + 12, y + 28)
+    ctx.fillText('行程一下', P + logoSize + 12, y + 28)
 
     // 品牌口号
     ctx.setFillStyle(C.outline)

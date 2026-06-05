@@ -139,9 +139,9 @@ import { useSafeArea } from '@/utils/safeArea.js'
 import { themeClass } from '@/utils/theme.js'
 
 const userStore = useUserStore()
-const defaultAvatar = 'https://ui-avatars.com/api/?name=慧游&background=1a237e&color=fff&size=256'
+const defaultAvatar = 'https://ui-avatars.com/api/?name=行程一下&background=0F4C5C&color=fff&size=256'
 const userAvatar = computed(() => userStore.avatarUrl || defaultAvatar)
-const userNickname = computed(() => userStore.nickname || '慧游')
+const userNickname = computed(() => userStore.nickname || '行程一下')
 
 const userInfo = ref({ nickname: '', avatar: '', id: '' })
 const quotaInfo = ref({ used: 0, bonus: 0, max: 10, remaining: 10 })
@@ -334,11 +334,11 @@ const showDevToast = () => uni.showToast({ title: '页面开发中', icon: 'none
 .edit-name-btn {
   width: 28px; height: 28px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(0,6,102,0.06); border: none; padding: 0;
+  background: rgba(15,76,92,0.06); border: none; padding: 0;
   flex-shrink: 0;
 }
 .edit-name-btn::after { border: none; }
-.edit-name-btn:active { background: rgba(0,6,102,0.12); }
+.edit-name-btn:active { background: rgba(15,76,92,0.12); }
 .edit-name-btn text { font-size: 14px; }
 .profile-badge {
   display: inline-flex; align-items: center; gap: 6px;
@@ -444,7 +444,7 @@ const showDevToast = () => uni.showToast({ title: '页面开发中', icon: 'none
 .nav-active {
   background: var(--color-primary-container);
   color: var(--color-on-primary-container); opacity: 1;
-  box-shadow: 0 4px 12px rgba(0,6,102,0.15);
+  box-shadow: 0 4px 12px rgba(15,76,92,0.15);
   padding: 14px 32px;
 }
 .nav-item-icon { font-size: 22px; margin-bottom: 2px; }

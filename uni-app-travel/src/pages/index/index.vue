@@ -88,7 +88,7 @@
       <text class="show-text">显示行程</text>
     </button>
 
-    <!-- Floating 慧游 Butler -->
+    <!-- Floating 行程一下 Butler -->
     <button class="ai-butler" @click="goExplore" :style="{ bottom: (136 + safeAreaBottom) + 'px' }">
       <text class="ai-icon">✨</text>
       <text class="ai-text">快来生成你得专属攻略吧</text>
@@ -216,10 +216,10 @@ export default {
     travelStore() { return useTravelStore() },
     userStore() { return useUserStore() },
     userAvatar() {
-      return this.userStore.avatarUrl || 'https://ui-avatars.com/api/?name=慧游&background=1a237e&color=fff&size=64'
+      return this.userStore.avatarUrl || 'https://ui-avatars.com/api/?name=行程一下&background=0F4C5C&color=fff&size=64'
     },
     userNickname() {
-      return this.userStore.nickname || '慧游'
+      return this.userStore.nickname || '行程一下'
     },
     themeClass() { return themeClass.value },
     hasPlan() {
@@ -273,7 +273,7 @@ export default {
                 fail: () => {
                   uni.showModal({
                     title: '需要位置权限',
-                    content: '慧游需要获取您的位置信息来在地图上展示附近景点和导航路线',
+                    content: '行程一下需要获取您的位置信息来在地图上展示附近景点和导航路线',
                     confirmText: '去设置',
                     success: (modal) => {
                       if (modal.confirm) {
@@ -673,7 +673,7 @@ export default {
 .quick-tag {
   font-size: 11px; font-weight: 700; letter-spacing: 0.05em;
   color: var(--color-primary);
-  background: rgba(0,6,102,0.1); padding: 2px 10px; border-radius: 999px;
+  background: rgba(15,76,92,0.1); padding: 2px 10px; border-radius: 999px;
 }
 .quick-day { font-size: 12px; font-weight: 500; letter-spacing: 0.05em; color: var(--color-on-surface-variant); }
 .quick-title {
@@ -690,7 +690,7 @@ export default {
 .quick-next { font-size: 14px; color: var(--color-on-surface-variant); font-weight: 500; }
 .quick-arrow {
   width: 40px; height: 40px; border-radius: 50%;
-  background: linear-gradient(135deg, #1a237e 0%, #4c56af 50%, #6366f1 100%);
+  background: linear-gradient(135deg, #0F4C5C 0%, #14B8A6 50%, #2DD4BF 100%);
   display: flex; align-items: center; justify-content: center;
   color: #fff; font-size: 20px; font-weight: 700;
   flex-shrink: 0;
@@ -731,9 +731,9 @@ export default {
   position: fixed; right: 48rpx; bottom: 136px; z-index: 10;
   display: flex; align-items: center; gap: 12px;
   padding: 32rpx 40rpx;
-  background: linear-gradient(135deg, #1a237e 0%, #4c56af 50%, #6366f1 100%);
+  background: linear-gradient(135deg, #0F4C5C 0%, #14B8A6 50%, #2DD4BF 100%);
   border-radius: 22px 22px 22px 4px;
-  box-shadow: 0 8px 24px rgba(0,6,102,0.2);
+  box-shadow: 0 8px 24px rgba(15,76,92,0.2);
   color: #fff; border: 1px solid rgba(255,255,255,0.2);
 }
 .ai-icon { font-size: 22px; }
@@ -757,7 +757,7 @@ export default {
 .nav-active {
   background: var(--color-primary-container);
   color: var(--color-on-primary-container); opacity: 1;
-  box-shadow: 0 4px 12px rgba(0,6,102,0.15);
+  box-shadow: 0 4px 12px rgba(15,76,92,0.15);
 }
 .nav-item-icon { font-size: 22px; margin-bottom: 2px; }
 .nav-item-label { font-size: 10px; font-weight: 700; letter-spacing: 0.02em; }
@@ -806,10 +806,10 @@ export default {
   background: rgba(26,35,126,0.08);
   padding: 4px 14px; border-radius: 999px;
   font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
-  color: #1a237e;
+  color: #0F4C5C;
 }
 .sheet-title {
-  font-size: 28px; font-weight: 700; color: #1a237e;
+  font-size: 28px; font-weight: 700; color: #0F4C5C;
   letter-spacing: -0.02em; line-height: 36px;
 }
 .sheet-body {
@@ -865,7 +865,7 @@ export default {
 .sheet-btn-nav {
   flex: 1;
   display: flex; align-items: center; justify-content: center; gap: 8px;
-  background: #1a237e; color: #fff;
+  background: #0F4C5C; color: #fff;
   padding: 16px 10px; border-radius: 999px;
   font-size: 17px; font-weight: 700;
   box-shadow: 0 4px 14px 0 rgba(26, 35, 126, 0.39);

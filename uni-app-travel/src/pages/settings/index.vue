@@ -53,7 +53,7 @@
               <text class="settings-icon">🌙</text>
               <text class="settings-item-title">深色模式</text>
             </view>
-            <switch :checked="darkModeEnabled" @change="toggleDarkMode" :disabled="followSystemTheme" color="#000666" />
+            <switch :checked="darkModeEnabled" @change="toggleDarkMode" :disabled="followSystemTheme" color="#0F4C5C" />
           </view>
           <view class="menu-divider"></view>
           <view class="settings-item">
@@ -61,7 +61,7 @@
               <text class="settings-icon">📱</text>
               <text class="settings-item-title">跟随系统</text>
             </view>
-            <switch :checked="followSystemTheme" @change="toggleFollowSystem" color="#000666" />
+            <switch :checked="followSystemTheme" @change="toggleFollowSystem" color="#0F4C5C" />
           </view>
         </view>
       </section>
@@ -75,7 +75,7 @@
               <text class="settings-icon">🔔</text>
               <text class="settings-item-title">行程提醒</text>
             </view>
-            <switch :checked="notificationEnabled" @change="toggleNotification" color="#000666" />
+            <switch :checked="notificationEnabled" @change="toggleNotification" color="#0F4C5C" />
           </view>
           <view class="menu-divider"></view>
           <view class="settings-item">
@@ -83,7 +83,7 @@
               <text class="settings-icon">🎯</text>
               <text class="settings-item-title">优惠活动推送</text>
             </view>
-            <switch :checked="promoEnabled" @change="togglePromo" color="#000666" />
+            <switch :checked="promoEnabled" @change="togglePromo" color="#0F4C5C" />
           </view>
           <view class="menu-divider"></view>
           <view class="settings-item" @click="showDevToast">

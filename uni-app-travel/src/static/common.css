@@ -5,15 +5,15 @@
   --status-bar-height: 0px;
 
   /* Light Theme (Default) */
-  --color-primary: #000666;
+  --color-primary: #0F4C5C;
   --color-on-primary: #ffffff;
-  --color-primary-container: #1a237e;
-  --color-on-primary-container: #8690ee;
-  --color-primary-fixed: #e0e0ff;
-  --color-primary-fixed-dim: #bdc2ff;
-  --color-on-primary-fixed: #000767;
-  --color-on-primary-fixed-variant: #343d96;
-  --color-inverse-primary: #bdc2ff;
+  --color-primary-container: #14B8A6;
+  --color-on-primary-container: #E0FFFF;
+  --color-primary-fixed: #E0FFFF;
+  --color-primary-fixed-dim: #A7F3D0;
+  --color-on-primary-fixed: #0F4C5C;
+  --color-on-primary-fixed-variant: #0D9488;
+  --color-inverse-primary: #14B8A6;
 
   --color-secondary: #516161;
   --color-on-secondary: #ffffff;
@@ -54,18 +54,18 @@
   --color-outline: #767683;
   --color-outline-variant: #c6c5d4;
   --color-surface-variant: #e1e3e4;
-  --color-surface-tint: #4c56af;
+  --color-surface-tint: #14B8A6;
   --color-background: #f8f9fa;
   --color-on-background: #191c1d;
 
-  --gradient-brand: linear-gradient(135deg, #000666 0%, #1a237e 100%);
-  --gradient-brand-reverse: linear-gradient(135deg, #1a237e 0%, #000666 100%);
+  --gradient-brand: linear-gradient(135deg, #0F4C5C 0%, #14B8A6 100%);
+  --gradient-brand-reverse: linear-gradient(135deg, #14B8A6 0%, #0F4C5C 100%);
   --gradient-shimmer: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
 
   --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.03);
-  --shadow-card: 0px 8px 24px rgba(0,6,102,0.04);
-  --shadow-elevated: 0px 12px 32px rgba(0,6,102,0.08);
-  --shadow-button: 0 12px 32px rgba(0,6,102,0.25);
+  --shadow-card: 0px 8px 24px rgba(15,76,92,0.04);
+  --shadow-elevated: 0px 12px 32px rgba(15,76,92,0.08);
+  --shadow-button: 0 12px 32px rgba(15,76,92,0.25);
 
   --radius-sm: 8px;
   --radius-md: 12px;
@@ -86,15 +86,15 @@
 /* Dark Theme - Supports both page-level and container-level */
 page.dark-theme,
 .dark-theme {
-  --color-primary: #bdc2ff;
-  --color-on-primary: #000767;
-  --color-primary-container: #343d96;
-  --color-on-primary-container: #e0e0ff;
-  --color-primary-fixed: #e0e0ff;
-  --color-primary-fixed-dim: #bdc2ff;
-  --color-on-primary-fixed: #000767;
-  --color-on-primary-fixed-variant: #bdc2ff;
-  --color-inverse-primary: #000666;
+  --color-primary: #A7F3D0;
+  --color-on-primary: #0F4C5C;
+  --color-primary-container: #0D9488;
+  --color-on-primary-container: #E0FFFF;
+  --color-primary-fixed: #E0FFFF;
+  --color-primary-fixed-dim: #A7F3D0;
+  --color-on-primary-fixed: #0F4C5C;
+  --color-on-primary-fixed-variant: #A7F3D0;
+  --color-inverse-primary: #14B8A6;
 
   --color-secondary: #b8cac9;
   --color-on-secondary: #0e1e1e;
@@ -135,12 +135,12 @@ page.dark-theme,
   --color-outline: #8e9192;
   --color-outline-variant: #454652;
   --color-surface-variant: #2e3132;
-  --color-surface-tint: #bdc2ff;
+  --color-surface-tint: #A7F3D0;
   --color-background: #0f1112;
   --color-on-background: #e1e3e4;
 
-  --gradient-brand: linear-gradient(135deg, #343d96 0%, #4c56af 100%);
-  --gradient-brand-reverse: linear-gradient(135deg, #4c56af 0%, #343d96 100%);
+  --gradient-brand: linear-gradient(135deg, #0F4C5C 0%, #14B8A6 100%);
+  --gradient-brand-reverse: linear-gradient(135deg, #14B8A6 0%, #0F4C5C 100%);
   --gradient-shimmer: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
 
   --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
@@ -199,7 +199,7 @@ button::after { border: none; }
 }
 
 .brand-gradient {
-  background: linear-gradient(135deg, #000666 0%, #1a237e 100%);
+  background: linear-gradient(135deg, #0F4C5C 0%, #14B8A6 100%);
 }
 
 .brand-gradient:active {

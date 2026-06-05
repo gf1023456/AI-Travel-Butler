@@ -32,7 +32,7 @@
         <view class="input-header">
           <view class="input-header-left">
             <text class="section-icon">✏️</text>
-            <text class="section-overline">告诉慧游你的想法</text>
+            <text class="section-overline">告诉行程一下你的想法</text>
           </view>
           <text class="char-count">{{ charCount }} / 500</text>
         </view>
@@ -67,7 +67,7 @@
           <text class="apply-icon">✨</text>
           <text>立即应用优化</text>
         </button>
-        <text class="apply-hint">慧游 将为您重新生成最优路线</text>
+        <text class="apply-hint">行程一下 将为您重新生成最优路线</text>
       </section>
 
 <!--      &lt;!&ndash; Decorative Visual &ndash;&gt;-->
@@ -234,11 +234,11 @@ const handleRefine = async () => {
 .action-section { margin-top: 48rpx; display: flex; flex-direction: column; align-items: center; }
 .apply-btn {
   width: 100%; height: 56px;
-  background: linear-gradient(135deg, #000666 0%, #2a3eb1 50%, #1a237e 100%);
+  background: linear-gradient(135deg, #0F4C5C 0%, #14B8A6 50%, #0F4C5C 100%);
   border-radius: 16px; color: #fff;
   font-size: 18px; font-weight: 700; line-height: 28px;
   display: flex; align-items: center; justify-content: center; gap: 12px;
-  box-shadow: 0 12px 24px rgba(0,6,102,0.3);
+  box-shadow: 0 12px 24px rgba(15,76,92,0.3);
   background-size: 200% 200%;
 }
 .apply-btn[disabled] { opacity: 0.5; }

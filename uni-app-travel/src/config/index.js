@@ -33,7 +33,7 @@ export const API_CONFIG = {
 // ==================== 业务配置 ====================
 export const APP_CONFIG = {
   // 应用名称
-  NAME: '慧游',
+  NAME: '行程一下',
   
   // 版本
   VERSION: '1.0.0',

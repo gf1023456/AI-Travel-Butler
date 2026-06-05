@@ -148,11 +148,11 @@ const handleWechatLogin = async () => {
 
 <style scoped>
 page {
-  background-color: #000000;
+  background: linear-gradient(160deg, #0a3341 0%, #0F4C5C 40%, #134e5e 70%, #0D9488 100%);
 }
 .login-page {
   min-height: 100vh;
-  background-color: #000000;
+  background: linear-gradient(160deg, #0a3341 0%, #0F4C5C 40%, #134e5e 70%, #0D9488 100%);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -173,7 +173,7 @@ page {
 .bg-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(0,0,0,0.2);
+  background: linear-gradient(180deg, rgba(15,76,92,0.25) 0%, rgba(13,148,136,0.15) 50%, rgba(10,51,65,0.35) 100%);
   z-index: 1;
 }
 
@@ -308,7 +308,7 @@ page {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: rgba(53,52,55,0.8);
+  background: rgba(15,76,92,0.75);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border: 1px solid rgba(255,255,255,0.1);
@@ -376,7 +376,7 @@ page {
 }
 
 .nickname-input:focus {
-  border-bottom-color: rgba(255,255,255,0.6);
+  border-bottom-color: rgba(20,184,166,0.6);
 }
 
 .input-glow {
@@ -407,8 +407,8 @@ page {
   background: none;
   border: none;
   outline: none;
-  background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
-  box-shadow: 0 8px 24px rgba(79,70,229,0.4);
+  background: linear-gradient(135deg, #0F4C5C 0%, #14B8A6 100%);
+  box-shadow: 0 8px 24px rgba(15,76,92,0.4);
   transition: transform 0.5s, opacity 0.3s;
   margin-top: 16px;
 }

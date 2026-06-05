@@ -3,7 +3,7 @@
     {
       "path": "pages/index/index",
       "style": {
-        "navigationBarTitleText": "慧游",
+        "navigationBarTitleText": "行程一下",
         "enablePullDownRefresh": false,
         "navigationStyle": "custom"
       }
@@ -62,7 +62,7 @@
   ],
   "globalStyle": {
     "navigationBarTextStyle": "black",
-    "navigationBarTitleText": "慧游",
+    "navigationBarTitleText": "行程一下",
     "navigationBarBackgroundColor": "#F8F9FA",
     "backgroundColor": "#F8F9FA",
     "app-plus": {

@@ -3,7 +3,7 @@
     <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
     <header class="top-bar">
       <button class="back-btn" @click="goBack"><text>←</text></button>
-      <text class="top-brand">慧游</text>
+      <text class="top-brand">行程一下</text>
       <view class="top-spacer"></view>
     </header>
 
@@ -339,10 +339,10 @@ const loadHistoryList = async () => {
 .history-actions { display: flex; align-items: center; gap: 8px; margin-left: 12px; }
 .action-load {
   padding: 8px 16px; border-radius: 999px;
-  background: linear-gradient(135deg, #000666 0%, #1a237e 100%);
+  background: linear-gradient(135deg, #0F4C5C 0%, #14B8A6 100%);
   color: #fff; font-size: 12px; font-weight: 600;
   letter-spacing: 0.05em;
-  box-shadow: 0 4px 12px rgba(0,6,102,0.18);
+  box-shadow: 0 4px 12px rgba(15,76,92,0.18);
 }
 .action-load:active { transform: scale(0.95); }
 .action-delete {
@@ -374,7 +374,7 @@ const loadHistoryList = async () => {
 }
 .sheet-header {
   padding: 32rpx 48rpx 40rpx;
-  background: linear-gradient(135deg, #000666 0%, #1a237e 100%);
+  background: linear-gradient(135deg, #0F4C5C 0%, #14B8A6 100%);
   color: #fff;
 }
 .sheet-title {
@@ -433,8 +433,8 @@ const loadHistoryList = async () => {
   font-size: 15px; font-weight: 600;
 }
 .sheet-btn-primary {
-  background: linear-gradient(135deg, #000666 0%, #1a237e 100%);
-  color: #fff; box-shadow: 0 8px 24px rgba(0,6,102,0.2);
+  background: linear-gradient(135deg, #0F4C5C 0%, #14B8A6 100%);
+  color: #fff; box-shadow: 0 8px 24px rgba(15,76,92,0.2);
 }
 .sheet-btn-primary:active { transform: scale(0.97); }
 .sheet-btn-secondary {
