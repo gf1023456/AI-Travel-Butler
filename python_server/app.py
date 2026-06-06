@@ -58,8 +58,12 @@ from routes.plan_v3 import router as plan_v3_router
 from routes.plan_v4 import router as plan_v4_router
 
 from routes.poster import router as poster_router
+from routes.random_city import router as random_city_router
+from routes.plan_likes import router as plan_likes_router
 
 app.include_router(poster_router)
+app.include_router(random_city_router)
+app.include_router(plan_likes_router)
 app.include_router(user_router)
 app.include_router(history_router)
 app.include_router(quota_router)

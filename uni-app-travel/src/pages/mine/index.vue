@@ -1,16 +1,16 @@
 <template>
   <view class="mine-page" :class="themeClass">
-    <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
-    <header class="top-bar">
+    <header class="top-bar" :style="{ paddingTop: (12 + statusBarHeight) + 'px' }">
       <view class="top-left">
-        <image class="top-avatar" :src="userAvatar" mode="aspectFill" />
-        <text class="top-brand">{{ userNickname }}</text>
+        <button class="back-btn" @click="goBack"><text>←</text></button>
+        <text class="top-title">我的</text>
       </view>
-      <button class="top-notif">
-        <text>🔔</text>
-      </button>
+      <view class="top-right">
+        <button class="top-avatar-btn">
+          <image class="top-avatar" :src="userAvatarComputed" mode="aspectFill" />
+        </button>
+      </view>
     </header>
-
     <scroll-view scroll-y class="content" show-scrollbar="false">
       <!-- Profile Header -->
       <section class="profile-section">
@@ -51,7 +51,7 @@
       <section class="quota-card">
         <view class="quota-header">
           <text class="quota-label">旅行规划配额</text>
-          <view class="quota-bonus">含 2 次额外奖励</view>
+          <view class="quota-bonus">含 {{ quotaInfo.bonus }} 次额外奖励</view>
         </view>
         <view class="quota-numbers">
           <text class="quota-current">{{ quotaInfo.remaining }}</text>
@@ -64,7 +64,33 @@
         </view>
         <view class="quota-footer">
           <text>已使用：{{ quotaInfo.used }} 次</text>
-          <text>12 天后重置</text>
+          <view class="quota-refresh" @click="forceRefreshQuota">刷新</view>
+        </view>
+      </section>
+
+      <!-- Invite Card -->
+      <section class="invite-card">
+        <view class="invite-header">
+          <view class="invite-icon-wrap">
+            <text class="invite-icon">🎁</text>
+          </view>
+          <view class="invite-header-text">
+            <text class="invite-title">邀请好友，获取额外配额</text>
+            <text class="invite-subtitle">每邀请 1 位好友，双方各 +3 次规划机会</text>
+          </view>
+        </view>
+        <view class="invite-actions" v-if="inviteInfo.invite_code">
+          <button class="invite-share-btn" open-type="share" @success="onShareSuccess">
+            <text class="invite-btn-icon">📤</text>
+            <text>分享给好友</text>
+          </button>
+          <button class="invite-copy-btn" @click="copyInviteCode">
+            <text class="invite-btn-icon">📋</text>
+            <text>复制邀请码</text>
+          </button>
+        </view>
+        <view class="invite-loading" v-else>
+          <text>生成邀请链接...</text>
         </view>
       </section>
 
@@ -81,6 +107,16 @@
             <text class="menu-arrow">›</text>
           </view>
           <view class="menu-divider"></view>
+          <view class="menu-item" @click="goTo('/pages/history/index?favoriteOnly=1')">
+            <view class="menu-item-left">
+              <view class="menu-icon" style="background: rgba(239,68,68,0.15);">
+                <text style="color: #ef4444; font-size: 24px;">📌</text>
+              </view>
+              <text class="menu-item-title">我的收藏</text>
+            </view>
+            <text class="menu-arrow">›</text>
+          </view>
+          <view class="menu-divider"></view>
           <view class="menu-item" @click="goTo('/pages/settings/index')">
             <view class="menu-item-left">
               <view class="menu-icon" style="background: var(--color-secondary-fixed); opacity: 0.3;">
@@ -91,7 +127,7 @@
             <text class="menu-arrow">›</text>
           </view>
           <view class="menu-divider"></view>
-          <view class="menu-item" @click="showDevToast">
+          <view class="menu-item" @click="goTo('/pages/settings/feedback')">
             <view class="menu-item-left">
               <view class="menu-icon" style="background: var(--color-tertiary-fixed); opacity: 0.3;">
                 <text style="color: var(--color-tertiary); font-size: 24px;">💬</text>
@@ -113,16 +149,16 @@
     </scroll-view>
 
     <!-- Bottom Navigation -->
-    <nav class="bottom-nav" :style="{ bottom: (24 + safeAreaBottom) + 'px' }">
-      <button class="nav-item" @click="reLaunch('/pages/index/index')">
+    <nav class="bottom-nav" :style="{ bottom: (32 + safeAreaBottom) + 'px' }">
+      <button class="nav-item" @click="goExplore">
         <text class="nav-item-icon">🧭</text>
         <text class="nav-item-label">探索</text>
       </button>
-      <button class="nav-item" @click="reLaunch('/pages/plan/plan')">
+      <button class="nav-item" @click="goPlan">
         <text class="nav-item-icon">📅</text>
         <text class="nav-item-label">行程</text>
       </button>
-      <button class="nav-item nav-active">
+      <button :class="['nav-item', 'nav-active']" @click="goMine">
         <text class="nav-item-icon">👤</text>
         <text class="nav-item-label">我的</text>
       </button>
@@ -131,22 +167,50 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import { onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import { useUserStore } from '@/store/user.js'
 import { getUserInfo, updateUserInfo, verifyToken } from '@/api/user.js'
-import { getQuota } from '@/api/quota.js'
+import { getQuota, getInviteInfo, addBonus } from '@/api/quota.js'
 import { useSafeArea } from '@/utils/safeArea.js'
 import { themeClass } from '@/utils/theme.js'
 
 const userStore = useUserStore()
-const defaultAvatar = 'https://ui-avatars.com/api/?name=行程一下&background=0F4C5C&color=fff&size=256'
-const userAvatar = computed(() => userStore.avatarUrl || defaultAvatar)
-const userNickname = computed(() => userStore.nickname || '行程一下')
+const { statusBarHeight, safeAreaBottom } = useSafeArea()
+
+const goBack = () => uni.navigateBack({ delta: 1 })
+const goExplore = () => uni.navigateTo({ url: '/pages/explore/index' })
+const goPlan = () => uni.navigateTo({ url: '/pages/plan/plan' })
+const goMine = () => uni.reLaunch({ url: '/pages/mine/index' })
+const defaultAvatar = 'https://ui-avatars.com/api/?name=行程一下&background=1a237e&color=fff&size=256'
 
 const userInfo = ref({ nickname: '', avatar: '', id: '' })
-const quotaInfo = ref({ used: 0, bonus: 0, max: 10, remaining: 10 })
+const quotaInfo = ref({ used: 0, bonus: 0, max: 1, remaining: 1 })
+const inviteInfo = ref({ invite_code: '', bonus_per_invite: 3 })
 const nicknameFocus = ref(false)
-const { statusBarHeight, safeAreaBottom } = useSafeArea()
+
+const userAvatarComputed = computed(() => userInfo.value.avatar || userStore.avatarUrl || 'https://ui-avatars.com/api/?name=行程一下&background=0F4C5C&color=fff&size=64')
+const userNicknameComputed = computed(() => userInfo.value.nickname || userStore.nickname || '行程一下')
+
+// 分享：inviteCode 在调用时才读取，确保已更新
+const shareInviteCode = ref('')
+watch(inviteInfo, (val) => {
+  if (val.invite_code) shareInviteCode.value = val.invite_code
+})
+onShareAppMessage(() => ({
+  title: '行程一下 - 邀请好友，双方各得3次规划配额',
+  path: `/pages/login/index?invite=${shareInviteCode.value}`,
+  imageUrl: 'https://tonystark-ai.ccwu.cc/png/fed79683-fbb6-44ac-9327-44c2f269cc47.png'
+}))
+
+const onShareSuccess = async () => {
+  try {
+    await addBonus('share')
+    uni.showToast({ title: '分享成功 +3 次配额', icon: 'success' })
+  } catch (err) {
+    console.warn('[Mine] 分享加分失败:', err)
+  }
+}
 
 onMounted(async () => {
   userStore.restoreFromStorage()
@@ -157,6 +221,14 @@ onMounted(async () => {
   }
   await loadUserInfo()
   await loadQuotaInfo()
+  await loadInviteInfo()
+})
+
+// 每次回到本页都刷新（解决邀请奖励不及时显示的问题）
+onShow(async () => {
+  if (!userStore.hasToken) return
+  console.log('[Mine] onShow 触发,重新拉取 quota + inviteInfo')
+  await Promise.all([loadQuotaInfo(), loadInviteInfo()])
 })
 
 const loadUserInfo = async () => {
@@ -179,12 +251,47 @@ const loadQuotaInfo = async () => {
     if (quota) {
       quotaInfo.value = {
         used: quota.used ?? 0, bonus: quota.bonus ?? 0,
-        max: quota.max ?? 10, remaining: quota.remaining ?? 0
+        max: quota.max ?? 1, remaining: quota.remaining ?? 0
       }
     }
   } catch {
-    quotaInfo.value = userStore.quota || { used: 0, bonus: 0, max: 10, remaining: 10 }
+    quotaInfo.value = userStore.quota || { used: 0, bonus: 0, max: 1, remaining: 1 }
   }
+}
+
+const loadInviteInfo = async () => {
+  try {
+    const res = await getInviteInfo()
+    if (res && res.code === 0 && res.data) {
+      inviteInfo.value = res.data
+    }
+  } catch {
+    console.error('获取邀请信息失败')
+  }
+}
+
+const copyInviteCode = () => {
+  const code = inviteInfo.value.invite_code
+  if (!code) return
+  uni.setClipboardData({
+    data: code,
+    success: () => {
+      uni.showToast({ title: '邀请码已复制', icon: 'success' })
+    }
+  })
+}
+
+// 手动强制刷新配额（调试用）
+const forceRefreshQuota = async () => {
+  uni.showLoading({ title: '刷新中...' })
+  await Promise.all([loadQuotaInfo(), loadInviteInfo()])
+  uni.hideLoading()
+  uni.showToast({
+    title: `剩余 ${quotaInfo.value.remaining} / 奖励 ${quotaInfo.value.bonus}`,
+    icon: 'none',
+    duration: 2000
+  })
+  console.log('[Mine] 强制刷新完成:', JSON.stringify(quotaInfo.value))
 }
 
 const handleLogout = () => {
@@ -205,14 +312,8 @@ const onUpdateNickname = async (e) => {
   if (!newNickname || newNickname === userInfo.value.nickname) return
   
   try {
-    // 强制从存储中重新加载 token
     userStore.restoreFromStorage()
     
-    // 调试：检查当前 token
-    const currentToken = uni.getStorageSync('user_token')
-    console.log('[Debug] 当前用户 token:', currentToken ? currentToken.substring(0, 50) + '...' : '无 token')
-    
-    // 验证 token 是否有效
     const isValid = await verifyToken()
     if (!isValid) {
       uni.showToast({ title: '登录已过期，请重新登录', icon: 'none' })
@@ -238,14 +339,8 @@ const onUpdateAvatar = async (e) => {
   const newAvatar = e.detail?.avatarUrl
   if (!newAvatar) return
   try {
-    // 强制从存储中重新加载 token
     userStore.restoreFromStorage()
     
-    // 调试：检查当前 token
-    const currentToken = uni.getStorageSync('user_token')
-    console.log('[Debug] 当前用户 token:', currentToken ? currentToken.substring(0, 50) + '...' : '无 token')
-    
-    // 验证 token 是否有效
     const isValid = await verifyToken()
     if (!isValid) {
       uni.showToast({ title: '登录已过期，请重新登录', icon: 'none' })
@@ -275,31 +370,31 @@ const focusNickname = () => {
 }
 
 const goTo = (url) => uni.navigateTo({ url })
-const reLaunch = (url) => uni.reLaunch({ url })
-const showDevToast = () => uni.showToast({ title: '页面开发中', icon: 'none' })
 </script>
 
 <style scoped>
 .mine-page { min-height: 100vh; background: var(--color-surface); }
 
 .top-bar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 10;
   display: flex; align-items: center; justify-content: space-between;
   padding: 24rpx 40rpx 24rpx;
   background: rgba(255,255,255,0.7); backdrop-filter: blur(40px);
   -webkit-backdrop-filter: blur(40px);
   border-bottom: 1px solid rgba(255,255,255,0.2);
-  position: sticky; top: 0; z-index: 10;
 }
 .top-left { display: flex; align-items: center; gap: 12px; }
-.top-avatar { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--color-outline-variant); box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
-.top-brand { font-size: 24px; font-weight: 700; color: var(--color-primary); letter-spacing: -0.01em; line-height: 32px; }
-.top-notif {
-  width: 40px; height: 40px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 20px; color: var(--color-primary);
+.back-btn {
+  width: 36px; height: 36px; display: flex; align-items: center;
+  justify-content: center; font-size: 20px; color: var(--color-primary);
 }
+.top-title { font-size: 24px; font-weight: 700; color: var(--color-primary); letter-spacing: -0.01em; line-height: 32px; }
+.top-right { display: flex; align-items: center; gap: 12px; }
+.top-avatar { width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.4); }
+.top-avatar-btn { padding: 0; margin: 0; border: none; background: transparent; line-height: 0; }
+.top-avatar-btn::after { border: none; }
 
-.content { padding: 16rpx 40rpx 280rpx; }
+.content { padding: 260rpx 40rpx 280rpx; }
 
 .profile-section { margin-bottom: 24px; }
 .profile-row { display: flex; align-items: center; gap: 24px; position: relative; }
@@ -334,11 +429,11 @@ const showDevToast = () => uni.showToast({ title: '页面开发中', icon: 'none
 .edit-name-btn {
   width: 28px; height: 28px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(15,76,92,0.06); border: none; padding: 0;
+  background: rgba(0,6,102,0.06); border: none; padding: 0;
   flex-shrink: 0;
 }
 .edit-name-btn::after { border: none; }
-.edit-name-btn:active { background: rgba(15,76,92,0.12); }
+.edit-name-btn:active { background: rgba(0,6,102,0.12); }
 .edit-name-btn text { font-size: 14px; }
 .profile-badge {
   display: inline-flex; align-items: center; gap: 6px;
@@ -384,9 +479,17 @@ const showDevToast = () => uni.showToast({ title: '页面开发中', icon: 'none
   100% { transform: translateX(200%); }
 }
 .quota-footer {
-  display: flex; justify-content: space-between;
+  display: flex; justify-content: space-between; align-items: center;
   font-size: 12px; font-weight: 500; letter-spacing: 0.05em;
   color: var(--color-on-surface-variant); opacity: 0.7;
+}
+.quota-refresh {
+  padding: 6rpx 20rpx;
+  border-radius: 999rpx;
+  background: rgba(15, 76, 92, 0.08);
+  color: var(--color-primary, #0F4C5C);
+  font-size: 11px; font-weight: 500; letter-spacing: 0.05em;
+  opacity: 1;
 }
 
 .menu-section { margin-bottom: 24px; }
@@ -412,6 +515,45 @@ const showDevToast = () => uni.showToast({ title: '页面开发中', icon: 'none
 .menu-arrow { font-size: 24px; color: var(--color-outline-variant); }
 .menu-divider { height: 1px; margin: 0 48rpx; background: linear-gradient(to right, transparent, rgba(255,255,255,0.4), transparent); }
 
+.invite-card {
+  background: linear-gradient(135deg, #0F4C5C 0%, #14B8A6 100%);
+  border-radius: 32px;
+  padding: 48rpx;
+  margin-bottom: 24px;
+  box-shadow: 0 12px 32px rgba(15,76,92,0.2);
+}
+.invite-header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
+.invite-icon-wrap {
+  width: 48px; height: 48px; border-radius: 16px;
+  background: rgba(255,255,255,0.15);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.invite-icon { font-size: 24px; }
+.invite-header-text { flex: 1; }
+.invite-title { font-size: 17px; font-weight: 700; color: #ffffff; display: block; margin-bottom: 4px; }
+.invite-subtitle { font-size: 12px; font-weight: 400; color: rgba(255,255,255,0.65); display: block; line-height: 1.5; }
+.invite-actions { display: flex; gap: 12px; }
+.invite-share-btn, .invite-copy-btn {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
+  height: 48px; border-radius: 999px; font-size: 14px; font-weight: 600;
+  border: none; padding: 0;
+}
+.invite-share-btn {
+  background: #ffffff; color: var(--color-primary);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+.invite-copy-btn {
+  background: rgba(255,255,255,0.12); color: #ffffff;
+  border: 1px solid rgba(255,255,255,0.2);
+}
+.invite-share-btn::after, .invite-copy-btn::after { border: none; }
+.invite-share-btn:active { transform: scale(0.96); }
+.invite-copy-btn:active { background: rgba(255,255,255,0.2); transform: scale(0.96); }
+.invite-btn-icon { font-size: 16px; }
+.invite-loading { text-align: center; padding: 12px 0; }
+.invite-loading text { font-size: 13px; color: rgba(255,255,255,0.5); }
+
 .logout-section { margin-top: 16px; }
 .logout-btn {
   width: 100%; padding: 32rpx;
@@ -426,27 +568,29 @@ const showDevToast = () => uni.showToast({ title: '页面开发中', icon: 'none
 }
 .logout-icon { font-size: 20px; }
 
+/* Bottom Navigation - 与首页统一风格 */
 .bottom-nav {
-  position: fixed; left: 40rpx; right: 40rpx; z-index: 10;
+  position: fixed; left: 48rpx; right: 48rpx; z-index: 10;
   display: flex; align-items: center; justify-content: space-around;
-  height: 80px; padding: 0 8px;
+  height: 72px; padding: 0 8px;
   background: rgba(255,255,255,0.7); backdrop-filter: blur(30px);
   -webkit-backdrop-filter: blur(30px);
-  border: 1px solid rgba(255,255,255,0.4);
+  border: 1px solid rgba(255,255,255,0.5);
   border-radius: 999px;
-  box-shadow: 0 20px 50px rgba(0,0,0,0.1);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.1);
 }
 .nav-item {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   padding: 8px 24px; border-radius: 999px;
-  color: var(--color-on-secondary-container); opacity: 0.5;
+  color: var(--color-on-surface-variant); opacity: 0.6;
+  background: transparent; border: none;
 }
+.nav-item::after { border: none; }
 .nav-active {
   background: var(--color-primary-container);
   color: var(--color-on-primary-container); opacity: 1;
   box-shadow: 0 4px 12px rgba(15,76,92,0.15);
-  padding: 14px 32px;
 }
 .nav-item-icon { font-size: 22px; margin-bottom: 2px; }
-.nav-item-label { font-size: 12px; font-weight: 700; letter-spacing: 0.05em; }
+.nav-item-label { font-size: 10px; font-weight: 700; letter-spacing: 0.02em; }
 </style>

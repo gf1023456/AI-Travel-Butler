@@ -19,6 +19,7 @@ class LoginRequest(BaseModel):
     phone_code: Optional[str] = None  # 手机号授权code
     encrypted_data: Optional[str] = None  # 加密数据
     iv: Optional[str] = None  # 加密算法初始向量
+    invite_code: Optional[str] = None  # 邀请码（来自分享链接）
 
 
 class RefreshTokenRequest(BaseModel):
@@ -45,14 +46,16 @@ async def login(request: LoginRequest):
     print(f"[Login] 收到登录请求: code={request.code[:20] if request.code else 'None'}...")
     print(f"[Login] user_info: {request.user_info}")
     print(f"[Login] phone_code: {'已提供' if request.phone_code else '未提供'}")
-    
+    print(f"[Login] invite_code: {request.invite_code if request.invite_code else '未提供'}")
+
     try:
         result = await wechat_login(
             code=request.code,
             user_info=request.user_info,
             phone_code=request.phone_code,
             encrypted_data=request.encrypted_data,
-            iv=request.iv
+            iv=request.iv,
+            invite_code=request.invite_code
         )
         print(f"[Login] 登录成功: user_id={result['user_id']}")
         return {

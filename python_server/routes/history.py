@@ -7,6 +7,8 @@ from fastapi import APIRouter, Body, HTTPException, Query, Header
 from pydantic import BaseModel
 
 from database import db
+from database.models import TravelPlan, PlanLike
+from constants.travel_styles import is_valid_slug
 
 # 创建路由实例
 router = APIRouter(prefix="/api/history", tags=["历史记录"])
@@ -26,6 +28,10 @@ class PlanSaveRequest(BaseModel):
     mcp_trace: Optional[List[str]] = None
     tokens_used: Optional[int] = None
     cost_estimate: Optional[float] = None
+    # v1.1+: 广场/分类/封面
+    category: Optional[str] = None           # light/deep/food/outdoor
+    is_public: Optional[bool] = False
+    cover_url: Optional[str] = None
 
 
 class ToggleFavoriteRequest(BaseModel):
@@ -56,21 +62,30 @@ async def get_history_list(
 ):
     """
     获取历史记录列表
+
+    - favorite_only=false（默认）：当前用户自己创建的方案
+    - favorite_only=true：当前用户收藏的方案（来自 plan_favorites 表，跨用户独立）
     """
     user_id = get_user_id(authorization)
 
-    from database.models import TravelPlan  # 导入模型
+    from database.models import TravelPlan, PlanFavorite  # 导入模型
 
     offset = (page - 1) * page_size
 
     with db.get_session() as session:
-        query = session.query(TravelPlan).filter(
-            TravelPlan.user_id == user_id,
-            TravelPlan.is_deleted == False  # 过滤掉已删除的记录
-        )
-
         if favorite_only:
-            query = query.filter(TravelPlan.is_favorite == True)  # 只获取收藏的 
+            # v1.1: 用 plan_favorites 关联表，只取当前用户收藏的方案（不限制作者）
+            fav_q = session.query(PlanFavorite.plan_id).filter(PlanFavorite.user_id == user_id)
+            query = session.query(TravelPlan).filter(
+                TravelPlan.id.in_(fav_q.subquery()),
+                TravelPlan.is_deleted == False
+            )
+        else:
+            # 默认：仅看自己创建的方案
+            query = session.query(TravelPlan).filter(
+                TravelPlan.user_id == user_id,
+                TravelPlan.is_deleted == False
+            )
 
         total = query.count()
         plans_raw = query.order_by(TravelPlan.created_at.desc()).offset(offset).limit(page_size).all()
@@ -178,10 +193,42 @@ async def save_plan_to_history(
     if not user_input_value:
         raise HTTPException(status_code=422, detail="user_input is required")
 
+    # v1.1: 校验 category 合法性
+    category = getattr(request_data, 'category', None)
+    if category and not is_valid_slug(category):
+        return {"code": 400, "msg": f"无效的 category: {category}"}
+
+    is_public = bool(getattr(request_data, 'is_public', False))
+    if is_public and not category:
+        return {"code": 400, "msg": "公开到广场必须设置 category（旅行风格）"}
+
+    # 若未传 cover_url，自动从 day_plan[0].items[0].image 抓
+    cover_url = getattr(request_data, 'cover_url', None)
+    if not cover_url:
+        cover_url = _extract_first_image(getattr(request_data, 'day_plan', None))
+
     from database.models import User, TravelPlan  # 导入数据模型
 
     # 使用数据库会话
     with db.get_session() as session:
+        # v1.1 去重：同一用户 itinerary_summary 完全相同 → 视为重复，不入库
+        summary_value = (
+            getattr(request_data, 'itinerary_summary', None)
+            or getattr(request_data, 'itinerarySummary', None)
+            or ''
+        )
+        if summary_value:
+            existing = session.query(TravelPlan).filter(
+                TravelPlan.user_id == user_id,
+                TravelPlan.itinerary_summary == summary_value
+            ).order_by(TravelPlan.created_at.desc()).first()
+            if existing:
+                return {
+                    "code": 0,
+                    "data": {"id": existing.id, "deduped": True},
+                    "msg": "已存在相同摘要的方案，已复用"
+                }
+
         # 更新用户生成计数
         session.query(User).filter(User.id == user_id).update(
             {User.total_plans: User.total_plans + 1})
@@ -203,7 +250,10 @@ async def save_plan_to_history(
                                                         []),
             evidence=get_attr_or_fallback(request_data, 'evidence', 'evidence', []),
             warnings=get_attr_or_fallback(request_data, 'warnings', 'warnings', []),
-            generation_time_ms=get_attr_or_fallback(request_data, 'generation_time_ms', 'generationTimeMs', None)
+            generation_time_ms=get_attr_or_fallback(request_data, 'generation_time_ms', 'generationTimeMs', None),
+            category=category,
+            is_public=is_public,
+            cover_url=cover_url
         )
 
         session.add(plan_entity)
@@ -222,7 +272,10 @@ async def save_plan_to_history(
             "mcp_trace": plan_entity.mcp_trace,
             "generation_time_ms": plan_entity.generation_time_ms,
             "tokens_used": plan_entity.tokens_used,
-            "cost_estimate": float(plan_entity.cost_estimate) if plan_entity.cost_estimate else None
+            "cost_estimate": float(plan_entity.cost_estimate) if plan_entity.cost_estimate else None,
+            "category": plan_entity.category,
+            "is_public": plan_entity.is_public,
+            "cover_url": plan_entity.cover_url
         }
 
         session.commit()  # 确保数据提交
@@ -231,8 +284,38 @@ async def save_plan_to_history(
     return {
         "code": 0,
         "data": {"id": result["id"]},
-        "msg": "保存成功"
+        "msg": "保存成功" if not is_public else "已公开到广场"
     }
+
+
+def _extract_first_image(day_plan: Any) -> Optional[str]:
+    """从 day_plan 中提取第一张图（用于 cover_url 兜底）"""
+    try:
+        if not day_plan:
+            return None
+        # 数组形式 [day, day, ...]
+        if isinstance(day_plan, list):
+            for day in day_plan:
+                if isinstance(day, dict):
+                    items = day.get('items') if isinstance(day.get('items'), list) else None
+                    if items:
+                        for it in items:
+                            if isinstance(it, dict) and it.get('image'):
+                                return it['image']
+                    elif day.get('image'):
+                        return day['image']
+        # 字典形式 {day1: [loc, loc], ...}
+        elif isinstance(day_plan, dict):
+            for _dk, day in day_plan.items():
+                if isinstance(day, list):
+                    for it in day:
+                        if isinstance(it, dict) and it.get('image'):
+                            return it['image']
+                elif isinstance(day, dict) and day.get('image'):
+                    return day['image']
+    except Exception:
+        pass
+    return None
 
 
 
@@ -244,38 +327,222 @@ async def toggle_plan_favorite(
         authorization: str = Header(...)
 ):
     """
-    切换收藏状态
+    切换收藏状态（v1.1：每用户独立，使用 plan_favorites 关联表）
+
+    跨用户独立：用户 A 收藏了某方案，不会影响用户 B。
     """
     user_id = get_user_id(authorization)
+    print(f"[Favorite v1.1] 收到收藏请求 plan_id={request.plan_id} user_id={user_id}")
 
-    from database.models import TravelPlan
+    result = db.toggle_plan_favorite(user_id, request.plan_id)
 
-    with db.get_session() as session:
-        plan = session.query(TravelPlan).filter(
-            TravelPlan.id == request.plan_id,
-            TravelPlan.user_id == user_id
-        ).first()
-
-        if not plan:
-            return {
-                "code": 404,
-                "data": {"is_favorite": False},
-                "msg": "行程不存在"
-            }
-
-        # 在同一会话中变更并提交，直接获取状态避免LazyLoading 
-        current_favorite_status = not plan.is_favorite
-        plan.is_favorite = current_favorite_status
-        session.flush()  # 立即同步到数据库
-
-        result_status = plan.is_favorite
-        session.commit()
+    if result.get("code") == 404:
+        return {
+            "code": 404,
+            "data": {"is_favorite": False},
+            "msg": result.get("msg", "方案不存在")
+        }
 
     return {
         "code": 0,
-        "data": {"is_favorite": result_status},
-        "msg": "操作成功"
+        "data": {"is_favorite": result.get("is_favorited", False)},
+        "msg": "已收藏" if result.get("is_favorited") else "已取消收藏"
     }
+
+
+@router.get("/public")
+async def get_public_plans(
+        page: int = Query(1, ge=1),
+        page_size: int = Query(10, ge=1, le=50),
+        category: Optional[str] = Query(None, description="light/deep/food/outdoor，'all' 或空表示全部"),
+        sort: Optional[str] = Query("hot", description="hot(按点赞数) / new(按创建时间)"),
+        authorization: Optional[str] = Header(None)
+):
+    """
+    获取公开方案列表（灵感广场）
+
+    - 只返回 is_public=true 的方案
+    - 点赞数取自 plan_likes 真表
+    - 当前用户（如果登录）返回 is_liked 标记
+    """
+    from database.models import TravelPlan, PlanLike
+    from database.models import User
+    from sqlalchemy import func as sqlfunc
+
+    # 解析当前 user_id（可选登录）
+    current_user_id = None
+    if authorization:
+        try:
+            from auth import get_current_user_id
+            current_user_id = get_current_user_id(authorization.replace("Bearer ", "").strip())
+        except Exception:
+            current_user_id = None
+
+    offset = (page - 1) * page_size
+
+    with db.get_session() as session:
+        # 基础查询：已公开 + 非删除 + 有摘要
+        base_q = session.query(TravelPlan).filter(
+            TravelPlan.is_deleted == False,
+            TravelPlan.is_public == True,
+            TravelPlan.itinerary_summary.isnot(None),
+            TravelPlan.itinerary_summary != ""
+        )
+        if category and category not in ('', 'all', 'hot'):
+            base_q = base_q.filter(TravelPlan.category == category)
+
+        total = base_q.count()
+
+        # 排序：hot 按点赞数倒序，new 按时间倒序
+        if sort == 'new':
+            plans_raw = base_q.order_by(TravelPlan.created_at.desc()).offset(offset).limit(page_size).all()
+        else:
+            # 按点赞数 desc, created_at desc 二级排序
+            like_count_subq = session.query(
+                PlanLike.plan_id,
+                sqlfunc.count(PlanLike.id).label('like_count')
+            ).group_by(PlanLike.plan_id).subquery()
+            q = session.query(TravelPlan, sqlfunc.coalesce(like_count_subq.c.like_count, 0).label('like_count')) \
+                .outerjoin(like_count_subq, like_count_subq.c.plan_id == TravelPlan.id) \
+                .filter(
+                    TravelPlan.is_deleted == False,
+                    TravelPlan.is_public == True,
+                    TravelPlan.itinerary_summary.isnot(None),
+                    TravelPlan.itinerary_summary != ""
+                )
+            if category and category not in ('', 'all', 'hot'):
+                q = q.filter(TravelPlan.category == category)
+            plans_raw = q.order_by(sqlfunc.coalesce(like_count_subq.c.like_count, 0).desc(), TravelPlan.created_at.desc()) \
+                .offset(offset).limit(page_size).all()
+
+        # 批量取作者信息（SQLAlchemy 2.x 的 Row 不是 tuple 子类，用 _mapping 判断）
+        _is_row = bool(plans_raw) and hasattr(plans_raw[0], '_mapping')
+        if _is_row:
+            author_ids = list({row[0].user_id for row in plans_raw})
+        else:
+            author_ids = list({p.user_id for p in plans_raw})
+        authors = {a.id: a for a in session.query(User).filter(User.id.in_(author_ids)).all()} if author_ids else {}
+
+        # 批量取当前用户的点赞状态
+        if _is_row:
+            plan_ids = [row[0].id for row in plans_raw]
+        else:
+            plan_ids = [p.id for p in plans_raw]
+        liked_map = db.get_likes_for_plans(current_user_id, plan_ids) if current_user_id else {}
+        fav_map = db.get_favorites_for_user(current_user_id, plan_ids) if current_user_id else {}
+
+        fallback_covers = [
+            "https://tonystark-ai.ccwu.cc/png/fed79683-fbb6-44ac-9327-44c2f269cc47.png",
+            "https://tonystark-ai.ccwu.cc/png/600dc4e1-70ed-491a-85d4-a0edea269eb8.png",
+            "https://tonystark-ai.ccwu.cc/png/79b1c1f7-445f-49bc-a075-e44c66b289d8.png"
+        ]
+
+        plan_list = []
+        for i, item in enumerate(plans_raw):
+            if hasattr(item, '_mapping'):
+                p, likes = item[0], (item[1] if len(item) > 1 else 0)
+            else:
+                p, likes = item, 0
+            summary = p.itinerary_summary or ""
+            title = (summary[:30] + "...") if len(summary) > 30 else (summary or "旅行方案")
+
+            # 封面优先级：cover_url > 抓 day_plan image > fallback
+            cover = p.cover_url
+            if not cover:
+                cover = _extract_first_image(p.day_plan) or fallback_covers[i % len(fallback_covers)]
+
+            author = authors.get(p.user_id)
+            plan_list.append({
+                "id": p.id,
+                "title": title,
+                "author": author.nickname if author and author.nickname else "匿名旅者",
+                "author_avatar": author.avatar_url if author and author.avatar_url else "",
+                "category": p.category,
+                "likes": int(likes or 0),
+                "is_liked": liked_map.get(p.id, False),
+                "is_favorited": fav_map.get(p.id, False),
+                "is_public": True,
+                "cover": cover,
+                "user_input": p.user_input or "",
+                "created_at": p.created_at.isoformat() if p.created_at else None
+            })
+
+    return {
+        "code": 0,
+        "data": {
+            "list": plan_list,
+            "total": total,
+            "page": page,
+            "page_size": page_size
+        }
+    }
+
+
+@router.get("/public/{plan_id}")
+async def get_public_plan_detail(plan_id: int, authorization: Optional[str] = Header(None)):
+    """
+    获取公开方案详情（灵感广场点击查看），无需登录
+
+    - is_public=true 才返回（作者本人能预览自己私有的）
+    - 返回 category + is_liked
+    """
+    from database.models import TravelPlan, User, PlanLike, PlanFavorite
+
+    current_user_id = None
+    if authorization:
+        try:
+            from auth import get_current_user_id
+            current_user_id = get_current_user_id(authorization.replace("Bearer ", "").strip())
+        except Exception:
+            current_user_id = None
+
+    with db.get_session() as session:
+        plan = session.query(TravelPlan).filter(
+            TravelPlan.id == plan_id,
+            TravelPlan.is_deleted == False
+        ).first()
+
+        if not plan:
+            return {"code": 404, "msg": "行程不存在"}
+
+        # 私有时只有作者能看
+        if not plan.is_public and plan.user_id != current_user_id:
+            return {"code": 403, "msg": "该方案未公开"}
+
+        author = session.query(User).filter(User.id == plan.user_id).first()
+
+        # 真实点赞数 + 当前用户是否点过
+        like_count = session.query(PlanLike).filter(PlanLike.plan_id == plan_id).count()
+        is_liked = False
+        is_favorited = False
+        if current_user_id:
+            is_liked = session.query(PlanLike).filter(
+                PlanLike.user_id == current_user_id, PlanLike.plan_id == plan_id
+            ).first() is not None
+            is_favorited = session.query(PlanFavorite).filter(
+                PlanFavorite.user_id == current_user_id, PlanFavorite.plan_id == plan_id
+            ).first() is not None
+
+        plan_dict = {
+            "id": plan.id,
+            "user_input": plan.user_input,
+            "model_type": plan.model_type,
+            "itinerary_summary": plan.itinerary_summary,
+            "day_plan": plan.day_plan,
+            "social_recommendations": plan.social_recommendations,
+            "evidence": plan.evidence,
+            "warnings": plan.warnings,
+            "category": plan.category,
+            "is_public": plan.is_public,
+            "likes": int(like_count),
+            "is_liked": is_liked,
+            "is_favorited": is_favorited,
+            "author": author.nickname if author else "匿名旅者",
+            "author_avatar": author.avatar_url if author else "",
+            "created_at": plan.created_at.isoformat() if plan.created_at else None
+        }
+
+    return {"code": 0, "data": plan_dict}
 
 
 @router.delete("/{plan_id}")

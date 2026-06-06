@@ -8,6 +8,7 @@
 import { onLaunch, onShow } from '@dcloudio/uni-app'
 import { useUserStore } from './store/user.js'
 import { initTheme } from './utils/theme.js'
+import { getQuota } from './api/quota.js'
 
 // 添加更多的公共无需登录页面到白名单
 const whiteList = [
@@ -31,11 +32,46 @@ onLaunch(() => {
     }
   } catch (e) { /* ignore */ }
   // #endif
+
+  // 捕获分享带来的邀请码
+  captureInviteCode()
 })
 
 onShow(() => {
   checkAuth()
+  // 已登录用户：从后台返回时刷新配额（可能刚被新用户使用了邀请码）
+  const userStore = useUserStore()
+  userStore.restoreFromStorage()
+  if (userStore.hasToken) {
+    console.log('[App] onShow 检测到已登录,开始刷新 quota')
+    getQuota().then((quota) => {
+      if (quota) {
+        userStore.setQuota(quota)
+        console.log('[App] 配额已刷新:', JSON.stringify(quota))
+      }
+    }).catch((e) => console.warn('[App] 配额刷新失败:', e))
+  } else {
+    console.log('[App] onShow 未登录,跳过 quota 刷新')
+  }
 })
+
+// 捕获页面参数中的邀请码
+const captureInviteCode = () => {
+  try {
+    const pages = getCurrentPages()
+    if (pages.length === 0) return
+    const page = pages[pages.length - 1]
+    const options = page.$page?.options || page.options || {}
+    const inviteCode = options.invite
+    if (inviteCode) {
+      const userStore = useUserStore()
+      userStore.inviteCode = inviteCode
+      console.log('[App] 捕获到邀请码:', inviteCode)
+    }
+  } catch (e) {
+    console.warn('[App] 捕获邀请码失败:', e)
+  }
+}
 
 const checkAuth = () => {
   // 恢复登录状态

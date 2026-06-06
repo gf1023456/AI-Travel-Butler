@@ -148,7 +148,7 @@ export default class PosterGenerator {
     ctx.fillText('精心策划的行程', tagX + tagW / 2, tagY + 19)
 
     // 标题解析
-    let mainTitle = itinerarySummary || '智能行程'
+    let mainTitle = itinerarySummary || '专属行程'
     let subTitle = ''
     const commaIdx = mainTitle.indexOf('，')
     if (commaIdx > 0 && commaIdx < 12) {
@@ -312,7 +312,7 @@ export default class PosterGenerator {
     y += 18
 
     const features = [
-      { icon: 'AI', label: '智能规划' },
+      { icon: '✦', label: '专属规划' },
       { icon: '路', label: '路线优化' },
       { icon: '文', label: '人文洞察' }
     ]

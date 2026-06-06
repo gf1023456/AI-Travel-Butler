@@ -7,12 +7,26 @@
         </button>
         <text class="top-title">行程详情</text>
       </view>
-      <button class="top-avatar-btn">
-        <image class="top-avatar" :src="userAvatar" mode="aspectFill" />
-      </button>
+      <view class="top-right">
+        <button v-if="travelStore.currentPlan && !isEditing" class="edit-toggle-btn" @click="isEditing = true">
+          <text>✏️ 编辑</text>
+        </button>
+        <button v-if="isEditing" class="edit-toggle-btn edit-done" @click="isEditing = false">
+          <text>✅ 完成</text>
+        </button>
+        <button class="top-avatar-btn">
+          <image class="top-avatar" :src="userAvatar" mode="aspectFill" />
+        </button>
+      </view>
     </header>
 
     <scroll-view scroll-y class="content" :style="{ paddingTop: (80 + statusBarHeight) + 'px' }">
+      <!-- 骨架态顶栏：行程详情生成中 -->
+      <view v-if="isSkeleton" class="skeleton-banner">
+        <view class="skeleton-banner-dot"></view>
+        <text class="skeleton-banner-text">行程详情生成中…保存与分享将在生成完毕后开启</text>
+      </view>
+
       <section class="hero-card" v-if="travelStore.currentPlan">
         <image class="hero-img" src="https://tonystark-ai.ccwu.cc/png/fed79683-fbb6-44ac-9327-44c2f269cc47.png" mode="aspectFill" />
         <view class="hero-overlay"></view>
@@ -50,7 +64,7 @@
             <text class="day-title">{{ getDayTitle(dayKey) }}</text>
           </view>
           <view class="day-items">
-            <view v-for="(item, idx) in dayItems" :key="idx" class="timeline-item">
+            <view v-for="(item, idx) in dayItems" :key="idx" class="timeline-item" :class="{ 'item-editing': isEditing }">
               <view class="timeline-dot">
                 <view :class="['dot', idx === 0 ? 'dot-active' : '']"></view>
               </view>
@@ -63,11 +77,27 @@
                     <text class="item-name">{{ item.name || '景点' }}</text>
                     <text class="item-weather" v-if="item.weather_icon">{{ item.weather_icon }} {{ item.temperature }}</text>
                   </view>
-                  <view class="item-time">
+                  <view class="item-time" @click="isEditing && openTimePicker(item, dayKey, idx)">
                     <text>🕐</text>
                     <text>{{ item.time || '全天' }}</text>
+                    <text v-if="isEditing" class="time-edit-hint">点击修改</text>
                   </view>
                   <text class="item-desc">{{ item.description }}</text>
+                  <!-- 编辑模式下操作按钮 -->
+                  <view v-if="isEditing" class="item-actions">
+                    <button class="item-action-btn" :disabled="idx === 0" @click="moveItem(item, dayKey, 'up')">
+                      <text>↑</text>
+                    </button>
+                    <button class="item-action-btn" :disabled="idx === dayItems.length - 1" @click="moveItem(item, dayKey, 'down')">
+                      <text>↓</text>
+                    </button>
+                    <button class="item-action-btn action-ai" @click="refineSingleItem(item)">
+                      <text>💡</text>
+                    </button>
+                    <button class="item-action-btn action-delete" @click="confirmDeleteItem(item)">
+                      <text>🗑️</text>
+                    </button>
+                  </view>
                 </view>
               </view>
             </view>
@@ -75,32 +105,82 @@
         </view>
       </section>
 
-      <!-- 免责声明 -->
+      <!-- 免责声明 + 公开到广场开关 -->
       <view class="disclaimer" v-if="travelStore.currentPlan">
         <text>本行程仅供参考，出行前请核实相关信息</text>
+      </view>
+
+      <!-- 公开到广场开关（生成完毕后才显示） -->
+      <view v-if="travelStore.currentPlan && !isSkeleton && !travelStore.currentPlan.isFromHistory" class="publish-row">
+        <view class="publish-info">
+          <text class="publish-title">🌍 公开到探索广场</text>
+          <text class="publish-sub">开启后其他用户可在「探索」中看到这份方案</text>
+        </view>
+        <switch :checked="isPublic" @change="e => isPublic = e.detail.value" color="#0F4C5C" />
       </view>
     </scroll-view>
 
     <!-- Bottom Action Bar -->
     <view class="action-bar" :style="{ bottom: safeAreaBottom + 'px' }" v-if="travelStore.currentPlan">
-      <button class="action-btn action-outline" @click="generateBackendLongPoster">
-        <text>📤</text>
-        <text>分享行程</text>
-      </button>
-      <button class="action-btn action-outline" @click="copyToClipboard">
-        <text>📋</text>
-        <text>复制方案</text>
-      </button>
-      <button class="action-btn action-primary" @click="saveToHistory" v-if="!travelStore.currentPlan.isFromHistory">
-        <text>💾</text>
-        <text>保存行程</text>
-      </button>
+      <template v-if="!isEditing">
+        <button class="action-btn action-outline" @click="isEditing = true">
+          <text>✏️</text>
+          <text>编辑</text>
+        </button>
+        <button
+          class="action-btn action-outline"
+          :class="{ 'action-disabled': isSkeleton }"
+          :disabled="isSkeleton"
+          @click="generateBackendLongPoster"
+        >
+          <text>📤</text>
+          <text>分享</text>
+        </button>
+        <button class="action-btn action-outline" @click="copyToClipboard">
+          <text>📋</text>
+          <text>复制</text>
+        </button>
+        <button
+          class="action-btn action-primary"
+          :class="{ 'action-disabled': isSkeleton || saveLock }"
+          :disabled="isSkeleton || saveLock"
+          @click="saveToHistory"
+          v-if="!travelStore.currentPlan.isFromHistory"
+        >
+          <text>💾</text>
+          <text>{{ isSkeleton ? '生成中' : (saveLock ? '保存中…' : (isPublic ? '发布' : '保存')) }}</text>
+        </button>
+      </template>
+      <template v-else>
+        <button class="action-btn action-primary action-full" @click="isEditing = false">
+          <text>✅ 完成编辑</text>
+        </button>
+      </template>
     </view>
 
     <!-- Floating AI Bubble -->
-    <button class="ai-bubble" @click="goRefine" :style="{ bottom: (112 + safeAreaBottom) + 'px' }" v-if="travelStore.currentPlan">
+    <button class="ai-bubble" @click="goRefine" :style="{ bottom: (112 + safeAreaBottom) + 'px' }" v-if="travelStore.currentPlan && !isEditing">
       <text>💡</text>
     </button>
+
+    <!-- 时间选择器 -->
+    <view v-if="showTimePicker" class="picker-mask" @click="showTimePicker = false">
+      <view class="picker-panel" @click.stop>
+        <text class="picker-title">修改游览时间</text>
+        <picker-view :value="pickerTimeValue" class="picker-view" @change="onPickerChange">
+          <picker-view-column>
+            <view v-for="h in hours" :key="h" class="picker-item">{{ h }}时</view>
+          </picker-view-column>
+          <picker-view-column>
+            <view v-for="m in minutes" :key="m" class="picker-item">{{ m }}分</view>
+          </picker-view-column>
+        </picker-view>
+        <view class="picker-actions">
+          <button class="picker-cancel" @click="showTimePicker = false">取消</button>
+          <button class="picker-confirm" @click="confirmTimeFromPicker">确定</button>
+        </view>
+      </view>
+    </view>
 
     <!-- 隐藏 Canvas 用于生成分享图片 -->
     <canvas canvas-id="shareCanvas" id="shareCanvas" style="position: fixed; left: -9999px; top: -9999px; width: 750px; height: 1200px;"></canvas>
@@ -128,46 +208,138 @@ const dayPlanItinerary = ref([])
 const itinerarySummary = ref('')
 const officialImagePath = ref('')
 
+// 编辑模式
+const isEditing = ref(false)
+
+// 时间选择器
+const showTimePicker = ref(false)
+const editingTimeItem = ref(null)
+const editingTimeDayKey = ref('')
+const editingTimeIdx = ref(0)
+const pickerTime = ref('09:00')
+
+// 编辑操作：上移/下移
+const moveItem = (item, dayKey, direction) => {
+  // 找到 item 在 dayPlanItinerary 中的原始 index
+  const originalIdx = dayPlanItinerary.value.findIndex(i => i === item)
+  if (originalIdx < 0) return
+  travelStore.reorderItem({ day: parseInt(dayKey), fromIndex: originalIdx, direction })
+  // 同步本地数据
+  dayPlanItinerary.value = [...travelStore.currentPlan.dayPlanItinerary]
+}
+
+// 编辑操作：删除景点
+const confirmDeleteItem = (item) => {
+  uni.showModal({
+    title: '确认删除',
+    content: `确定要删除「${item.name || '景点'}」吗？`,
+    confirmText: '删除',
+    confirmColor: '#FF3B30',
+    success: (res) => {
+      if (res.confirm) {
+        const originalIdx = dayPlanItinerary.value.findIndex(i => i === item)
+        if (originalIdx < 0) return
+        travelStore.deleteItem(originalIdx)
+        dayPlanItinerary.value = [...travelStore.currentPlan.dayPlanItinerary]
+        uni.showToast({ title: '已删除', icon: 'success' })
+      }
+    }
+  })
+}
+
+// 编辑操作：打开时间选择器
+const openTimePicker = (item, dayKey, idx) => {
+  if (!isEditing.value) return
+  editingTimeItem.value = item
+  editingTimeDayKey.value = dayKey
+  editingTimeIdx.value = idx
+  pickerTime.value = item.time || '09:00'
+  showTimePicker.value = true
+}
+
+// 编辑操作：确认修改时间
+const onTimeConfirm = (e) => {
+  const newTime = e.detail.value
+  if (editingTimeItem.value) {
+    const originalIdx = dayPlanItinerary.value.findIndex(i => i === editingTimeItem.value)
+    if (originalIdx >= 0) {
+      travelStore.updateItemTime({ index: originalIdx, time: newTime })
+      dayPlanItinerary.value = [...travelStore.currentPlan.dayPlanItinerary]
+    }
+  }
+  showTimePicker.value = false
+}
+
+// 单景点 AI 优化
+const refineSingleItem = (item) => {
+  const instruction = `优化${item.name || '该景点'}的游览安排`
+  uni.navigateTo({
+    url: `/pages/refine/refine?refineInstruction=${encodeURIComponent(instruction)}&itemName=${encodeURIComponent(item.name || '')}`
+  })
+}
+
+// 时间选择器辅助数据
+const hours = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
+const minutes = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'))
+
+const pickerTimeValue = computed(() => {
+  const parts = pickerTime.value.split(':')
+  const h = parseInt(parts[0]) || 0
+  const m = parseInt(parts[1]) || 0
+  return [h, m]
+})
+
+const onPickerChange = (e) => {
+  const h = hours[e.detail.value[0]] || '09'
+  const m = minutes[e.detail.value[1]] || '00'
+  pickerTime.value = `${h}:${m}`
+}
+
+const confirmTimeFromPicker = () => {
+  if (editingTimeItem.value) {
+    const originalIdx = dayPlanItinerary.value.findIndex(i => i === editingTimeItem.value)
+    if (originalIdx >= 0) {
+      travelStore.updateItemTime({ index: originalIdx, time: pickerTime.value })
+      dayPlanItinerary.value = [...travelStore.currentPlan.dayPlanItinerary]
+    }
+  }
+  showTimePicker.value = false
+}
+
 // 填充进度相关状态
 const isFilling = ref(false)
 const fillProgress = ref(0)
 const fillProgressText = ref('正在加载...')
 
-// 监听 currentPlan 变化，骨架填充完成后自动更新页面
+// 骨架态：currentPlan.isSkeleton = true 时禁用保存/分享
+const isSkeleton = computed(() => !!travelStore.currentPlan?.isSkeleton)
+
+// 监听 currentPlan 变化
 watch(() => travelStore.currentPlan, (newPlan) => {
   if (newPlan) {
     const plan = newPlan
     dayPlanItinerary.value = Array.isArray(plan.dayPlanItinerary) ? plan.dayPlanItinerary : []
     itinerarySummary.value = plan.itinerarySummary || '排期已生成'
-    
-    // 检查是否已完成填充（description 有内容）
     const hasContent = dayPlanItinerary.value.some(item => item.description && item.description.length > 0)
     if (hasContent) {
       isFilling.value = false
       nextTick(() => preGenerateOfficialImage())
     } else {
-      // 骨架阶段或填充中
       isFilling.value = true
       updateFillProgress()
     }
   }
 }, { deep: true })
 
-// 计算填充进度
 const updateFillProgress = () => {
   const items = dayPlanItinerary.value
   if (!items || items.length === 0) {
-    fillProgress.value = 0
-    fillProgressText.value = '正在加载...'
-    return
+    fillProgress.value = 0; fillProgressText.value = '正在加载...'; return
   }
-  
   const total = items.length
   const filled = items.filter(item => item.description && item.description.length > 10).length
   fillProgress.value = Math.round((filled / total) * 100)
   fillProgressText.value = `正在填充详细信息 ${filled}/${total}`
-  
-  // 每500ms更新一次
   if (isFilling.value && fillProgress.value < 100) {
     setTimeout(updateFillProgress, 500)
   }
@@ -192,18 +364,12 @@ const sortedItinerary = computed(() =>
 )
 
 const days = computed(() => {
-  const set = new Set()
-  sortedItinerary.value.forEach(i => set.add(i.day))
-  return [...set].sort()
+  const set = new Set(); sortedItinerary.value.forEach(i => set.add(i.day)); return [...set].sort()
 })
 
 const daysByDay = computed(() => {
   const map = {}
-  sortedItinerary.value.forEach(item => {
-    const key = String(item.day || 1)
-    if (!map[key]) map[key] = []
-    map[key].push(item)
-  })
+  sortedItinerary.value.forEach(item => { const key = String(item.day || 1); if (!map[key]) map[key] = []; map[key].push(item) })
   return map
 })
 
@@ -216,21 +382,17 @@ const getStartDate = () => {
 
 const planDate = computed(() => {
   if (!travelStore.currentPlan) return ''
-  const start = getStartDate()
-  const numDays = days.value.length || 1
-  const end = new Date(start)
-  end.setDate(end.getDate() + numDays - 1)
+  const start = getStartDate(); const numDays = days.value.length || 1
+  const end = new Date(start); end.setDate(end.getDate() + numDays - 1)
   const f = (d) => `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`
   return `${f(start)} - ${f(end)} (${numDays}天)`
 })
 
 const getDayTitle = (day) => {
-  const start = getStartDate()
-  const d = new Date(start)
+  const start = getStartDate(); const d = new Date(start)
   d.setDate(d.getDate() + parseInt(day) - 1)
   const theme = (daysByDay.value[day]?.[0]?.dayTheme) || ''
-  const m = d.getMonth() + 1
-  const dd = d.getDate()
+  const m = d.getMonth() + 1; const dd = d.getDate()
   return theme ? `${m}月${dd}日 · ${theme}` : `${m}月${dd}日 · Day ${day}`
 }
 
@@ -249,364 +411,165 @@ const goRefine = () => uni.navigateTo({ url: '/pages/refine/refine' })
 
 const previewImage = (current) => {
   const urls = []
-  Object.values(daysByDay.value).forEach(dayItems => {
-    dayItems.forEach((item, idx) => {
-      const url = item.image || getPlaceholderImg(idx)
-      if (url) urls.push(url)
-    })
-  })
+  Object.values(daysByDay.value).forEach(dayItems => dayItems.forEach((item, idx) => { const url = item.image || getPlaceholderImg(idx); if (url) urls.push(url) }))
   if (urls.length === 0) return
   uni.previewImage({ current, urls })
 }
 
 const wrapText = (ctx, text, x, y, maxWidth, lineHeight, maxLines) => {
-  let line = ''
-  let currentLine = 0
+  let line = ''; let currentLine = 0
   for (let i = 0; i < text.length; i++) {
-    const testLine = line + text[i]
-    const metrics = ctx.measureText(testLine)
-    if (metrics.width > maxWidth && i > 0) {
-      ctx.fillText(line, x, y)
-      line = text[i]
-      y += lineHeight
-      currentLine++
-      if (currentLine >= maxLines) return
-    } else {
-      line = testLine
-    }
+    const testLine = line + text[i]; const metrics = ctx.measureText(testLine)
+    if (metrics.width > maxWidth && i > 0) { ctx.fillText(line, x, y); line = text[i]; y += lineHeight; currentLine++; if (currentLine >= maxLines) return }
+    else { line = testLine }
   }
   ctx.fillText(line, x, y)
 }
 
 const generateTags = () => {
-  const tags = ['行程一下', '旅行']
-  if (days.value.length <= 3) tags.push('短途旅行')
-  else if (days.value.length <= 7) tags.push('中途旅行')
-  else tags.push('长途旅行')
-  const dayPlan = dayPlanItinerary.value
-  if (dayPlan.some(item => item.name?.includes('美食') || item.name?.includes('餐厅'))) tags.push('美食之旅')
+  const tags = ['行程一下', '旅行']; if (days.value.length <= 3) tags.push('短途旅行'); else if (days.value.length <= 7) tags.push('中途旅行'); else tags.push('长途旅行')
+  const dayPlan = dayPlanItinerary.value; if (dayPlan.some(item => item.name?.includes('美食') || item.name?.includes('餐厅'))) tags.push('美食之旅')
   if (dayPlan.some(item => item.name?.includes('博物馆') || item.name?.includes('文化'))) tags.push('文化之旅')
   return tags.slice(0, 5)
 }
 
 const preGenerateOfficialImage = () => {
   if (!dayPlanItinerary.value.length) return
-  generateShareImageForOfficial((tempFilePath) => {
-    if (tempFilePath) {
-      officialImagePath.value = tempFilePath
-      console.log('[Plan] 贴图图片预生成成功')
-    }
-  })
+  generateShareImageForOfficial((tempFilePath) => { if (tempFilePath) { officialImagePath.value = tempFilePath } })
 }
 
 const generateShareImageForOfficial = (callback) => {
-  const ctx = uni.createCanvasContext('shareCanvas', instance)
-  const canvasWidth = 750
-  const padding = 40
-  let currentY = 60
-  ctx.setFillStyle('#FFFFFF')
-  ctx.fillRect(0, 0, canvasWidth, 1600)
-  ctx.setFillStyle('#0F4C5C')
-  ctx.fillRect(0, 0, canvasWidth, 180)
-  ctx.setFillStyle('#FFFFFF')
-  ctx.setFontSize(52)
-  ctx.fillText('行程一下', padding, 90)
-  ctx.setFontSize(28)
-  ctx.fillText(`📅 ${new Date().toLocaleDateString()}`, padding, 145)
+  const ctx = uni.createCanvasContext('shareCanvas', instance); const canvasWidth = 750; const padding = 40; let currentY = 60
+  ctx.setFillStyle('#FFFFFF'); ctx.fillRect(0, 0, canvasWidth, 1600)
+  ctx.setFillStyle('#0F4C5C'); ctx.fillRect(0, 0, canvasWidth, 180)
+  ctx.setFillStyle('#FFFFFF'); ctx.setFontSize(52); ctx.fillText('行程一下', padding, 90)
+  ctx.setFontSize(28); ctx.fillText(`📅 ${new Date().toLocaleDateString()}`, padding, 145)
   currentY = 220
-  const daysMap = {}
-  dayPlanItinerary.value.forEach(item => {
-    const key = String(item.day || 1)
-    if (!daysMap[key]) daysMap[key] = []
-    daysMap[key].push(item)
-  })
+  const daysMap = {}; dayPlanItinerary.value.forEach(item => { const key = String(item.day || 1); if (!daysMap[key]) daysMap[key] = []; daysMap[key].push(item) })
   Object.keys(daysMap).sort().forEach(day => {
-    ctx.setFontSize(36)
-    ctx.setFillStyle('#0F4C5C')
-    ctx.fillText(`【Day ${day}】`, padding, currentY)
-    currentY += 60
+    ctx.setFontSize(36); ctx.setFillStyle('#0F4C5C'); ctx.fillText(`【Day ${day}】`, padding, currentY); currentY += 60
     daysMap[day].forEach(item => {
-      ctx.setFontSize(28)
-      ctx.setFillStyle('#1A1A1A')
-      ctx.fillText(`📍 ${item.name || '景点'}`, padding, currentY)
-      currentY += 45
-      if (item.time) {
-        ctx.setFontSize(24)
-        ctx.setFillStyle('#666666')
-        ctx.fillText(`🕐 ${item.time}`, padding + 20, currentY)
-        currentY += 35
-      }
-      if (item.description) {
-        ctx.setFontSize(22)
-        ctx.setFillStyle('#888888')
-        wrapText(ctx, item.description, padding + 20, currentY, canvasWidth - padding * 2 - 20, 35, 3)
-        currentY += 80
-      }
-    })
-    currentY += 40
+      ctx.setFontSize(28); ctx.setFillStyle('#1A1A1A'); ctx.fillText(`📍 ${item.name || '景点'}`, padding, currentY); currentY += 45
+      if (item.time) { ctx.setFontSize(24); ctx.setFillStyle('#666666'); ctx.fillText(`🕐 ${item.time}`, padding + 20, currentY); currentY += 35 }
+      if (item.description) { ctx.setFontSize(22); ctx.setFillStyle('#888888'); wrapText(ctx, item.description, padding + 20, currentY, canvasWidth - padding * 2 - 20, 35, 3); currentY += 80 }
+    }); currentY += 40
   })
-  ctx.setFontSize(24)
-  ctx.setFillStyle('#AAAAAA')
-  ctx.textAlign = 'center'
-  ctx.fillText('行程一下 AI 旅行助手 · 智能规划您的旅程', canvasWidth / 2, currentY + 80)
-  ctx.textAlign = 'left'
-  ctx.draw(false, () => {
-    setTimeout(() => {
-      uni.canvasToTempFilePath({
-        canvasId: 'shareCanvas',
-        success: (res) => callback(res.tempFilePath),
-        fail: () => callback(null)
-      }, instance)
-    }, 500)
-  })
-}
-
-const generatePoster = () => {
-  if (!dayPlanItinerary.value.length) {
-    uni.showToast({ title: '无行程可分享', icon: 'none' })
-    return
-  }
-  
-  // 直接调用后端生成海报
-  generateBackendLongPoster()
-}
-
-const generateFrontendPoster = () => {
-
-  // #ifdef MP-WEIXIN
-  uni.showLoading({ title: '生成海报中...' })
-
-  posterGen.generate({
-    itinerarySummary: itinerarySummary.value,
-    days: days.value,
-    dayPlanItinerary: dayPlanItinerary.value
-  }).then((tempFilePath) => {
-    wx.showShareImageMenu({
-      path: tempFilePath,
-      needShowEntrance: true,
-      entrancePath: 'pages/index/index',
-      success: () => uni.showToast({ title: '分享成功', icon: 'success' }),
-      fail: (err) => {
-        console.error('分享失败:', err)
-        uni.showToast({ title: '分享失败', icon: 'none' })
-      },
-      complete: () => uni.hideLoading()
-    })
-  }).catch((err) => {
-    console.error('生成图片失败:', err)
-    uni.hideLoading()
-    uni.showToast({ title: '生成图片失败', icon: 'error' })
-  })
-  // #endif
-
-  // #ifndef MP-WEIXIN
-  uni.showToast({ title: '仅微信小程序支持图片分享', icon: 'none' })
-  // #endif
+  ctx.setFontSize(24); ctx.setFillStyle('#AAAAAA'); ctx.textAlign = 'center'; ctx.fillText('行程一下 · 让灵感即刻启程', canvasWidth / 2, currentY + 80); ctx.textAlign = 'left'
+  ctx.draw(false, () => { setTimeout(() => { uni.canvasToTempFilePath({ canvasId: 'shareCanvas', success: (res) => callback(res.tempFilePath), fail: () => callback(null) }, instance) }, 500) })
 }
 
 const shareToOfficial = () => {
   if (!dayPlanItinerary.value.length) { uni.showToast({ title: '无行程可发表', icon: 'none' }); return }
   // #ifdef MP-WEIXIN
-  // 开发工具模拟器不支持此 API，提示用户在真机上测试
-  if (wx.getSystemInfoSync().platform === 'devtools') {
-    uni.showModal({
-      title: '提示',
-      content: '贴图功能仅在真机微信中可用，是否改为图片分享？',
-      confirmText: '图片分享',
-      cancelText: '取消',
-      success: (modal) => { if (modal.confirm) sharePlanImage() }
-    })
-    return
-  }
-
-  const title = `🌍 ${itinerarySummary.value || '行程一下智能行程'}`.substring(0, 50)
-  const content = generateText()
-  const tags = generateTags()
-
+  if (wx.getSystemInfoSync().platform === 'devtools') { uni.showModal({ title: '提示', content: '贴图功能仅在真机微信中可用', confirmText: '知道了', showCancel: false }); return }
+  const title = `🌍 ${itinerarySummary.value || '行程一下'}`.substring(0, 50); const content = generateText(); const tags = generateTags()
   if (officialImagePath.value) {
-    // 已有预生成图片，直接同步调用 API（必须在用户点击栈中）
-    wx.shareToOfficialAccount({
-      title,
-      content,
-      tags,
-      images: [officialImagePath.value],
-      path: '/pages/index/index',
-      success: (res) => {
-        console.log('贴图发表成功:', res)
-        if (res.postUrl) {
-          uni.showModal({
-            title: '发表成功', content: '您的行程贴图已发布！', showCancel: false,
-            success: () => { uni.setClipboardData({ data: res.postUrl, success: () => uni.showToast({ title: '文章链接已复制', icon: 'success' }) }) }
-          })
-        }
-      },
-      fail: (err) => {
-        console.error('贴图发表失败:', err)
-        if (err.errMsg && !err.errMsg.includes('cancel')) {
-          uni.showToast({ title: '发表失败: ' + (err.errMsg || ''), icon: 'none', duration: 3000 })
-        }
-      }
-    })
+    wx.shareToOfficialAccount({ title, content, tags, images: [officialImagePath.value], path: '/pages/index/index', success: (res) => { if (res.postUrl) { uni.showModal({ title: '发表成功', content: '您的行程贴图已发布！', showCancel: false }) } }, fail: (err) => { if (err.errMsg && !err.errMsg.includes('cancel')) uni.showToast({ title: '发表失败', icon: 'none' }) } })
   } else {
-    // 图片未准备好，异步生成后提示用户再次点击
-    uni.showLoading({ title: '首次准备图片...' })
-    generateShareImageForOfficial((tempFilePath) => {
-      uni.hideLoading()
-      if (tempFilePath) {
-        officialImagePath.value = tempFilePath
-        uni.showToast({ title: '图片已准备好，请再次点击发表', icon: 'none', duration: 2500 })
-      } else {
-        uni.showToast({ title: '图片生成失败', icon: 'error' })
-      }
-    })
+    uni.showLoading({ title: '准备图片...' }); generateShareImageForOfficial((tempFilePath) => { uni.hideLoading(); if (tempFilePath) { officialImagePath.value = tempFilePath; uni.showToast({ title: '已准备好，请再次点击', icon: 'none' }) } })
   }
-  // #endif
-  // #ifndef MP-WEIXIN
-  uni.showToast({ title: '仅微信小程序支持', icon: 'none' })
   // #endif
 }
 
+// 公开到广场开关
+const isPublic = ref(false)
+// 保存防抖锁（1.5s 内禁止重复点击）
+const saveLock = ref(false)
+
+// 旅行风格 slug（从 currentPlan.category 继承，或回退到 preferences.travelMode，再不行 default 'deep'）
+const travelStyleSlug = computed(() => {
+  const cp = travelStore.currentPlan
+  if (cp?.category) return cp.category
+  if (travelStore.preferences?.travelMode) return travelStore.preferences.travelMode
+  return 'deep'
+})
+
 const saveToHistory = async () => {
-  if (!dayPlanItinerary.value.length) {
-    uni.showToast({ title: '无行程可保存', icon: 'none' }); return
+  if (isSkeleton.value || saveLock.value) return
+  if (!dayPlanItinerary.value.length) { uni.showToast({ title: '无行程可保存', icon: 'none' }); return }
+  if (isPublic.value && !travelStyleSlug.value) {
+    uni.showToast({ title: '请选择旅行风格', icon: 'none' }); return
   }
+
+  // 立刻上锁，避免狂点
+  saveLock.value = true
+  setTimeout(() => { saveLock.value = false }, 1500)
+
+  // 兜底：cover_url 取 day_plan 第一张 image
+  const coverUrl = (dayPlanItinerary.value.find(i => i.image)?.image) || ''
+
   try {
-    uni.showLoading({ title: '保存中...' })
+    uni.showLoading({ title: isPublic.value ? '发布到广场…' : '保存中…' })
     const result = await saveHistory({
-      userInput: travelStore.currentPlan?.userInput || '行程方案',
-      modelType: 'auto', provider: 'unknown',
+      userInput: travelStore.currentPlan?.userInput || travelStore.preferences?.userInput || '行程方案',
+      modelType: 'auto',
+      provider: 'unknown',
       itinerarySummary: itinerarySummary.value,
       dayPlan: dayPlanItinerary.value,
       socialRecommendations: [],
-      evidence: [], warnings: []
+      evidence: [],
+      warnings: [],
+      // v1.1+
+      category: travelStyleSlug.value,
+      is_public: isPublic.value,
+      cover_url: coverUrl
     })
     uni.hideLoading()
     if (result?.id) {
-      uni.showToast({ title: '保存成功', icon: 'success' })
+      if (result.deduped) {
+        uni.showToast({ title: '已存在相同方案', icon: 'none' })
+      } else if (isPublic.value) {
+        uni.showToast({ title: '已发布到广场', icon: 'success' })
+      } else {
+        uni.showToast({ title: '保存成功', icon: 'success' })
+      }
     } else {
       saveToLocalStorage()
     }
-  } catch (error) {
+  } catch (e) {
     uni.hideLoading()
+    uni.showToast({ title: e.message || '保存失败', icon: 'none' })
     saveToLocalStorage()
   }
 }
 
 const saveToLocalStorage = () => {
   try {
-    const history = JSON.parse(uni.getStorageSync('travel_history') || '[]')
-    history.unshift({
-      id: Date.now(), timestamp: new Date().toLocaleString(),
-      summary: itinerarySummary.value, itinerary: dayPlanItinerary.value
-    })
-    if (history.length > 30) history.pop()
-    uni.setStorageSync('travel_history', JSON.stringify(history))
-    uni.showToast({ title: '已保存到本地', icon: 'success' })
-  } catch (error) {
-    uni.showToast({ title: '保存失败', icon: 'error' })
-  }
+    const history = JSON.parse(uni.getStorageSync('travel_history') || '[]'); history.unshift({ id: Date.now(), timestamp: new Date().toLocaleString(), summary: itinerarySummary.value, itinerary: dayPlanItinerary.value })
+    if (history.length > 30) history.pop(); uni.setStorageSync('travel_history', JSON.stringify(history)); uni.showToast({ title: '已保存到本地', icon: 'success' })
+  } catch { uni.showToast({ title: '保存失败', icon: 'error' }) }
 }
 
 const copyToClipboard = () => {
   if (!dayPlanItinerary.value.length) { uni.showToast({ title: '无内容', icon: 'none' }); return }
-  uni.setClipboardData({
-    data: generateText(),
-    success: () => uni.showToast({ title: '已复制', icon: 'success' }),
-    fail: () => uni.showToast({ title: '复制失败', icon: 'error' })
-  })
-}
-
-const exportToFile = () => {
-  uni.showModal({
-    title: '导出行程', content: '已将行程复制到剪贴板，可粘贴到文档中使用',
-    showCancel: false, success: () => copyToClipboard()
-  })
+  uni.setClipboardData({ data: generateText(), success: () => uni.showToast({ title: '已复制', icon: 'success' }), fail: () => uni.showToast({ title: '复制失败', icon: 'error' }) })
 }
 
 const generateText = () => {
-  let text = `🌍 行程一下 行程指南\n📅 ${new Date().toLocaleString()}\n\n`
-  if (itinerarySummary.value) text += `📝 ${itinerarySummary.value}\n\n`
-  const days = {}
-  dayPlanItinerary.value.forEach(item => {
-    if (!days[item.day]) days[item.day] = []
-    days[item.day].push(item)
-  })
-  Object.keys(days).sort().forEach(day => {
-    text += `【Day ${day}】\n`
-    days[day].forEach(item => {
-      text += `📍 ${item.sequence || ''}. ${item.name || ''} ${item.time || ''}\n`
-      if (item.description) text += `   ${item.description}\n`
-    })
-    text += '\n'
-  })
+  let text = `🌍 行程一下 行程指南\n📅 ${new Date().toLocaleString()}\n\n`; if (itinerarySummary.value) text += `📝 ${itinerarySummary.value}\n\n`
+  const days = {}; dayPlanItinerary.value.forEach(item => { if (!days[item.day]) days[item.day] = []; days[item.day].push(item) })
+  Object.keys(days).sort().forEach(day => { text += `【Day ${day}】\n`; days[day].forEach(item => { text += `📍 ${item.sequence || ''}. ${item.name || ''} ${item.time || ''}\n`; if (item.description) text += `   ${item.description}\n` }); text += '\n' })
   return text
 }
 
 const generateBackendLongPoster = async () => {
-  if (!dayPlanItinerary.value.length) {
-    uni.showToast({ title: '无行程可生成', icon: 'none' })
-    return
-  }
-  
+  if (!dayPlanItinerary.value.length) { uni.showToast({ title: '无行程可生成', icon: 'none' }); return }
   try {
     uni.showLoading({ title: '生成海报中...' })
-    
-    const posterData = {
-      itinerarySummary: itinerarySummary.value,
-      days: days.value,
-      dayPlanItinerary: dayPlanItinerary.value
-    }
-    
-    const result = await generateBackendPoster(posterData)
-    
+    const result = await generateBackendPoster({ itinerarySummary: itinerarySummary.value, days: days.value, dayPlanItinerary: dayPlanItinerary.value })
     if (result.code === 0 && result.data?.image) {
-      // 将base64图片保存到本地
       const tempFilePath = await downloadPoster(result.data.image)
-      
-      // 调用微信分享图片菜单
       // #ifdef MP-WEIXIN
-      wx.showShareImageMenu({
-        path: tempFilePath,
-        needShowEntrance: true,
-        entrancePath: 'pages/index/index',
-        success: () => {
-          uni.showToast({ title: '分享成功', icon: 'success' })
-        },
-        fail: (err) => {
-          console.error('分享失败:', err)
-          // 如果分享失败，至少让用户可以预览保存
-          uni.previewImage({
-            urls: [tempFilePath],
-            success: () => {
-              uni.showToast({ title: '海报已生成，请长按保存', icon: 'none', duration: 2000 })
-            }
-          })
-        }
-      })
+      wx.showShareImageMenu({ path: tempFilePath, needShowEntrance: true, entrancePath: 'pages/index/index', success: () => uni.showToast({ title: '分享成功', icon: 'success' }), fail: () => { uni.previewImage({ urls: [tempFilePath], success: () => uni.showToast({ title: '海报已生成，请长按保存', icon: 'none' }) }) } })
       // #endif
-      
-      // #ifndef MP-WEIXIN
-      uni.previewImage({
-        urls: [result.data.image],
-        success: () => {
-          uni.showToast({ title: '海报生成成功', icon: 'success' })
-        }
-      })
-      // #endif
-    } else {
-      uni.showToast({ title: '海报生成失败', icon: 'error' })
-    }
-  } catch (error) {
-    console.error('后端海报生成错误:', error)
-    uni.showToast({ title: '生成失败: ' + (error.message || '未知错误'), icon: 'none' })
-  } finally {
-    uni.hideLoading()
-  }
+    } else { uni.showToast({ title: '海报生成失败', icon: 'error' }) }
+  } catch (error) { console.error('海报生成错误:', error); uni.showToast({ title: '生成失败', icon: 'none' }) }
+  finally { uni.hideLoading() }
 }
 </script>
 
 <style scoped>
-.plan-page { min-height: 100vh; background: var(--color-surface); }
+.plan-page { min-height: 100vh; background: #f8f9fa; }
 
 .top-bar {
   position: fixed; top: 0; left: 0; right: 0; z-index: 10;
@@ -627,22 +590,25 @@ const generateBackendLongPoster = async () => {
 .content { padding: 160rpx 40rpx 280rpx; }
 
 .empty-btn {
-  margin-top: 16px;
-  padding: 12px 32px;
-  border-radius: 999px;
+  margin-top: 16px; padding: 12px 32px; border-radius: 999px;
   background: linear-gradient(135deg, #0F4C5C 0%, #14B8A6 100%);
-  color: #fff;
-  font-size: 16px;
-  font-weight: 600;
+  color: #fff; font-size: 16px; font-weight: 600;
   box-shadow: 0 8px 20px rgba(15,76,92,0.25);
 }
 
-.disclaimer {
-  text-align: center;
-  padding: 48rpx 40rpx 16rpx;
-  font-size: 12px;
-  color: #999;
+.disclaimer { text-align: center; padding: 48rpx 40rpx 16rpx; font-size: 12px; color: #999; }
+
+.publish-row {
+  display: flex; align-items: center; justify-content: space-between;
+  margin: 0 32rpx 32rpx;
+  padding: 24rpx 28rpx;
+  border-radius: 20rpx;
+  background: linear-gradient(90deg, rgba(15,76,92,0.05), rgba(20,184,166,0.08));
+  border: 1px solid rgba(15,76,92,0.10);
 }
+.publish-info { display: flex; flex-direction: column; gap: 4rpx; flex: 1; }
+.publish-title { font-size: 14px; font-weight: 600; color: var(--color-primary); }
+.publish-sub { font-size: 11px; color: var(--color-on-surface-variant); opacity: 0.7; }
 
 .hero-card {
   position: relative; overflow: hidden; border-radius: 16px;
@@ -650,34 +616,18 @@ const generateBackendLongPoster = async () => {
   box-shadow: 0 12px 32px rgba(15,76,92,0.08);
 }
 .hero-img { position: absolute; inset: 0; width: 100%; height: 100%; }
-.hero-overlay {
-  position: absolute; inset: 0;
-  background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.2) 50%, transparent 100%);
-}
-.hero-content {
-  position: absolute; bottom: 0; left: 0; right: 0; padding: 48rpx;
-  display: flex; flex-direction: column; gap: 8px;
-}
+.hero-overlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.2) 50%, transparent 100%); }
+.hero-content { position: absolute; bottom: 0; left: 0; right: 0; padding: 48rpx; display: flex; flex-direction: column; gap: 8px; }
 .hero-title { font-size: 24px; font-weight: 700; color: #fff; letter-spacing: -0.01em; line-height: 32px; }
 .hero-date { font-size: 14px; color: rgba(255,255,255,0.9); display: flex; align-items: center; gap: 8px; }
 .hero-badge { align-self: flex-start; }
-.hero-badge text {
-  font-size: 12px; font-weight: 500; letter-spacing: 0.05em;
-  color: #fff; background: rgba(255,255,255,0.2); backdrop-filter: blur(8px);
-  padding: 6px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.3);
-}
+.hero-badge text { font-size: 12px; font-weight: 500; letter-spacing: 0.05em; color: #fff; background: rgba(255,255,255,0.2); backdrop-filter: blur(8px); padding: 6px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.3); }
 
-.fill-progress {
-  display: flex; align-items: center; gap: 8px; margin-top: 12px;
-}
+.fill-progress { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
 .fill-icon { font-size: 14px; }
 .fill-text { font-size: 12px; color: rgba(255,255,255,0.9); }
-.fill-bar {
-  flex: 1; height: 4px; background: rgba(255,255,255,0.3); border-radius: 2px; overflow: hidden;
-}
-.fill-bar-inner {
-  height: 100%; background: #34C759; border-radius: 2px; transition: width 0.3s;
-}
+.fill-bar { flex: 1; height: 4px; background: rgba(255,255,255,0.3); border-radius: 2px; overflow: hidden; }
+.fill-bar-inner { height: 100%; background: #34C759; border-radius: 2px; transition: width 0.3s; }
 
 .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 160rpx 40rpx; gap: 16px; }
 .empty-icon { font-size: 64px; opacity: 0.5; }
@@ -686,38 +636,17 @@ const generateBackendLongPoster = async () => {
 .timeline { padding-bottom: 32px; }
 .day-group { margin-bottom: 48px; }
 .day-header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
-.day-badge {
-  width: 44px; height: 44px; border-radius: 50%;
-  background: var(--color-secondary-container);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 14px; font-weight: 700; color: var(--color-primary);
-  box-shadow: 0 4px 12px rgba(15,76,92,0.15);
-}
-.day-active {
-  background: linear-gradient(135deg, #0F4C5C 0%, #14B8A6 100%);
-  color: #fff;
-}
+.day-badge { width: 44px; height: 44px; border-radius: 50%; background: var(--color-secondary-container); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: var(--color-primary); box-shadow: 0 4px 12px rgba(15,76,92,0.15); }
+.day-active { background: linear-gradient(135deg, #0F4C5C 0%, #14B8A6 100%); color: #fff; }
 .day-title { font-size: 20px; font-weight: 600; color: var(--color-primary); letter-spacing: -0.01em; }
 .day-items { padding: 0; }
 
 .timeline-item { display: flex; gap: 12px; margin-bottom: 24px; position: relative; }
 .timeline-dot { display: flex; flex-direction: column; align-items: center; padding-top: 8px; width: 20px; flex-shrink: 0; }
-.dot {
-  width: 16px; height: 16px; border-radius: 50%;
-  background: var(--color-outline-variant);
-  border: 4px solid var(--color-surface);
-  box-shadow: 0 0 0 2px var(--color-outline-variant);
-}
+.dot { width: 16px; height: 16px; border-radius: 50%; background: var(--color-outline-variant); border: 4px solid var(--color-surface); box-shadow: 0 0 0 2px var(--color-outline-variant); }
 .dot-active { background: var(--color-primary); box-shadow: 0 0 0 2px var(--color-primary); }
 
-.item-card {
-  flex: 1; display: flex; gap: 16px;
-  background: rgba(255,255,255,0.75); backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255,255,255,0.5);
-  border-radius: 16px; padding: 16px;
-  box-shadow: 0 8px 24px rgba(15,76,92,0.04);
-}
+.item-card { flex: 1; display: flex; gap: 16px; background: rgba(255,255,255,0.75); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.5); border-radius: 16px; padding: 16px; box-shadow: 0 8px 24px rgba(15,76,92,0.04); }
 .item-img-wrap { width: 96px; height: 96px; border-radius: 12px; overflow: hidden; flex-shrink: 0; }
 .item-img { width: 100%; height: 100%; }
 .item-info { flex: 1; }
@@ -727,33 +656,97 @@ const generateBackendLongPoster = async () => {
 .item-time { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--color-on-surface-variant); margin-top: 4px; }
 .item-desc { font-size: 13px; color: var(--color-on-surface-variant); margin-top: 8px; line-height: 1.5; }
 
-.action-bar {
-  position: fixed; left: 0; right: 0; z-index: 10;
-  display: flex; gap: 12px; padding: 40rpx;
-  background: rgba(255,255,255,0.85); backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border-top: 1px solid rgba(15,76,92,0.08);
+.action-bar { position: fixed; left: 0; right: 0; z-index: 10; display: flex; gap: 12px; padding: 40rpx; background: rgba(255,255,255,0.85); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border-top: 1px solid rgba(15,76,92,0.08); }
+.action-btn { flex: 1; height: 48px; border-radius: 999px; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 14px; font-weight: 600; }
+.action-outline { border: 1px solid var(--color-outline-variant); color: var(--color-primary); }
+.action-primary { flex: 1.5; background: linear-gradient(135deg, #0F4C5C 0%, #14B8A6 100%); color: #fff; box-shadow: 0 8px 20px rgba(15,76,92,0.25); }
+.action-disabled { opacity: 0.5; filter: grayscale(0.4); }
+
+/* 骨架态顶栏 */
+.skeleton-banner {
+  display: flex; align-items: center; gap: 12rpx;
+  margin: 0 24rpx 16rpx;
+  padding: 16rpx 24rpx;
+  border-radius: 16rpx;
+  background: linear-gradient(90deg, rgba(15,76,92,0.06), rgba(20,184,166,0.08));
+  border: 1px solid rgba(15,76,92,0.12);
 }
-.action-btn {
-  flex: 1; height: 48px; border-radius: 999px;
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  font-size: 14px; font-weight: 600;
+.skeleton-banner-dot {
+  width: 12rpx; height: 12rpx; border-radius: 50%;
+  background: #14B8A6;
+  box-shadow: 0 0 0 0 rgba(20,184,166,0.6);
+  animation: skel-pulse 1.4s ease-in-out infinite;
 }
-.action-outline {
-  border: 1px solid var(--color-outline-variant); color: var(--color-primary);
-}
-.action-primary {
-  flex: 1.5;
-  background: linear-gradient(135deg, #0F4C5C 0%, #14B8A6 100%);
-  color: #fff; box-shadow: 0 8px 20px rgba(15,76,92,0.25);
+.skeleton-banner-text { font-size: 12px; color: var(--color-primary); font-weight: 500; letter-spacing: 0.02em; }
+@keyframes skel-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(20,184,166,0.55); }
+  70% { box-shadow: 0 0 0 10rpx rgba(20,184,166,0); }
+  100% { box-shadow: 0 0 0 0 rgba(20,184,166,0); }
 }
 
-.ai-bubble {
-  position: fixed; right: 48rpx; z-index: 10;
-  width: 56px; height: 56px; border-radius: 50%;
-  background: linear-gradient(135deg, #0F4C5C 0%, #14B8A6 100%);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 28px; color: #fff;
-  box-shadow: 0 8px 24px rgba(15,76,92,0.3);
+.ai-bubble { position: fixed; right: 48rpx; z-index: 10; width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, #0F4C5C 0%, #14B8A6 100%); display: flex; align-items: center; justify-content: center; font-size: 28px; color: #fff; box-shadow: 0 8px 24px rgba(15,76,92,0.3); border: none; }
+.ai-bubble::after { border: none; }
+
+/* 编辑模式 */
+.top-right { display: flex; align-items: center; gap: 8px; }
+.edit-toggle-btn {
+  padding: 6px 16px; border-radius: 999px; font-size: 13px; font-weight: 600;
+  background: rgba(15,76,92,0.08); color: var(--color-primary); border: none;
 }
+.edit-toggle-btn::after { border: none; }
+.edit-done { background: rgba(15,76,92,0.15); }
+
+.item-editing .item-card {
+  border-color: rgba(15,76,92,0.2);
+  box-shadow: 0 0 0 2px rgba(15,76,92,0.08), 0 8px 24px rgba(15,76,92,0.06);
+}
+
+.time-edit-hint {
+  font-size: 10px; color: var(--color-primary); opacity: 0.6;
+  margin-left: 4px;
+}
+
+.item-actions {
+  display: flex; gap: 8px; margin-top: 10px; padding-top: 10px;
+  border-top: 1px solid rgba(0,0,0,0.04);
+}
+.item-action-btn {
+  width: 36px; height: 36px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; background: rgba(15,76,92,0.06); border: none;
+  color: var(--color-primary);
+}
+.item-action-btn::after { border: none; }
+.item-action-btn:disabled { opacity: 0.3; }
+.action-ai { background: rgba(20,184,166,0.1); }
+.action-delete { background: rgba(255,59,48,0.08); color: #FF3B30; }
+
+.action-full { flex: 1; }
+
+/* 时间选择器 */
+.picker-mask {
+  position: fixed; inset: 0; z-index: 600;
+  background: rgba(0,0,0,0.5);
+  display: flex; align-items: flex-end;
+}
+.picker-panel {
+  width: 100%; background: #fff; border-radius: 24px 24px 0 0;
+  padding: 24rpx 40rpx; padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
+}
+.picker-title { font-size: 18px; font-weight: 700; color: var(--color-primary); display: block; text-align: center; margin-bottom: 20px; }
+.picker-view { width: 100%; height: 200px; }
+.picker-item { display: flex; align-items: center; justify-content: center; font-size: 16px; height: 40px; }
+.picker-actions { display: flex; gap: 16px; margin-top: 20px; }
+.picker-cancel {
+  flex: 1; height: 44px; border-radius: 12px;
+  background: rgba(0,0,0,0.04); color: var(--color-on-surface-variant);
+  font-size: 16px; font-weight: 600; border: none;
+}
+.picker-cancel::after { border: none; }
+.picker-confirm {
+  flex: 1; height: 44px; border-radius: 12px;
+  background: linear-gradient(135deg, #0F4C5C 0%, #14B8A6 100%);
+  color: #fff; font-size: 16px; font-weight: 600; border: none;
+}
+.picker-confirm::after { border: none; }
 </style>

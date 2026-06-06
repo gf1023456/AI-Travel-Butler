@@ -3,7 +3,7 @@ AI Travel Butler - Database Module
 PostgreSQL + SQLAlchemy
 """
 
-from sqlalchemy import create_engine, Column, Integer, String, Text, Boolean, SmallInteger, DECIMAL, JSON, TIMESTAMP, ForeignKey, Date
+from sqlalchemy import create_engine, Column, Integer, String, Text, Boolean, SmallInteger, DECIMAL, JSON, TIMESTAMP, ForeignKey, Date, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy.sql import func
@@ -33,6 +33,8 @@ class User(Base):
     language = Column(String(20))
     status = Column(SmallInteger, default=1)
     total_plans = Column(Integer, default=0)
+    invite_code = Column(String(32), unique=True, index=True)
+    invited_by = Column(Integer, ForeignKey('users.id'), nullable=True)
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
 
@@ -91,7 +93,12 @@ class TravelPlan(Base):
     # 状态
     is_favorite = Column(Boolean, default=False)
     is_deleted = Column(Boolean, default=False)
-    
+
+    # 广场/分类（v1.1+）
+    category = Column(String(32), index=True, nullable=True)        # light/deep/food/outdoor
+    is_public = Column(Boolean, default=False, nullable=False, index=True)
+    cover_url = Column(String(500), nullable=True)                  # 显式封面，优先于 day_plan[].image
+
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
 
@@ -114,6 +121,40 @@ class UserFeedback(Base):
     created_at = Column(TIMESTAMP, server_default=func.now())
 
     plan = relationship("TravelPlan", back_populates="feedbacks")
+
+
+class PlanLike(Base):
+    """方案点赞表（公开社交信号）"""
+    __tablename__ = 'plan_likes'
+
+    id = Column(Integer, primary_key=True)
+    plan_id = Column(Integer, ForeignKey('travel_plans.id', ondelete='CASCADE'), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+
+    plan = relationship("TravelPlan", backref="likes")
+    user = relationship("User", backref="liked_plans")
+
+    __table_args__ = (
+        UniqueConstraint('plan_id', 'user_id', name='uq_plan_user_like'),
+    )
+
+
+class PlanFavorite(Base):
+    """方案收藏表（每个用户对每条方案一份收藏，跨用户独立）"""
+    __tablename__ = 'plan_favorites'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    plan_id = Column(Integer, ForeignKey('travel_plans.id', ondelete='CASCADE'), nullable=False, index=True)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+
+    plan = relationship("TravelPlan", backref="favorited_by")
+    user = relationship("User", backref="favorite_plans")
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'plan_id', name='uq_user_plan_fav'),
+    )
 
 
 class SystemConfig(Base):
@@ -277,7 +318,7 @@ class Database:
             config = session.query(SystemConfig).filter(
                 SystemConfig.config_key == 'max_free_plans_per_day'
             ).first()
-            max_free = int(config.config_value) if config and config.config_value else 10
+            max_free = int(config.config_value) if config and config.config_value else 1
             
             usage = session.query(UserDailyUsage).filter(
                 UserDailyUsage.user_id == user_id,
@@ -337,7 +378,7 @@ class Database:
             config = session.query(SystemConfig).filter(
                 SystemConfig.config_key == 'max_free_plans_per_day'
             ).first()
-            max_free = int(config.config_value) if config and config.config_value else 10
+            max_free = int(config.config_value) if config and config.config_value else 1
             
             # 计算 remaining：免费剩余 + bonus
             free_remaining = max_free - usage.plan_count
@@ -376,6 +417,198 @@ class Database:
                 session.add(usage)
             
             return True
+
+    def get_or_create_invite_code(self, user_id: int) -> str:
+        """获取或生成用户邀请码"""
+        import uuid
+        with self.get_session() as session:
+            user = session.query(User).filter(User.id == user_id).first()
+            if not user:
+                return ""
+            if user.invite_code:
+                return user.invite_code
+            code = uuid.uuid4().hex[:8].upper()
+            user.invite_code = code
+            return code
+
+    def process_invite(self, user_id: int, invite_code: str, _session=None) -> dict:
+        """处理邀请：被邀请人使用邀请码，双方各+3次配额
+
+        Args:
+            user_id: 被邀请人 user_id
+            invite_code: 邀请码
+            _session: (内部用) 传入已有 session 以避免事务隔离问题
+        """
+        from datetime import date
+
+        today = date.today()
+        INVITE_BONUS = 3
+
+        if _session is not None:
+            return self._process_invite_in_session(_session, user_id, invite_code, today, INVITE_BONUS)
+
+        with self.get_session() as session:
+            return self._process_invite_in_session(session, user_id, invite_code, today, INVITE_BONUS)
+
+    def _process_invite_in_session(self, session, user_id: int, invite_code: str, today, INVITE_BONUS: int) -> dict:
+        """在指定 session 中处理邀请（保证与外层事务一致）"""
+        # 找到邀请人
+        inviter = session.query(User).filter(User.invite_code == invite_code).first()
+        if not inviter:
+            return {"code": 404, "msg": "邀请码无效"}
+
+        if inviter.id == user_id:
+            return {"code": 400, "msg": "不能使用自己的邀请码"}
+
+        # 检查是否已经使用过邀请码
+        invitee = session.query(User).filter(User.id == user_id).first()
+        if not invitee:
+            return {"code": 404, "msg": "用户不存在"}
+        if invitee.invited_by:
+            return {"code": 400, "msg": "您已使用过邀请码"}
+
+        # 记录邀请关系
+        invitee.invited_by = inviter.id
+
+        # 邀请人 +3 bonus
+        inviter_usage = session.query(UserDailyUsage).filter(
+            UserDailyUsage.user_id == inviter.id,
+            UserDailyUsage.usage_date == today
+        ).first()
+        inviter_before_bonus = inviter_usage.bonus_count if inviter_usage else 0
+        if inviter_usage:
+            inviter_usage.bonus_count += INVITE_BONUS
+        else:
+            session.add(UserDailyUsage(
+                user_id=inviter.id, usage_date=today,
+                plan_count=0, bonus_count=INVITE_BONUS
+            ))
+        session.flush()
+        inviter_after_bonus = session.query(UserDailyUsage.bonus_count).filter(
+            UserDailyUsage.user_id == inviter.id,
+            UserDailyUsage.usage_date == today
+        ).scalar() or 0
+        print(f"[Invite] 邀请人 user_id={inviter.id} (invite_code={invite_code}) bonus: {inviter_before_bonus} → {inviter_after_bonus} (+{INVITE_BONUS})")
+
+        # 被邀请人 +3 bonus
+        invitee_usage = session.query(UserDailyUsage).filter(
+            UserDailyUsage.user_id == user_id,
+            UserDailyUsage.usage_date == today
+        ).first()
+        invitee_before_bonus = invitee_usage.bonus_count if invitee_usage else 0
+        if invitee_usage:
+            invitee_usage.bonus_count += INVITE_BONUS
+        else:
+            session.add(UserDailyUsage(
+                user_id=user_id, usage_date=today,
+                plan_count=0, bonus_count=INVITE_BONUS
+            ))
+        session.flush()
+        invitee_after_bonus = session.query(UserDailyUsage.bonus_count).filter(
+            UserDailyUsage.user_id == user_id,
+            UserDailyUsage.usage_date == today
+        ).scalar() or 0
+        print(f"[Invite] 被邀请人 user_id={user_id} bonus: {invitee_before_bonus} → {invitee_after_bonus} (+{INVITE_BONUS})")
+
+        return {
+            "code": 0,
+            "msg": "邀请成功，获得3次额外配额",
+            "inviter_id": inviter.id,
+            "invitee_id": user_id,
+            "inviter_bonus_added": INVITE_BONUS,
+            "invitee_bonus_added": INVITE_BONUS
+        }
+
+    # ========== 点赞 ==========
+
+    def toggle_plan_like(self, user_id: int, plan_id: int) -> dict:
+        """Toggle 点赞：写过删行返回 is_liked=False，没写过插行返回 is_liked=True
+
+        同时校验 plan 存在且未删除。
+        """
+        with self.get_session() as session:
+            plan = session.query(TravelPlan).filter(
+                TravelPlan.id == plan_id,
+                TravelPlan.is_deleted == False
+            ).first()
+            if not plan:
+                return {"code": 404, "msg": "方案不存在", "is_liked": False, "likes": 0}
+
+            existing = session.query(PlanLike).filter(
+                PlanLike.user_id == user_id,
+                PlanLike.plan_id == plan_id
+            ).first()
+            if existing:
+                session.delete(existing)
+                is_liked = False
+            else:
+                session.add(PlanLike(user_id=user_id, plan_id=plan_id))
+                is_liked = True
+            session.flush()
+            count = session.query(PlanLike).filter(PlanLike.plan_id == plan_id).count()
+            print(f"[Like] user_id={user_id} plan_id={plan_id} is_liked={is_liked} total_likes={count}")
+            return {"code": 0, "is_liked": is_liked, "likes": count}
+
+    def get_likes_for_plans(self, user_id: int, plan_ids: list) -> dict:
+        """批量查询 user 对这些 plan 的点赞状态 {plan_id: True}（未点的不在 dict 里）"""
+        if not plan_ids:
+            return {}
+        with self.get_session() as session:
+            rows = session.query(PlanLike.plan_id).filter(
+                PlanLike.user_id == user_id,
+                PlanLike.plan_id.in_(plan_ids)
+            ).all()
+            return {row[0]: True for row in rows}
+
+    def get_plans_like_counts(self, plan_ids: list) -> dict:
+        """批量查询多个 plan 的点赞数 {plan_id: count}"""
+        if not plan_ids:
+            return {}
+        with self.get_session() as session:
+            rows = session.query(PlanLike.plan_id, func.count(PlanLike.id)).filter(
+                PlanLike.plan_id.in_(plan_ids)
+            ).group_by(PlanLike.plan_id).all()
+            return {pid: cnt for pid, cnt in rows}
+
+    # ========== 收藏（每用户独立） ==========
+
+    def toggle_plan_favorite(self, user_id: int, plan_id: int) -> dict:
+        """Toggle 收藏：写过删行返回 is_favorited=False，没写过插行返回 is_favorited=True
+
+        跨用户独立：用户 A 的收藏不影响用户 B。
+        """
+        with self.get_session() as session:
+            plan = session.query(TravelPlan).filter(
+                TravelPlan.id == plan_id,
+                TravelPlan.is_deleted == False
+            ).first()
+            if not plan:
+                return {"code": 404, "msg": "方案不存在", "is_favorited": False}
+
+            existing = session.query(PlanFavorite).filter(
+                PlanFavorite.user_id == user_id,
+                PlanFavorite.plan_id == plan_id
+            ).first()
+            if existing:
+                session.delete(existing)
+                is_favorited = False
+            else:
+                session.add(PlanFavorite(user_id=user_id, plan_id=plan_id))
+                is_favorited = True
+            session.flush()
+            print(f"[Favorite] user_id={user_id} plan_id={plan_id} is_favorited={is_favorited}")
+            return {"code": 0, "is_favorited": is_favorited}
+
+    def get_favorites_for_user(self, user_id: int, plan_ids: list) -> dict:
+        """批量查询 user 对这些 plan 的收藏状态 {plan_id: True}（未收藏的不在 dict 里）"""
+        if not plan_ids:
+            return {}
+        with self.get_session() as session:
+            rows = session.query(PlanFavorite.plan_id).filter(
+                PlanFavorite.user_id == user_id,
+                PlanFavorite.plan_id.in_(plan_ids)
+            ).all()
+            return {row[0]: True for row in rows}
 
 
 # 全局数据库实例

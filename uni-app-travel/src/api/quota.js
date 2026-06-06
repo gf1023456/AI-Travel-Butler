@@ -106,3 +106,32 @@ export async function addBonus(bonusType = 'share') {
   
   return data
 }
+
+/**
+ * 邀请好友增加配额（邀请1个好友+3次）
+ */
+export async function inviteFriend(inviteCode) {
+  const data = await request({
+    url: '/quota/invite',
+    method: 'POST',
+    data: { invite_code: inviteCode }
+  })
+  
+  const userStore = useUserStore()
+  if (data) {
+    userStore.setQuota(data)
+  }
+  
+  return data
+}
+
+/**
+ * 获取邀请链接/二维码
+ */
+export async function getInviteInfo() {
+  const data = await request({
+    url: '/quota/invite-info',
+    method: 'GET'
+  })
+  return data
+}

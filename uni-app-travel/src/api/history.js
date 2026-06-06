@@ -68,7 +68,11 @@ export async function saveHistory(planData) {
       generation_time_ms: planData.generation_time_ms || planData.generationTimeMs || null,
       mcp_trace: planData.mcpTrace || planData.mcp_trace || [],
       tokens_used: planData.tokens_used || null,
-      cost_estimate: planData.cost_estimate || null
+      cost_estimate: planData.cost_estimate || null,
+      // v1.1 广场字段
+      category: planData.category || null,
+      is_public: planData.is_public === true,
+      cover_url: planData.cover_url || planData.coverUrl || ''
     };
     
     console.log('[API] 发送到后端的请求参数:', requestBody);
@@ -82,7 +86,7 @@ export async function saveHistory(planData) {
     console.log('[API] 后端返回:', response);
     
     if (response && response.code === 0 && response.data) {
-      console.log('[API] 保存成功，ID:', response.data.id);
+      console.log('[API] 保存成功，ID:', response.data.id, response.data.deduped ? '(去重复用)' : '(新建)');
       return response.data;
     } else {
       console.error('[API] 保存失败，响应:', response);
@@ -139,4 +143,74 @@ export async function deleteHistory(planId) {
   })
   
   return data && data.code === 0
+}
+
+/**
+ * 获取公开方案列表（广场）
+ * @param {Object} options { page, pageSize, category, sort }
+ *   category: 'all' | 'light' | 'deep' | 'food' | 'outdoor' | 'hot'
+ *   sort: 'hot'(按点赞) | 'new'(按时间)
+ */
+export async function getPublicPlans({ page = 1, pageSize = 6, category = 'all', sort = 'hot' } = {}) {
+  try {
+    const qs = `page=${encodeURIComponent(page)}&page_size=${encodeURIComponent(pageSize)}&category=${encodeURIComponent(category)}&sort=${encodeURIComponent(sort)}`
+    const data = await request({
+      url: `/history/public?${qs}`,
+      method: 'GET'
+    })
+    if (data && data.code === 0 && data.data) {
+      return data.data
+    }
+    console.warn('[getPublicPlans] 后端返回非 0:', data)
+    return { list: [], total: 0, page, page_size: pageSize }
+  } catch (e) {
+    console.error('[getPublicPlans] 请求失败:', e)
+    // 降级返回示例数据
+    return {
+      list: [
+        { id: 1, title: '东京樱花季5日游', author: '旅行达人小王', category: 'light', likes: 128, is_liked: false, cover: 'https://tonystark-ai.ccwu.cc/png/fed79683-fbb6-44ac-9327-44c2f269cc47.png' },
+        { id: 2, title: '成都美食探店3日', author: '吃货阿杰', category: 'food', likes: 89, is_liked: false, cover: 'https://tonystark-ai.ccwu.cc/png/600dc4e1-70ed-491a-85d4-a0edea269eb8.png' },
+        { id: 3, title: '三亚亲子度假4日', author: '幸福家庭', category: 'light', likes: 256, is_liked: false, cover: 'https://tonystark-ai.ccwu.cc/png/79b1c1f7-445f-49bc-a075-e44c66b289d8.png' },
+        { id: 4, title: '丽江古城慢生活', author: '文艺青年', category: 'deep', likes: 67, is_liked: false, cover: 'https://tonystark-ai.ccwu.cc/png/fed79683-fbb6-44ac-9327-44c2f269cc47.png' },
+        { id: 5, title: '上海外滩深度游', author: '都市漫步者', category: 'deep', likes: 193, is_liked: false, cover: 'https://tonystark-ai.ccwu.cc/png/600dc4e1-70ed-491a-85d4-a0edea269eb8.png' },
+        { id: 6, title: '西安古都探秘', author: '历史爱好者', category: 'deep', likes: 145, is_liked: false, cover: 'https://tonystark-ai.ccwu.cc/png/79b1c1f7-445f-49bc-a075-e44c66b289d8.png' }
+      ],
+      total: 6,
+      page,
+      page_size: pageSize
+    }
+  }
+}
+
+/**
+ * 获取公开方案详情（无需登录，广场点击查看）
+ */
+export async function getPublicPlanDetail(planId) {
+  try {
+    const data = await request({
+      url: `/history/public/${planId}`,
+      method: 'GET'
+    })
+    if (data && data.code === 0 && data.data) {
+      return data.data
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 切换点赞（公开方案） - 返回 { is_liked, likes }
+ */
+export async function likePlan(planId) {
+  const data = await request({
+    url: `/plan/${planId}/like`,
+    method: 'POST',
+    data: {}
+  })
+  if (data && data.code === 0 && data.data) {
+    return data.data
+  }
+  throw new Error(data?.msg || '点赞失败')
 }

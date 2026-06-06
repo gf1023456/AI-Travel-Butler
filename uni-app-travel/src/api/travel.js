@@ -144,6 +144,23 @@ export const getCurrentModel = () => {
   return get('/getModel', {})
 }
 
+/**
+ * 随机获取一个旅行城市
+ * @returns {Promise}
+ */
+export const getRandomCity = () => {
+  return get('/plan/random-city')
+}
+
+/**
+ * 随机获取多个旅行城市（用于转盘）
+ * @param {number} count - 数量，默认6
+ * @returns {Promise}
+ */
+export const getRandomCities = (count = 6) => {
+  return get(`/plan/random-cities?count=${count}`)
+}
+
 export default {
   createPlan,
   createPlanV2,
@@ -157,5 +174,7 @@ export default {
   getPlanV3Result,
   refinePlan,
   getFrontendConfig,
-  getCurrentModel
+  getCurrentModel,
+  getRandomCity,
+  getRandomCities
 }

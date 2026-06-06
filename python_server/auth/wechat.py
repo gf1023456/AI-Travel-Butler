@@ -83,7 +83,7 @@ async def get_wechat_session(code: str) -> dict:
         }
 
 
-async def wechat_login(code: str, user_info: dict = None, phone_code: str = None, encrypted_data: str = None, iv: str = None) -> dict:
+async def wechat_login(code: str, user_info: dict = None, phone_code: str = None, encrypted_data: str = None, iv: str = None, invite_code: str = None) -> dict:
     """
     微信小程序登录
     
@@ -93,6 +93,7 @@ async def wechat_login(code: str, user_info: dict = None, phone_code: str = None
         phone_code: 手机号授权code
         encrypted_data: 加密数据
         iv: 加密算法初始向量
+        invite_code: 邀请码（来自分享链接）
     
     Returns:
         {user_id, openid, access_token, expires_at, phone}
@@ -123,7 +124,8 @@ async def wechat_login(code: str, user_info: dict = None, phone_code: str = None
         
         # 查找用户
         user = db_session.query(User).filter(User.openid == openid).first()
-        
+        print(f"[Login] openid={openid}, existing_user={bool(user)}, invite_code_param={invite_code}")
+
         if not user:
             # 创建新用户
             user = User(
@@ -140,6 +142,20 @@ async def wechat_login(code: str, user_info: dict = None, phone_code: str = None
             )
             db_session.add(user)
             db_session.flush()  # 获取 user.id
+
+            # 新用户：如果有邀请码，自动处理邀请
+            # 关键：传外层 db_session 进去，保证新用户在同一事务内可见
+            if invite_code:
+                try:
+                    result = db.process_invite(user.id, invite_code, _session=db_session)
+                    if result.get('code') == 0:
+                        print(f"[Login] ✅ 自动处理邀请码成功: user_id={user.id}, invite_code={invite_code}, inviter_id={result.get('inviter_id')}")
+                    else:
+                        print(f"[Login] ⚠️ 处理邀请码返回非 0: {result}")
+                except Exception as e:
+                    print(f"[Login] ⚠️ 处理邀请码异常: {e}")
+                    import traceback
+                    traceback.print_exc()
         else:
             # 更新用户信息
             if user_info:

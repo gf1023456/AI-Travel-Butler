@@ -18,12 +18,13 @@ export const useUserStore = defineStore('user', {
     refreshExpiresAt: '',
     nickname: '',
     avatarUrl: '',
+    inviteCode: '',  // 来自分享链接的邀请码
     isLoggedIn: false,
     quota: {
       used: 0,
       bonus: 0,
-      max: 10,
-      remaining: 10
+      max: 1,
+      remaining: 1
     }
   }),
 
@@ -98,7 +99,8 @@ export const useUserStore = defineStore('user', {
           userId: this.userId,
           openid: this.openid,
           nickname: this.nickname,
-          avatarUrl: this.avatarUrl
+          avatarUrl: this.avatarUrl,
+          inviteCode: this.inviteCode
         })
         console.log('[UserStore] saveToStorage 完成')
       } catch (e) {
@@ -128,6 +130,7 @@ export const useUserStore = defineStore('user', {
           this.openid = userInfo.openid
           this.nickname = userInfo.nickname
           this.avatarUrl = userInfo.avatarUrl
+          this.inviteCode = userInfo.inviteCode || ''
         }
       } catch (e) {
         console.error('恢复用户信息失败:', e)
@@ -144,8 +147,9 @@ export const useUserStore = defineStore('user', {
       this.refreshExpiresAt = ''
       this.nickname = ''
       this.avatarUrl = ''
+      this.inviteCode = ''
       this.isLoggedIn = false
-      this.quota = { used: 0, bonus: 0, max: 10, remaining: 10 }
+      this.quota = { used: 0, bonus: 0, max: 1, remaining: 1 }
 
       try {
         uni.removeStorageSync('user_token')

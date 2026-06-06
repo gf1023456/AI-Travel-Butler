@@ -60,7 +60,13 @@ export async function wechatLogin(params = {}) {
           requestData.iv = params.iv || ''
           console.log('[WeChat] 包含手机号授权信息')
         }
-        
+
+        // 5. 邀请码（分享链接带来的）透传给后端
+        if (params.invite_code) {
+          requestData.invite_code = params.invite_code
+          console.log('[WeChat] 包含邀请码:', params.invite_code)
+        }
+
         try {
           // 5. 发送到后端换取 token
           const response = await uni.request({

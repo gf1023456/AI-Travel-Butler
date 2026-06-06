@@ -55,12 +55,23 @@
 
 <script setup>
 import { ref } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
 import { wechatLogin } from '@/api/user.js'
+import { getQuota } from '@/api/quota.js'
 import { useUserStore } from '@/store/user.js'
 
 const loading = ref(false)
 const nickname = ref('')
 const avatarUrl = ref('')
+
+// 从分享链接提取邀请码
+onLoad((options = {}) => {
+  if (options.invite) {
+    const userStore = useUserStore()
+    userStore.inviteCode = options.invite
+    console.log('[Login] 捕获邀请码:', options.invite)
+  }
+})
 
 const handleClose = () => {
   uni.navigateBack({ fallback: () => uni.switchTab({ url: '/pages/index/index' }) })
@@ -119,18 +130,38 @@ const handleWechatLogin = async () => {
       })
     })
 
-    const loginData = await wechatLogin({
+    const userStore = useUserStore()
+
+    // 登录参数
+    const loginParams = {
       code,
       nickname: nickname.value,
       avatar_url: avatarUrl.value
-    })
+    }
 
-    const userStore = useUserStore()
+    // 如果有来自分享的邀请码，自动带上
+    if (userStore.inviteCode) {
+      loginParams.invite_code = userStore.inviteCode
+    }
+
+    const loginData = await wechatLogin(loginParams)
+
+    // 登录成功后清除邀请码
+    userStore.inviteCode = ''
+
     userStore.setLoginData(loginData)
     userStore.setUserInfo({
       nickname: loginData.nickname || nickname.value,
       avatar_url: loginData.avatar_url || avatarUrl.value
     })
+
+    // 立即拉一次最新配额（这样切到我的页时 store 已经是新值）
+    try {
+      const quota = await getQuota()
+      console.log('[Login] 登录后立即拉取 quota:', JSON.stringify(quota))
+    } catch (e) {
+      console.warn('[Login] 登录后拉 quota 失败:', e)
+    }
 
     uni.hideLoading()
     uni.showToast({ title: '登录成功', icon: 'success' })

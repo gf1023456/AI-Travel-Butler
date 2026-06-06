@@ -58,6 +58,20 @@
         "navigationBarTitleText": "设置",
         "navigationStyle": "custom"
       }
+    },
+    {
+      "path": "pages/settings/feedback",
+      "style": {
+        "navigationBarTitleText": "帮助与反馈",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/plan-detail/index",
+      "style": {
+        "navigationBarTitleText": "方案详情",
+        "navigationStyle": "custom"
+      }
     }
   ],
   "globalStyle": {

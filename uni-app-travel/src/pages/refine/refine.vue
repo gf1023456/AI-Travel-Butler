@@ -67,149 +67,154 @@
           <text class="apply-icon">✨</text>
           <text>立即应用优化</text>
         </button>
-        <text class="apply-hint">行程一下 将为您重新生成最优路线</text>
+        <text class="apply-hint">将根据你的需求优化当前行程</text>
       </section>
 
-<!--      &lt;!&ndash; Decorative Visual &ndash;&gt;-->
-<!--      <view class="deco-image">-->
-<!--        <image class="deco-img" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBvaIBpvSfc7bQdB9Eyz-qbNj0HwauVvGllVjqsfxny-ctimt6M4tS2QwntgTeb2Q1bSZI2-uK13weAGS26NEGecLp7LT7YVok6UJNMO61aFQSN-8SIDchRAkmM0jeABJAUdcjbGDTg2ZPGsHLU8oxq6J1XRuL2fGtuaySVhZzwNhHRwLbHCP5Ppo_2GZCCtQ5-wP8H9kD44BpsojqgU2T9QoTHH_AK-m_gvKWV69xHpn2KecwEKfFOe5ps4v5lLp-9dIkhBkJJIx0" mode="aspectFill" />-->
-<!--        <view class="deco-overlay"></view>-->
-<!--        <view class="deco-content">-->
-<!--          <text class="deco-title">灵感启发</text>-->
-<!--          <text class="deco-sub">探索京都最隐秘的红叶观赏点</text>-->
-<!--        </view>-->
-<!--      </view>-->
+      <!-- Decorative Image -->
+      <view class="deco-image">
+        <image class="deco-img" src="https://tonystark-ai.ccwu.cc/png/4d94c032-2cd5-4e00-8771-b1cd89cb0850.png" mode="aspectFill" />
+        <view class="deco-overlay"></view>
+        <view class="deco-content">
+          <text class="deco-title">每次优化，让旅行更完美</text>
+          <text class="deco-sub">行程一下 · 你的私人旅行管家</text>
+        </view>
+      </view>
     </scroll-view>
   </view>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useTravelStore } from '@/store/travel.js'
+import { useUserStore } from '@/store/user.js'
 import { useSafeArea } from '@/utils/safeArea.js'
 import { themeClass } from '@/utils/theme.js'
 
 const travelStore = useTravelStore()
+const userStore = useUserStore()
 const { statusBarHeight } = useSafeArea()
+
 const refineRequest = ref('')
 const charCount = computed(() => refineRequest.value.length)
 
 const currentTitle = computed(() => {
-  return travelStore.currentPlan?.itinerarySummary?.substring(0, 20) || '京都秋意之旅'
+  const plan = travelStore.currentPlan
+  return plan?.itinerarySummary?.substring(0, 40) || '未命名行程'
 })
 const currentDate = computed(() => {
-  return '11月15日 - 11月20日 (6天)'
+  return new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
 })
-const currentTags = computed(() => {
-  const items = travelStore.currentPlan?.dayPlanItinerary || []
-  const names = items.slice(0, 3).map(i => i.name).filter(Boolean)
-  const more = items.length > 3 ? items.length - 3 : 0
-  return [...names, ...(more ? [`+${more} 更多`] : [])]
-})
+const currentTags = computed(() => ['专属规划', '可优化'])
 
 const suggestions = [
-  { icon: '🍲', text: '更多特色餐厅' },
-  { icon: '☕', text: '寻找精品咖啡' },
-  { icon: '🚶', text: '减少步行距离' },
-  { icon: '📸', text: '增加网红打卡' }
+  { icon: '🍜', text: '增加美食推荐' },
+  { icon: '📸', text: '加入拍照打卡点' },
+  { icon: '😌', text: '行程更轻松一些' },
+  { icon: '🏛️', text: '增加文化体验' },
 ]
 
-const goBack = () => uni.navigateBack()
+onMounted(() => {
+  userStore.restoreFromStorage()
+  if (!userStore.hasToken) {
+    uni.showToast({ title: '请先登录', icon: 'none' })
+    setTimeout(() => uni.reLaunch({ url: '/pages/login/index' }), 1500)
+  }
+})
+
+const goBack = () => uni.reLaunch({ url: '/pages/index/index' })
 
 const handleRefine = async () => {
   if (!refineRequest.value.trim()) {
-    uni.showToast({ title: '请输入优化需求', icon: 'none' }); return
-  }
-  if (!travelStore.currentPlan) {
-    uni.showToast({ title: '请先创建行程', icon: 'none' }); return
+    uni.showToast({ title: '请输入优化需求', icon: 'none' })
+    return
   }
   try {
-    uni.showLoading({ title: '正在优化...' })
-    await travelStore.refinePlan({
-      userInput: travelStore.currentPlan.userInput || '',
-      modelType: travelStore.currentPlan.modelType || 'auto',
-      isPlannerMode: travelStore.currentPlan.isPlannerMode || false,
-      travelMode: travelStore.currentPlan.travelMode || 'deep',
-      refineInstruction: refineRequest.value,
-      basePlan: travelStore.currentPlan
+    const result = await travelStore.refinePlanV4({
+      refineRequest: refineRequest.value,
+      currentPlan: travelStore.currentPlan
     })
-    uni.hideLoading()
-    uni.showToast({ title: '优化成功', icon: 'success' })
-    setTimeout(() => uni.navigateBack(), 1500)
-  } catch (error) {
-    uni.hideLoading()
+    if (result) {
+      uni.showToast({ title: '优化完成', icon: 'success' })
+      uni.reLaunch({ url: '/pages/index/index' })
+    }
+  } catch {
     uni.showToast({ title: '优化失败，请稍后重试', icon: 'none' })
   }
 }
 </script>
 
 <style scoped>
-.refine-page { min-height: 100vh; background: var(--color-surface); }
+.refine-page { min-height: 100vh; background: #f8f9fa; }
 
 .top-bar {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 10;
   display: flex; align-items: center; justify-content: space-between;
-  padding: 24rpx 40rpx 24rpx;
-  background: var(--color-surface); opacity: 0.95;
-  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  padding: 16rpx 40rpx;
+  background: rgba(255,255,255,0.7); backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
   border-bottom: 1px solid rgba(255,255,255,0.2);
+  position: sticky; top: 0; z-index: 10;
 }
 .top-left { display: flex; align-items: center; gap: 12px; }
-.back-btn { font-size: 20px; color: var(--color-primary); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
-.top-title { font-size: 20px; font-weight: 600; color: var(--color-primary); line-height: 28px; }
-.more-btn { font-size: 24px; color: var(--color-on-surface-variant); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
+.back-btn {
+  width: 36px; height: 36px; display: flex; align-items: center;
+  justify-content: center; font-size: 20px; color: var(--color-primary);
+  background: transparent; border: none; padding: 0;
+}
+.back-btn::after { border: none; }
+.top-title { font-size: 24px; font-weight: 700; color: var(--color-primary); letter-spacing: -0.01em; line-height: 32px; }
+.more-btn {
+  width: 40px; height: 40px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px; color: var(--color-primary);
+  background: transparent; border: none;
+}
+.more-btn::after { border: none; }
 
-.content { padding: 160rpx 40rpx 64rpx; }
+.content { padding: 16rpx 40rpx 80rpx; }
 
-.section { margin-bottom: 80rpx; }
-.section-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.section-icon { font-size: 18px; color: var(--color-on-primary-container); }
+.section { margin-bottom: 24px; }
+.section-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.section-icon { font-size: 18px; }
 .section-overline {
-  font-size: 12px; font-weight: 500; letter-spacing: 0.1em;
-  color: var(--color-on-secondary-container); text-transform: uppercase;
+  font-size: 11px; font-weight: 700; color: var(--color-outline);
+  text-transform: uppercase; letter-spacing: 0.15em;
 }
 
 .summary-card {
-  position: relative; overflow: hidden;
-  background: #fff; border: 1px solid rgba(255,255,255,0.8);
-  border-radius: 16px; padding: 48rpx;
-  box-shadow: 0 12px 32px rgba(0,0,0,0.04);
+  position: relative; overflow: hidden; border-radius: 24px;
+  background: rgba(255,255,255,0.6);
+  padding: 40rpx; border: 1px solid rgba(255,255,255,0.4);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.04);
 }
 .summary-bg-deco {
-  position: absolute; top: 0; right: 0; width: 128px; height: 128px;
-  background: var(--color-primary); opacity: 0.03;
-  border-radius: 50%; transform: translate(32px, -32px); filter: blur(40px);
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(15,76,92,0.03) 0%, transparent 100%);
 }
 .summary-content { position: relative; z-index: 1; }
-.summary-title { font-size: 24px; font-weight: 700; color: var(--color-primary); letter-spacing: -0.01em; margin-bottom: 4px; }
-.summary-date { font-size: 14px; color: var(--color-on-surface-variant); opacity: 0.8; margin-bottom: 20px; display: flex; align-items: center; gap: 6px; }
-.summary-tags { display: flex; gap: 8px; flex-wrap: wrap; }
-.tag {
-  padding: 6px 14px; border-radius: 8px;
-  background: var(--color-surface-container-low);
-  border: 1px solid var(--color-outline-variant); opacity: 0.2;
-  font-size: 13px; font-weight: 600; color: var(--color-on-surface-variant);
-}
+.summary-title { font-size: 18px; font-weight: 700; color: var(--color-primary); line-height: 28px; margin-bottom: 8px; display: block; }
+.summary-date { font-size: 13px; color: var(--color-on-surface-variant); opacity: 0.7; }
+.summary-tags { display: flex; gap: 8px; margin-top: 8px; }
+.tag { font-size: 11px; font-weight: 600; padding: 4px 12px; border-radius: 999px; background: var(--color-primary-fixed); color: var(--color-primary); }
 
-.input-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.input-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .input-header-left { display: flex; align-items: center; gap: 8px; }
-.char-count { font-size: 12px; font-weight: 500; color: var(--color-outline); opacity: 0.6; }
+.char-count { font-size: 12px; color: var(--color-outline); opacity: 0.5; }
 
 .input-area {
-  position: relative;
-  background: rgba(255,255,255,0.4); backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255,255,255,0.6);
-  border-radius: 16px; overflow: hidden;
+  display: flex; align-items: flex-end; gap: 12px;
+  background: rgba(255,255,255,0.6);
+  border: 1px solid rgba(255,255,255,0.4);
+  border-radius: 24px;
+  padding: 40rpx;
 }
 .input-textarea {
-  width: 100%; height: 320rpx; padding: 48rpx;
-  font-size: 16px; line-height: 26px; color: var(--color-on-surface);
-  background: transparent;
+  flex: 1; min-height: 90px;
+  background: transparent; border: none; resize: none;
+  font-size: 15px; line-height: 24px;
+  color: var(--color-on-surface);
 }
-.input-textarea::placeholder { color: var(--color-outline-variant); opacity: 0.6; }
+.input-textarea::placeholder { color: var(--color-on-surface-variant); opacity: 0.4; }
 .voice-btn {
-  position: absolute; bottom: 32rpx; right: 32rpx;
   width: 44px; height: 44px; border-radius: 12px;
   background: rgba(255,255,255,0.8); border: 1px solid #fff;
   display: flex; align-items: center; justify-content: center;
@@ -226,20 +231,20 @@ const handleRefine = async () => {
 .suggestion-chip {
   display: flex; align-items: center; justify-content: center; gap: 8px;
   padding: 24rpx 32rpx;
-  background: #fff; border: 1px solid var(--color-outline-variant); opacity: 0.2;
+  background: #fff; border: 1px solid var(--color-outline-variant);
   border-radius: 12px;
-  font-size: 14px; font-weight: 600; color: var(--color-primary); opacity: 0.8;
+  font-size: 14px; font-weight: 600; color: var(--color-primary);
 }
 
 .action-section { margin-top: 48rpx; display: flex; flex-direction: column; align-items: center; }
 .apply-btn {
   width: 100%; height: 56px;
   background: linear-gradient(135deg, #0F4C5C 0%, #14B8A6 50%, #0F4C5C 100%);
+  background-size: 200% 200%;
   border-radius: 16px; color: #fff;
   font-size: 18px; font-weight: 700; line-height: 28px;
   display: flex; align-items: center; justify-content: center; gap: 12px;
   box-shadow: 0 12px 24px rgba(15,76,92,0.3);
-  background-size: 200% 200%;
 }
 .apply-btn[disabled] { opacity: 0.5; }
 .apply-icon { font-size: 24px; }

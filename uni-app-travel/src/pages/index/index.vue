@@ -35,8 +35,7 @@
         </view>
       </view>
       <view class="nav-actions">
-<!--        <button class="nav-btn"><text>🔍</text></button>-->
-<!--        <button class="nav-btn"><text>🔔</text></button>-->
+        <button class="nav-btn" @click="goExplore"><text>🧭</text></button>
       </view>
     </header>
 
@@ -54,6 +53,12 @@
       <button class="ctrl-btn ctrl-locate" @click="getUserLocation">
         <text>📍</text>
       </button>
+    </view>
+
+    <!-- 行程生成中提示 -->
+    <view v-if="travelStore.currentPlan?.isSkeleton" class="skeleton-banner" :style="{ bottom: (250 + safeAreaBottom) + 'px' }">
+      <view class="skeleton-dot"></view>
+      <text class="skeleton-text">行程详情正在生成中…</text>
     </view>
 
     <!-- Itinerary Quick Card -->
@@ -188,6 +193,7 @@ import { computed } from 'vue'
 import { getWeatherNow } from '@/api/weather.js'
 import { useSafeArea } from '@/utils/safeArea.js'
 import { themeClass } from '@/utils/theme.js'
+
 
 export default {
   data() {
@@ -588,7 +594,7 @@ export default {
 </script>
 
 <style scoped>
-.map-page { flex: 1; height: 100vh; position: relative; background: var(--color-surface); }
+.map-page { flex: 1; height: 100vh; position: relative; background: #f8f9fa; }
 .map-container { width: 100%; height: 100%; }
 .map-overlay {
   position: absolute; inset: 0;
@@ -621,6 +627,7 @@ export default {
   display: flex; align-items: center; justify-content: center;
   font-size: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
 }
+.nav-btn::after { border: none; }
 
 .map-controls {
   position: fixed; right: 48rpx; top: 112px; z-index: 10;
@@ -651,6 +658,26 @@ export default {
   position: fixed; left: 48rpx; right: 48rpx; z-index: 10;
   max-width: 360px; margin: 0 auto;
   display: flex; align-items: flex-start; gap: 8px;
+}
+.skeleton-banner {
+  position: fixed; left: 48rpx; right: 48rpx; z-index: 11;
+  max-width: 360px; margin: 0 auto;
+  display: flex; align-items: center; gap: 12rpx;
+  padding: 18rpx 28rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(90deg, rgba(15,76,92,0.92), rgba(20,184,166,0.92));
+  color: #fff; font-size: 12px;
+  box-shadow: 0 4rpx 16rpx rgba(15,76,92,0.25);
+}
+.skeleton-dot {
+  width: 12rpx; height: 12rpx; border-radius: 50%;
+  background: #fff;
+  animation: skeleton-pulse 1.2s ease-in-out infinite;
+}
+.skeleton-text { font-weight: 500; }
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.7); }
 }
 .quick-card {
   flex: 1;

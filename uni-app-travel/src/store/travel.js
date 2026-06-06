@@ -13,6 +13,8 @@ export const useTravelStore = defineStore('travel', {
   state: () => ({
     // 当前行程
     currentPlan: null,
+    // 方案预览（用于探索页 → 方案详情页）
+    previewPlan: null,
     // 行程历史
     planHistory: [],
     // 加载状态
@@ -65,22 +67,21 @@ export const useTravelStore = defineStore('travel', {
           console.log('[TravelStore] 剩余配额:', remaining)
           
           if (remaining <= 0) {
-            // 配额不足
+            // 配额不足 - 引导邀请好友
             this.loading = false
             uni.showModal({
               title: '配额不足',
-              content: '今日生成次数已用完，观看广告可获取额外配额',
-              confirmText: '去看广告',
-              cancelText: '关闭',
+              content: '生成次数已用完，每成功邀请1位好友即可获得3次额外额度！',
+              confirmText: '邀请好友',
+              cancelText: '取消',
               success: (res) => {
                 if (res.confirm) {
-                  // TODO: 调用看广告接口
-                  uni.showToast({ title: '广告功能开发中', icon: 'none' })
+                  uni.reLaunch({ url: '/pages/mine/index' })
                 }
               }
             })
-            this.error = '今日配额已用完'
-            return null  // 直接返回，不继续
+            this.error = '配额已用完'
+            return null
           }
         } catch (quotaError) {
           // 配额检查失败（网络错误、401等），阻止生成
@@ -88,7 +89,7 @@ export const useTravelStore = defineStore('travel', {
           this.loading = false
           uni.showToast({ title: '无法检查配额，请稍后重试', icon: 'none' })
           this.error = '配额检查失败'
-          return null  // 直接返回，不继续
+          return null
         }
 
         const result = await travelApi.createPlan({
@@ -491,11 +492,16 @@ export const useTravelStore = defineStore('travel', {
             this.loading = false
             uni.showModal({
               title: '配额不足',
-              content: '今日生成次数已用完',
-              showCancel: false,
-              confirmText: '我知道了'
+              content: '生成次数已用完，每成功邀请1位好友即可获得3次额外额度！',
+              confirmText: '邀请好友',
+              cancelText: '取消',
+              success: (res) => {
+                if (res.confirm) {
+                  uni.reLaunch({ url: '/pages/mine/index' })
+                }
+              }
             })
-            this.error = '今日配额已用完'
+            this.error = '配额已用完'
             return null
           }
         } catch (quotaError) {
@@ -556,17 +562,29 @@ export const useTravelStore = defineStore('travel', {
                 // 骨架已就绪，立即存储并跳转，让用户有感知
                 const skeleton = await travelApi.getPlanV4Result(taskId)
                 console.log('[TravelStore V4] Skeleton ready, locations:', (skeleton.dayPlanItinerary && skeleton.dayPlanItinerary.length) || 0)
-                
+
+                // 标记为骨架态：保存/分享按钮要禁用，等填充完毕才放开
+                skeleton.isSkeleton = true
+                skeleton._taskId = taskId
+
                 // 先存储骨架数据，让前端可以立即展示
                 this.currentPlan = skeleton
                 this.planHistory.push(skeleton)
-                
+
+                // 骨架阶段立即扣减配额，让用户感知"已开始使用"
+                try {
+                  await useQuota()
+                  console.log('[TravelStore V4] 骨架就绪，配额已扣减')
+                } catch (quotaError) {
+                  console.error('[TravelStore V4] 配额扣减失败:', quotaError)
+                }
+
                 // 骨架阶段就先跳转页面，用户可以看到行程列表
                 uni.hideLoading()
                 this.loading = false // 重置 loading 状态
                 uni.showToast({ title: '骨架已生成，正在填充详情...', icon: 'none', duration: 2000 })
                 uni.reLaunch({ url: '/pages/index/index' })
-                
+
                 // 继续在后台轮询直到完成（不影响用户操作）
                 this._v4BackgroundPoll(taskId)
                 resolve(skeleton)
@@ -575,17 +593,10 @@ export const useTravelStore = defineStore('travel', {
 
               if (status === 'completed') {
                 const result = await travelApi.getPlanV4Result(taskId)
+                result.isSkeleton = false
                 this.currentPlan = result
                 this.planHistory.push(result)
                 this.loading = false // 重置 loading 状态
-
-                try {
-                  await useQuota()
-                  console.log('[TravelStore V4] 配额已扣减')
-                } catch (quotaError) {
-                  console.error('[TravelStore V4] 配额扣减失败:', quotaError)
-                }
-
                 resolve(result)
               } else if (status === 'failed') {
                 this.loading = false // 重置 loading 状态
@@ -638,22 +649,29 @@ export const useTravelStore = defineStore('travel', {
 
           if (status === 'completed') {
             const result = await travelApi.getPlanV4Result(taskId)
+            result.isSkeleton = false
             // 更新完整数据
             this.currentPlan = result
+
+            // 同步更新 planHistory 里那条骨架：用 taskId 找到并替换
+            const idx = this.planHistory.findIndex(p => p && p._taskId === taskId)
+            if (idx >= 0) {
+              this.planHistory.splice(idx, 1, result)
+              console.log('[TravelStore V4] planHistory 已同步完整数据 idx=', idx)
+            }
+
             console.log('[TravelStore V4] 后台轮询完成，数据已更新')
             uni.showToast({ title: '行程详情已生成', icon: 'success', duration: 2000 })
-            // 扣减配额
-            try {
-              await useQuota()
-              console.log('[TravelStore V4] 后台轮询完成，配额已扣减')
-            } catch (quotaError) {
-              console.error('[TravelStore V4] 后台轮询配额扣减失败:', quotaError)
-            }
             return
           }
 
           if (status === 'failed') {
             console.warn('[TravelStore V4] 后台任务失败:', statusRes.error)
+            // 即使失败，也要把 isSkeleton 清掉，避免一直卡在禁用态
+            if (this.currentPlan && this.currentPlan._taskId === taskId) {
+              this.currentPlan.isSkeleton = false
+              this.currentPlan.fillFailed = true
+            }
             uni.showToast({ title: '填充详情失败，请稍后重试', icon: 'none' })
             return
           }
@@ -711,6 +729,56 @@ export const useTravelStore = defineStore('travel', {
      */
     setPreferences(prefs) {
       this.preferences = { ...this.preferences, ...prefs }
+    },
+
+    /**
+     * 行程编辑：上下移动景点
+     */
+    reorderItem({ day, fromIndex, direction }) {
+      if (!this.currentPlan?.dayPlanItinerary) return
+      // 获取同天的项目
+      const dayItems = this.currentPlan.dayPlanItinerary
+        .map((item, idx) => ({ ...item, _idx: idx }))
+        .filter(item => item.day === day)
+        .sort((a, b) => a.sequence - b.sequence)
+
+      const posInDay = dayItems.findIndex(item => item._idx === fromIndex)
+      if (posInDay < 0) return
+
+      const targetPos = direction === 'up' ? posInDay - 1 : posInDay + 1
+      if (targetPos < 0 || targetPos >= dayItems.length) return
+
+      // 交换 sequence
+      const itemA = this.currentPlan.dayPlanItinerary[dayItems[posInDay]._idx]
+      const itemB = this.currentPlan.dayPlanItinerary[dayItems[targetPos]._idx]
+      const tmpSeq = itemA.sequence
+      itemA.sequence = itemB.sequence
+      itemB.sequence = tmpSeq
+
+      // 触发响应式更新
+      this.currentPlan = { ...this.currentPlan }
+    },
+
+    /**
+     * 行程编辑：删除景点
+     */
+    deleteItem(index) {
+      if (!this.currentPlan?.dayPlanItinerary) return
+      this.currentPlan.dayPlanItinerary.splice(index, 1)
+      // 重新计算 sequence
+      this.currentPlan.dayPlanItinerary.forEach((item, idx) => {
+        item.sequence = idx + 1
+      })
+      this.currentPlan = { ...this.currentPlan }
+    },
+
+    /**
+     * 行程编辑：修改景点时间
+     */
+    updateItemTime({ index, time }) {
+      if (!this.currentPlan?.dayPlanItinerary) return
+      this.currentPlan.dayPlanItinerary[index].time = time
+      this.currentPlan = { ...this.currentPlan }
     }
   }
 })

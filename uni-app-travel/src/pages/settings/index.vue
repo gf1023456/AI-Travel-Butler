@@ -1,14 +1,6 @@
 <template>
   <view class="settings-page" :class="themeClass">
-    <view class="status-bar" :style="{ height: statusBarHeight + 'px' }"></view>
-    <header class="top-bar">
-      <view class="top-left">
-        <button class="back-btn" @click="goBack">
-          <text>←</text>
-        </button>
-        <text class="top-title">设置</text>
-      </view>
-    </header>
+    <NavBar show-back title="设置" @back="goBack" />
 
     <scroll-view scroll-y class="content" show-scrollbar="false">
       <!-- Account & Security -->
@@ -24,22 +16,6 @@
               <text class="settings-item-desc">{{ userStore.phone || '未绑定' }}</text>
               <text class="menu-arrow">›</text>
             </view>
-          </view>
-          <view class="menu-divider"></view>
-          <view class="settings-item" @click="showDevToast">
-            <view class="settings-item-left">
-              <text class="settings-icon">🔒</text>
-              <text class="settings-item-title">修改密码</text>
-            </view>
-            <text class="menu-arrow">›</text>
-          </view>
-          <view class="menu-divider"></view>
-          <view class="settings-item danger" @click="showDevToast">
-            <view class="settings-item-left">
-              <text class="settings-icon">🗑️</text>
-              <text class="settings-item-title">注销账号</text>
-            </view>
-            <text class="menu-arrow">›</text>
           </view>
         </view>
       </section>
@@ -86,13 +62,13 @@
             <switch :checked="promoEnabled" @change="togglePromo" color="#0F4C5C" />
           </view>
           <view class="menu-divider"></view>
-          <view class="settings-item" @click="showDevToast">
+          <view class="settings-item" @click="showTravelPreference">
             <view class="settings-item-left">
               <text class="settings-icon">✈️</text>
               <text class="settings-item-title">行程偏好</text>
             </view>
             <view class="settings-item-right">
-              <text class="settings-item-desc">休闲</text>
+              <text class="settings-item-desc">{{ currentPreference }}</text>
               <text class="menu-arrow">›</text>
             </view>
           </view>
@@ -125,7 +101,7 @@
       <section class="settings-section">
         <text class="section-label">关于与帮助</text>
         <view class="settings-card">
-          <view class="settings-item" @click="showDevToast">
+          <view class="settings-item" @click="goToAgreement('user')">
             <view class="settings-item-left">
               <text class="settings-icon">📋</text>
               <text class="settings-item-title">用户协议</text>
@@ -133,7 +109,7 @@
             <text class="menu-arrow">›</text>
           </view>
           <view class="menu-divider"></view>
-          <view class="settings-item" @click="showDevToast">
+          <view class="settings-item" @click="goToAgreement('privacy')">
             <view class="settings-item-left">
               <text class="settings-icon">🔏</text>
               <text class="settings-item-title">隐私政策</text>
@@ -141,7 +117,7 @@
             <text class="menu-arrow">›</text>
           </view>
           <view class="menu-divider"></view>
-          <view class="settings-item" @click="showDevToast">
+          <view class="settings-item" @click="goToFeedback">
             <view class="settings-item-left">
               <text class="settings-icon">💬</text>
               <text class="settings-item-title">帮助与反馈</text>
@@ -167,17 +143,20 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useUserStore } from '@/store/user.js'
-import { useSafeArea } from '@/utils/safeArea.js'
 import { APP_CONFIG } from '@/config/index.js'
 import { getCurrentTheme, setTheme, isFollowSystem, setFollowSystem, themeClass } from '@/utils/theme.js'
+import NavBar from '@/components/NavBar.vue'
 
 const userStore = useUserStore()
-const { statusBarHeight } = useSafeArea()
+const goBack = () => uni.navigateBack()
 const appVersion = ref(APP_CONFIG.VERSION)
 const notificationEnabled = ref(true)
 const promoEnabled = ref(true)
 const darkModeEnabled = ref(false)
 const followSystemTheme = ref(true)
+
+const preferenceOptions = ['休闲', '商务', '探险', '文化', '美食', '自然']
+const currentPreference = ref('休闲')
 
 onMounted(() => {
   userStore.restoreFromStorage()
@@ -190,14 +169,32 @@ const loadSettings = () => {
     promoEnabled.value = uni.getStorageSync('setting_promo') !== false
     followSystemTheme.value = isFollowSystem()
     darkModeEnabled.value = getCurrentTheme() === 'dark'
+    currentPreference.value = uni.getStorageSync('setting_travel_preference') || '休闲'
   } catch (e) {
     console.log('加载设置失败', e)
   }
 }
 
-const goBack = () => uni.navigateBack()
-
 const showDevToast = () => uni.showToast({ title: '功能开发中', icon: 'none' })
+
+const goToAgreement = (type) => {
+  uni.navigateTo({ url: `/pages/agreement/${type}` })
+}
+
+const goToFeedback = () => {
+  uni.navigateTo({ url: '/pages/settings/feedback' })
+}
+
+const showTravelPreference = () => {
+  uni.showActionSheet({
+    itemList: preferenceOptions,
+    success: (res) => {
+      currentPreference.value = preferenceOptions[res.tapIndex]
+      uni.setStorageSync('setting_travel_preference', currentPreference.value)
+      uni.showToast({ title: `已切换为${currentPreference.value}模式`, icon: 'none' })
+    }
+  })
+}
 
 const toggleNotification = (e) => {
   notificationEnabled.value = e.detail.value
@@ -289,24 +286,6 @@ const clearLocalData = () => {
 <style scoped>
 .settings-page { min-height: 100vh; background: var(--color-surface); }
 
-.status-bar { background: rgba(255,255,255,0.7); backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px); }
-.top-bar {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 24rpx 40rpx 24rpx;
-  background: rgba(255,255,255,0.7); backdrop-filter: blur(40px);
-  -webkit-backdrop-filter: blur(40px);
-  border-bottom: 1px solid rgba(255,255,255,0.2);
-  position: sticky; top: 0; z-index: 10;
-}
-.top-left { display: flex; align-items: center; gap: 12px; }
-.back-btn {
-  width: 36px; height: 36px; display: flex; align-items: center;
-  justify-content: center; font-size: 20px; color: var(--color-primary);
-  background: transparent; border: none; padding: 0;
-}
-.back-btn::after { border: none; }
-.top-title { font-size: 24px; font-weight: 700; color: var(--color-primary); letter-spacing: -0.01em; line-height: 32px; }
-
 .content { padding: 16rpx 40rpx 80rpx; }
 
 .settings-section { margin-bottom: 24px; }
@@ -316,7 +295,6 @@ const clearLocalData = () => {
   text-transform: uppercase;
   margin-bottom: 12px;
 }
-
 .settings-card {
   background: rgba(255,255,255,0.7); backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
