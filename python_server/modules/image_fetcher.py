@@ -1,6 +1,7 @@
 """
 AI Travel Butler - 实景图获取模块
 Serper.dev (Google Images) → Pixabay → LoremFlickr
+获取原图 URL → 调用 image_compressor 下载压缩到本地
 """
 
 import asyncio
@@ -10,6 +11,7 @@ from typing import List, Dict
 from urllib.parse import quote
 
 from config import settings
+from modules.image_compressor import compress_all
 
 PIXABAY_API = "https://pixabay.com/api/"
 PIXABAY_KEY = settings.external_apis.pixabay_api_key
@@ -83,6 +85,12 @@ def _loremflickr(name: str, city: str) -> str:
 
 
 async def enrich_images(items: List[Dict], mcp_trace: List[str]) -> List[Dict]:
+    """
+    三步:
+    1. 并发拿每个 item 的外网图 URL
+    2. 全部拿完后,批量下载压缩存到本地
+    3. 把 item.image 替换成本地 URL
+    """
     if not items:
         return items
 
@@ -100,4 +108,21 @@ async def enrich_images(items: List[Dict], mcp_trace: List[str]) -> List[Dict]:
                 mcp_trace.append(f"image:not_found:{name}")
         return item
 
-    return await asyncio.gather(*[fetch_one(item) for item in items])
+    # 第一步:并发拿 URL
+    items = await asyncio.gather(*[fetch_one(item) for item in items])
+
+    # 第二步:批量下载压缩
+    urls = [item.get("image", "") for item in items if item.get("image")]
+    if not urls:
+        return items
+
+    compressed = await compress_all(urls)
+    url_map = dict(zip(urls, compressed))
+
+    # 第三步:替换成本地 URL
+    for item in items:
+        orig = item.get("image", "")
+        if orig and orig in url_map:
+            item["image"] = url_map[orig]
+
+    return items

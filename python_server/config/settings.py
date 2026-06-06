@@ -11,9 +11,11 @@ from pydantic_settings import BaseSettings
 
 
 class ServerSettings(BaseModel):
+    host: str = "0.0.0.0"
     port: int = 8787
-    request_timeout_ms: int = 120000
+    request_timeout_ms: int = 240000
     max_retries: int = 3
+    public_base_url: str = "https://tonystark-ai.ccwu.cc"
 
 
 class RagSettings(BaseModel):

@@ -344,7 +344,12 @@ const onScrollToLower = () => {
 </script>
 
 <style scoped>
-.history-page { min-height: 100vh; background: #f8f9fa; }
+.history-page {
+  height: 100vh;
+  display: flex; flex-direction: column;
+  background: #f8f9fa;
+  overflow: hidden;
+}
 
 .status-bar { width: 100%; background: rgba(255,255,255,0.7); }
 
@@ -365,7 +370,11 @@ const onScrollToLower = () => {
 .top-brand { font-size: 24px; font-weight: 700; color: var(--color-primary); letter-spacing: -0.01em; line-height: 32px; }
 .top-spacer { width: 36px; }
 
-.content { padding: 16rpx 40rpx 80rpx; }
+.content {
+  flex: 1; min-height: 0;
+  padding: 16rpx 40rpx 80rpx;
+  box-sizing: border-box;
+}
 
 .loading-hint {
   display: flex; justify-content: center; align-items: center;

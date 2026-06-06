@@ -200,7 +200,7 @@ watch(inviteInfo, (val) => {
 onShareAppMessage(() => ({
   title: '行程一下 - 邀请好友，双方各得3次规划配额',
   path: `/pages/login/index?invite=${shareInviteCode.value}`,
-  imageUrl: 'https://tonystark-ai.ccwu.cc/png/fed79683-fbb6-44ac-9327-44c2f269cc47.png'
+  imageUrl: 'https://tonystark-ai.ccwu.cc/png/kfeng.png'
 }))
 
 const onShareSuccess = async () => {

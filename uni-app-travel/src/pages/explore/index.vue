@@ -12,7 +12,7 @@
       </view>
     </header>
 
-    <scroll-view scroll-y class="content" show-scrollbar="false" :scroll-top="scrollTop" :scroll-with-animation="true" @scrolltolower="onScrollToLower" @scroll="onScroll" refresher-enabled :refresher-triggering="refresherTriggering" @refresherrefresh="onRefresh">
+    <scroll-view scroll-y class="content" show-scrollbar="false" :scroll-top="scrollTop" :scroll-with-animation="true" :refresher-enabled="true" :refresher-triggered="plazaRefreshing" refresher-background="transparent" @refresherrefresh="onPlazaRefresh" @scrolltolower="onScrollToLower" @scroll="onScroll">
       <!-- 分类标签 -->
       <view class="category-scroll">
         <text
@@ -243,7 +243,7 @@ const myInviteCode = ref('')
 onShareAppMessage(() => ({
   title: '行程一下 - 输入旅行想法，自动生成专属行程',
   path: `/pages/login/index?invite=${myInviteCode.value || ''}`,
-  imageUrl: 'https://tonystark-ai.ccwu.cc/png/fed79683-fbb6-44ac-9327-44c2f269cc47.png'
+  imageUrl: 'https://tonystark-ai.ccwu.cc/png/kfeng.png'
 }))
 
 onMounted(async () => {
@@ -280,7 +280,17 @@ const plazaPage = ref(1)
 const plazaPageSize = 12
 const plazaHasMore = ref(true)
 const plazaLoadingMore = ref(false)
-const refresherTriggering = ref(false)
+// scroll-view 自带下拉刷新（refresher-enabled + @refresherrefresh）
+// 关键：用受控的 :refresher-triggered 布尔值，true→false 才会真正收起 spinner
+const plazaRefreshing = ref(false)
+const onPlazaRefresh = async () => {
+  plazaRefreshing.value = true
+  try {
+    await loadPlazaPlans(false)
+  } finally {
+    plazaRefreshing.value = false
+  }
+}
 
 // 返回顶部
 const scrollTop = ref(0)
@@ -339,12 +349,6 @@ const onScrollToLower = () => {
   if (plazaLoading.value || plazaLoadingMore.value || !plazaHasMore.value) return
   plazaPage.value += 1
   loadPlazaPlans(true)
-}
-
-const onRefresh = async () => {
-  refresherTriggering.value = true
-  await loadPlazaPlans(false)
-  refresherTriggering.value = false
 }
 
 // 点赞（乐观更新 + 失败回滚）
@@ -651,7 +655,12 @@ const onFabClick = () => {
 </script>
 
 <style scoped>
-.explore-page { min-height: 100vh; background: #f8f9fa; }
+.explore-page {
+  height: 100vh;
+  display: flex; flex-direction: column;
+  background: #f8f9fa;
+  overflow: hidden;
+}
 
 .top-bar {
   position: fixed; top: 0; left: 0; right: 0; z-index: 10;
@@ -672,7 +681,11 @@ const onFabClick = () => {
 .top-avatar-btn { padding: 0; margin: 0; border: none; background: transparent; line-height: 0; }
 .top-avatar-btn::after { border: none; }
 
-.content { padding: 260rpx 24rpx 80rpx; }
+.content {
+  flex: 1; min-height: 0;
+  padding: 260rpx 24rpx 80rpx;
+  box-sizing: border-box;
+}
 
 .category-scroll {
   display: flex; gap: 12px; padding: 0 4rpx 24rpx;

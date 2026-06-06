@@ -12,6 +12,7 @@ from datetime import datetime
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 import httpx
 
 from config import (
@@ -50,6 +51,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 静态资源:本地压缩后的图片
+import os as _os
+_STATIC_DIR = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "static")
+_os.makedirs(_os.path.join(_STATIC_DIR, "img"), exist_ok=True)
+app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
 
 # 注册路由
 from routes import user_router, history_router, quota_router, weather_router, location_router
@@ -609,10 +616,11 @@ async def get_current_model():
 
 @app.get("/api/frontend-config")
 async def get_frontend_config(request_id: str = ""):
-    """Get frontend configuration."""
     import os
+    public_base = settings.server.public_base_url or f"http://localhost:{settings.server.port}"
     return {
         "backend_url": f"http://localhost:{settings.server.port}",
+        "public_base_url": public_base.rstrip("/"),
         "tdt_api_key": settings.external_apis.tdt_api_key,
         "map_center": [30.5728, 104.0668],
         "map_zoom": 12,
