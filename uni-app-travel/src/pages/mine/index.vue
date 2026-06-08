@@ -106,6 +106,8 @@
             </view>
             <text class="menu-arrow">›</text>
           </view>
+          <!-- 我的收藏已隐藏，避免审核风险 -->
+          <!--
           <view class="menu-divider"></view>
           <view class="menu-item" @click="goTo('/pages/history/index?favoriteOnly=1')">
             <view class="menu-item-left">
@@ -116,6 +118,7 @@
             </view>
             <text class="menu-arrow">›</text>
           </view>
+          -->
           <view class="menu-divider"></view>
           <view class="menu-item" @click="goTo('/pages/settings/index')">
             <view class="menu-item-left">
