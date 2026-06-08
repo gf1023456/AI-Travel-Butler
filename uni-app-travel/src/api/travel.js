@@ -113,7 +113,7 @@ export const getPlanV4Result = (taskId) => {
 }
 
 /**
- * 优化现有行程
+ * 优化现有行程（同步版本，保留兼容）
  * @param {Object} params - 优化参数
  * @returns {Promise}
  */
@@ -126,6 +126,40 @@ export const refinePlan = (params) => {
     refineInstruction: params.refineInstruction,
     basePlan: params.basePlan
   })
+}
+
+/**
+ * 优化现有行程（异步版本）
+ * @param {Object} params - 优化参数
+ * @returns {Promise} 返回 taskId
+ */
+export const refinePlanAsync = (params) => {
+  return post('/plan/refine/async', {
+    userInput: params.userInput,
+    modelType: params.modelType,
+    isPlannerMode: params.isPlannerMode !== false,
+    travelMode: params.travelMode || 'deep',
+    refineInstruction: params.refineInstruction,
+    basePlan: params.basePlan
+  })
+}
+
+/**
+ * 查询优化任务状态
+ * @param {string} taskId - 任务ID
+ * @returns {Promise}
+ */
+export const getRefineStatus = (taskId) => {
+  return get(`/plan/refine/status/${taskId}`)
+}
+
+/**
+ * 获取优化任务结果
+ * @param {string} taskId - 任务ID
+ * @returns {Promise}
+ */
+export const getRefineResult = (taskId) => {
+  return get(`/plan/refine/result/${taskId}`)
 }
 
 /**

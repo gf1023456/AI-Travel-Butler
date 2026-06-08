@@ -67,7 +67,9 @@ from routes.plan_v4 import router as plan_v4_router
 from routes.poster import router as poster_router
 from routes.random_city import router as random_city_router
 from routes.plan_likes import router as plan_likes_router
+from routes.refine import router as refine_router
 
+app.include_router(refine_router)
 app.include_router(poster_router)
 app.include_router(random_city_router)
 app.include_router(plan_likes_router)
@@ -249,10 +251,42 @@ def validate_payload(payload: Dict) -> Optional[str]:
 
 
 def to_refine_payload(payload: Dict) -> Dict:
-    """Convert refine request to plan payload."""
-    base_summary = payload.get("basePlan", {}).get("itinerarySummary", "")
+    """Convert refine request to plan payload - 包含关键行程信息用于优化"""
+    base_plan = payload.get("basePlan", {})
+    base_summary = base_plan.get("itinerarySummary", "")
+    items = base_plan.get("items", [])
+    
+    # 限制摘要长度
+    if len(base_summary) > 200:
+        base_summary = base_summary[:200] + "..."
+    
+    refine_instruction = payload.get('refineInstruction', '')
+    
+    # 构建包含行程详情的优化指令
+    user_input_parts = [f"优化需求：{refine_instruction}"]
+    
+    if base_summary:
+        user_input_parts.append(f"行程主题：{base_summary}")
+    
+    # 添加具体行程信息（如果有）
+    if items and len(items) > 0:
+        itinerary_desc = []
+        for day in items:
+            day_num = day.get('day', 0)
+            day_items = day.get('items', [])
+            if day_items:
+                item_names = [f"{item.get('name', '')}({item.get('type', '')})" for item in day_items if item.get('name')]
+                if item_names:
+                    itinerary_desc.append(f"第{day_num}天：{'、'.join(item_names)}")
+        
+        if itinerary_desc:
+            user_input_parts.append("当前行程：" + "；".join(itinerary_desc))
+    
+    # 添加优化指引
+    user_input_parts.append("请基于以上行程进行优化调整，保持原有行程结构，根据优化需求修改或补充相关景点。")
+    
     return {
-        "userInput": f"{payload.get('userInput', '')}\n\n请基於已有方案继续调整：{payload.get('refineInstruction', '')}\n已有摘要：{base_summary}".strip(),
+        "userInput": "\n".join(user_input_parts),
         "modelType": payload.get("modelType"),
         "isPlannerMode": payload.get("isPlannerMode", True),
         "travelMode": payload.get("travelMode", "deep")
@@ -285,12 +319,12 @@ def push_alert(level: str, code: str, message: str, extra: Dict = None):
         alerts.pop()
 
 
-async def call_compatible_api(endpoint: str, api_key: str, model: str, messages: List[Dict], provider: str, mcp_trace: List[str], request_id: str) -> Dict:
+async def call_compatible_api(endpoint: str, api_key: str, model: str, messages: List[Dict], provider: str, mcp_trace: List[str], request_id: str, timeout_ms: int = None) -> Dict:
     """Call compatible API (DeepSeek, Zhipu, Dashscope)."""
     from config import TOOLS_CONFIG
 
     max_retries = settings.server.max_retries
-    timeout_ms = settings.server.request_timeout_ms
+    timeout_ms = timeout_ms or settings.server.request_timeout_ms
 
     headers = {
         "Content-Type": "application/json",
@@ -343,6 +377,130 @@ async def call_compatible_api(endpoint: str, api_key: str, model: str, messages:
             await asyncio.sleep(0.3 * (attempt + 1))
 
     return {}
+
+
+async def call_ai_model_for_refine(provider: str, model: str, prompt: str, user_input: str, mcp_trace: List[str], request_id: str) -> Dict:
+    """Call AI model for refine - 简化版，减少工具轮次到 3 轮，优化场景专用"""
+    day_plan_itinerary = []
+    social_recommendations = []
+    max_tool_rounds = 3  # 优化场景只需要 3 轮工具调用
+    refine_timeout_ms = settings.server.refine_timeout_ms  # 使用专用超时配置
+
+    messages = [
+        {"role": "system", "content": GLOBAL_SYSTEM_PROMPT},
+        {"role": "user", "content": f"【行程优化】{user_input}。{prompt}。请基于已有行程进行调整优化，调用工具获取必要信息。"}
+    ]
+
+    final_message = None
+
+    for round_idx in range(max_tool_rounds):
+        mcp_trace.append(f"refine_round:{round_idx}:start")
+
+        endpoint = API_ENDPOINTS.get(provider)
+        api_keys = {
+            "deepseek": settings.providers.deepseek_api_key,
+            "zhipu": settings.providers.zhipu_api_key,
+            "dashscope": settings.providers.dashscope_api_key,
+            "mimo": settings.providers.mimo_api_key
+        }
+        api_key = api_keys.get(provider)
+
+        if not api_key:
+            raise Exception(f"Missing API key for {provider}")
+
+        message = await call_compatible_api(endpoint, api_key, model, messages, provider, mcp_trace, request_id, timeout_ms=refine_timeout_ms)
+        print(f"[RAW-MODEL-OUTPUT-REFINE] {provider} round {round_idx}:", message)
+
+        messages.append(message)
+        tool_calls = message.get("tool_calls", [])
+
+        if not tool_calls:
+            final_message = message
+            mcp_trace.append(f"refine_round:{round_idx}:no_more_calls")
+            break
+
+        mapped = map_tool_calls(tool_calls, mcp_trace, provider)
+        day_plan_itinerary.extend(mapped.get("dayPlanItinerary", []))
+        if mapped.get("socialRecommendations") and not social_recommendations:
+            social_recommendations = mapped["socialRecommendations"]
+
+        for tc in tool_calls:
+            fn_name = tc.get("function", {}).get("name")
+            raw_args = tc.get("function", {}).get("arguments", "{}")
+            try:
+                args = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
+            except:
+                args = {}
+
+            print(f"[TOOL_CALL_REFINE] {fn_name}:", args)
+
+            if fn_name == "get_social_recommendations":
+                mcp_trace.append(f"tool:{provider}:get_social_recommendations:executed")
+                recs = social_recommendations or []
+                tool_result = json.dumps({"status": "ok", "count": len(recs), "recommendations": [r.get("title", "") for r in recs]}, ensure_ascii=False)
+            elif fn_name == "location":
+                mcp_trace.append(f"tool:{provider}:location:executed")
+                name = args.get("name", "")
+                item = next((i for i in mapped.get("dayPlanItinerary", []) if i.get("name") == name), None)
+                tool_result = json.dumps({"status": "ok", "name": name, "city": args.get("city", ""), "lat": item.get("lat") if item else args.get("lat"), "lng": item.get("lng") if item else args.get("lng")}, ensure_ascii=False)
+            else:
+                tool_result = "[]"
+
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tc.get("id", f"call_{round_idx}_{fn_name}"),
+                "content": tool_result
+            })
+
+        mcp_trace.append(f"refine_round:{round_idx}:completed:{len(tool_calls)}_calls")
+
+    if not day_plan_itinerary and social_recommendations:
+        day_plan_itinerary = synthesize_locations_from_social(user_input, social_recommendations, provider, mcp_trace)
+
+    # 生成优化摘要
+    summary = final_message.get("content", "") if final_message else ""
+    if not summary:
+        summary = generate_refine_summary_from_input(user_input)
+
+    return {
+        "provider": provider,
+        "itinerarySummary": summary,
+        "dayPlanItinerary": day_plan_itinerary,
+        "socialRecommendations": social_recommendations,
+        "mcpTrace": mcp_trace,
+    }
+
+
+def generate_refine_summary_from_input(user_input: str) -> str:
+    """根据用户输入生成优化行程摘要"""
+    if not user_input:
+        return "行程已优化完成"
+
+    text = user_input.lower()
+
+    # 提取优化需求关键词
+    if "美食" in text or "吃" in text:
+        return "美食升级！精选当地特色餐厅与街头小吃"
+    if "拍照" in text or "打卡" in text or "摄影" in text:
+        return "出片率UP！精选最佳拍照打卡点与机位"
+    if "轻松" in text or "休闲" in text or "慢" in text:
+        return "节奏优化！行程更轻松，享受慢旅行时光"
+    if "文化" in text or "历史" in text or "博物馆" in text:
+        return "深度文化游！融入历史人文与艺术体验"
+    if "亲子" in text or "孩子" in text or "家庭" in text:
+        return "亲子友好！适合全家出游的精选行程"
+    if "浪漫" in text or "情侣" in text or "约会" in text:
+        return "浪漫升级！情侣专属甜蜜行程"
+    if "购物" in text or "买" in text:
+        return "购物指南！精选必买特产与逛街好去处"
+    if "自然" in text or "户外" in text or "徒步" in text:
+        return "亲近自然！户外风光与自然体验之旅"
+    if "夜景" in text or "晚上" in text:
+        return "夜游指南！璀璨夜景与夜间精彩体验"
+    if "省钱" in text or "便宜" in text or "预算" in text:
+        return "高性价比！精选实惠又好玩的行程"
+
+    return "行程已优化完成，更符合您的需求"
 
 
 async def call_ai_model(provider: str, model: str, prompt: str, user_input: str, mcp_trace: List[str], request_id: str) -> Dict:
@@ -682,14 +840,93 @@ async def create_plan(payload: Dict):
         raise HTTPException(status_code=500, detail=f"{error_msg}\n\n堆栈:\n{stack_trace}")
 
 
+async def generate_refine_plan(payload: Dict, request_id: str) -> Dict:
+    """Generate refined travel plan - 简化版，针对优化场景优化"""
+    mcp_trace = [f"refine_request:{request_id}:received"]
+
+    # 优化场景不使用缓存
+    evidence = await retrieve_evidence(payload.get("userInput", ""), settings.rag.top_k)
+    mcp_trace.append(f"rag:retrieved:{len(evidence)}")
+
+    rag_context = build_rag_context(evidence)
+    prompt = construct_user_prompt(
+        payload.get("userInput", ""),
+        payload.get("isPlannerMode", True),
+        payload.get("travelMode", "deep"),
+        rag_context
+    )
+
+    chosen = choose_rollout_provider(payload)
+    mcp_trace.append(f"refine_rollout:{chosen['rollout']}:provider:{chosen['provider']}:model:{chosen['modelType']}")
+
+    # 使用简化版 AI 调用，减少工具轮次
+    plan = await call_ai_model_for_refine(
+        chosen["provider"],
+        chosen["modelType"],
+        prompt,
+        payload.get("userInput", ""),
+        mcp_trace,
+        request_id
+    )
+
+    expected_city = extract_expected_city_from_input(payload.get("userInput", ""), plan.get("socialRecommendations", []))
+    if expected_city:
+        plan["dayPlanItinerary"] = harmonize_itinerary_city(plan.get("dayPlanItinerary", []), expected_city, mcp_trace)
+
+    plan["dayPlanItinerary"] = ensure_minimum_items_by_requested_days(
+        plan.get("dayPlanItinerary", []),
+        payload.get("userInput", ""),
+        plan.get("socialRecommendations", []),
+        chosen["provider"],
+        mcp_trace
+    )
+
+    real_weather = await fetch_real_weather(plan.get("dayPlanItinerary", []), mcp_trace)
+    plan["dayPlanItinerary"] = enrich_with_mcp_signals(plan.get("dayPlanItinerary", []), mcp_trace, real_weather)
+
+    plan["dayPlanItinerary"] = await enrich_images(plan.get("dayPlanItinerary", []), mcp_trace)
+
+    warnings = verify_plan(plan.get("dayPlanItinerary", []), mcp_trace)
+    plan["warnings"] = warnings
+
+    plan["evidence"] = evidence
+
+    execution_log_store[request_id] = {
+        "requestId": request_id,
+        "route": "/api/plan/refine",
+        "startedAt": datetime.now().isoformat(),
+        "finishedAt": datetime.now().isoformat(),
+        "durationMs": 0,
+        "modelType": payload.get("modelType"),
+        "provider": get_provider_from_model(payload.get("modelType", "")),
+        "userInputPreview": str(payload.get("userInput", ""))[:120],
+        "mcpTraceCount": len(mcp_trace),
+        "evidenceCount": len(evidence),
+        "itineraryCount": len(plan.get("dayPlanItinerary", [])),
+        "failed": False,
+        "errorMessage": None
+    }
+
+    if len(execution_log_store) > 200:
+        oldest_key = next(iter(execution_log_store))
+        del execution_log_store[oldest_key]
+
+    return plan
+
+
 @app.post("/api/plan/refine")
 async def refine_plan(payload: Dict):
-    """Refine travel plan."""
+    """Refine travel plan - 优化版，减少超时风险"""
     global metrics
     metrics["totalRequests"] += 1
     metrics["refineRequests"] += 1
 
     request_id = str(uuid.uuid4())
+    print(f"\n{'=' * 80}")
+    print(f"📨 [请求开始] POST /api/plan/refine")
+    print(f"🆔 Request ID: {request_id}")
+    print(f"⏰ 请求时间: {datetime.now().isoformat()}")
+    print("=" * 80)
 
     refined_payload = to_refine_payload(payload)
     error = validate_payload(refined_payload)
@@ -698,7 +935,13 @@ async def refine_plan(payload: Dict):
         raise HTTPException(status_code=400, detail=error)
 
     try:
-        plan = await generate_plan(refined_payload, request_id)
+        # 使用专用的简化版生成流程
+        plan = await generate_refine_plan(refined_payload, request_id)
+        print(f"\n{'='*80}")
+        print(f"✅ [请求完成] POST /api/plan/refine")
+        print(f"🆔 Request ID: {request_id}")
+        print(f"⏰ 完成时间: {datetime.now().isoformat()}")
+        print(f"{'='*80}\n")
         return {**plan, "requestId": request_id}
     except Exception as e:
         metrics["failedRequests"] += 1

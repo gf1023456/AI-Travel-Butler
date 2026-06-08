@@ -35,7 +35,7 @@
         </view>
       </view>
       <view class="nav-actions">
-        <button class="nav-btn" @click="goExplore"><text>🧭</text></button>
+        <button class="nav-btn" @click="goInspiration"><text>💡</text></button>
       </view>
     </header>
 
@@ -59,6 +59,12 @@
     <view v-if="travelStore.currentPlan?.isSkeleton" class="skeleton-banner" :style="{ bottom: (250 + safeAreaBottom) + 'px' }">
       <view class="skeleton-dot"></view>
       <text class="skeleton-text">行程详情正在生成中…</text>
+    </view>
+
+    <!-- 行程优化中提示 -->
+    <view v-if="travelStore.loading && travelStore.currentPlan" class="skeleton-banner refine-banner" :style="{ bottom: (250 + safeAreaBottom) + 'px' }">
+      <view class="skeleton-dot refine-dot"></view>
+      <text class="skeleton-text">行程优化中，预计2-3分钟…</text>
     </view>
 
     <!-- Itinerary Quick Card -->
@@ -94,16 +100,16 @@
     </button>
 
     <!-- Floating 行程一下 Butler -->
-    <button class="ai-butler" @click="goExplore" :style="{ bottom: (136 + safeAreaBottom) + 'px' }">
+    <button class="ai-butler" @click="goInspiration" :style="{ bottom: (136 + safeAreaBottom) + 'px' }">
       <text class="ai-icon">✨</text>
       <text class="ai-text">快来生成你得专属攻略吧</text>
     </button>
 
     <!-- Bottom Navigation -->
     <nav class="bottom-nav" :style="{ bottom: (32 + safeAreaBottom) + 'px' }">
-      <button :class="['nav-item', 'nav-active']" @click="goExplore">
-        <text class="nav-item-icon">🧭</text>
-        <text class="nav-item-label">探索</text>
+      <button :class="['nav-item', 'nav-active']" @click="goInspiration">
+        <text class="nav-item-icon">💡</text>
+        <text class="nav-item-label">灵感</text>
       </button>
       <button class="nav-item" @click="goPlan">
         <text class="nav-item-icon">📅</text>
@@ -418,6 +424,7 @@ export default {
       }
     },
     goExplore() { uni.navigateTo({ url: '/pages/explore/index' }) },
+    goInspiration() { uni.navigateTo({ url: '/pages/inspiration/index' }) },
     goPlan() { uni.navigateTo({ url: '/pages/plan/plan' }) },
     goMine() { uni.navigateTo({ url: '/pages/mine/index' }) },
     // Quick Card 滑动切换方法
@@ -669,15 +676,31 @@ export default {
   color: #fff; font-size: 12px;
   box-shadow: 0 4rpx 16rpx rgba(15,76,92,0.25);
 }
+.skeleton-banner.refine-banner {
+  background: linear-gradient(90deg, rgba(245,158,11,0.92), rgba(251,191,36,0.92));
+  box-shadow: 0 4rpx 16rpx rgba(245,158,11,0.25);
+}
 .skeleton-dot {
   width: 12rpx; height: 12rpx; border-radius: 50%;
   background: #fff;
   animation: skeleton-pulse 1.2s ease-in-out infinite;
 }
+.skeleton-dot.refine-dot {
+  animation: refine-spin 1s linear infinite;
+  border-radius: 0;
+  width: 14rpx; height: 14rpx;
+  border: 2rpx solid transparent;
+  border-top-color: #fff;
+  border-right-color: #fff;
+  background: transparent;
+}
 .skeleton-text { font-weight: 500; }
 @keyframes skeleton-pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.4; transform: scale(0.7); }
+}
+@keyframes refine-spin {
+  to { transform: rotate(360deg); }
 }
 .quick-card {
   flex: 1;

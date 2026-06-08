@@ -4,7 +4,7 @@
     <view class="bg-overlay"></view>
 
     <view class="close-btn" @click="handleClose">
-      <text class="close-icon">×</text>
+      <text class="close-icon">←</text>
     </view>
 
     <view class="main-content">
@@ -39,15 +39,24 @@
             <text class="btn-text">微信一键登录</text>
           </view>
         </button>
+
+        <view class="agreement-section">
+          <view class="checkbox-wrap" @click="toggleAgreement">
+            <view class="checkbox" :class="{ 'checkbox-checked': agreedToTerms }">
+              <text v-if="agreedToTerms" class="checkbox-icon">✓</text>
+            </view>
+          </view>
+          <view class="agreement-text">
+            <text class="agreement-label">我已阅读并同意</text>
+            <text class="agreement-link" @click.stop="showAgreement('user')">《用户协议》</text>
+            <text class="agreement-label">和</text>
+            <text class="agreement-link" @click.stop="showAgreement('privacy')">《隐私政策》</text>
+          </view>
+        </view>
       </view>
 
       <view class="footer">
-        <text class="footer-text">登录即代表您同意</text>
-        <view class="footer-links">
-          <text class="footer-link" @click.stop="showAgreement('user')">用户协议</text>
-          <view class="footer-divider"></view>
-          <text class="footer-link" @click.stop="showAgreement('privacy')">隐私政策</text>
-        </view>
+        <text class="footer-text">安全登录，保护您的隐私</text>
       </view>
     </view>
   </view>
@@ -63,6 +72,11 @@ import { useUserStore } from '@/store/user.js'
 const loading = ref(false)
 const nickname = ref('')
 const avatarUrl = ref('')
+const agreedToTerms = ref(false)
+
+const toggleAgreement = () => {
+  agreedToTerms.value = !agreedToTerms.value
+}
 
 // 从分享链接提取邀请码
 onLoad((options = {}) => {
@@ -106,6 +120,11 @@ const showAgreement = (type) => {
 }
 
 const handleWechatLogin = async () => {
+  if (!agreedToTerms.value) {
+    uni.showToast({ title: '请先同意用户协议和隐私政策', icon: 'none' })
+    return
+  }
+
   if (!avatarUrl.value) {
     uni.showToast({ title: '请选择头像', icon: 'none' })
     return
@@ -211,7 +230,7 @@ page {
 .close-btn {
   position: absolute;
   top: 24px;
-  right: 24px;
+  left: 24px;
   z-index: 10;
   display: flex;
   align-items: center;
@@ -221,9 +240,9 @@ page {
 }
 
 .close-icon {
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 300;
-  color: rgba(255,255,255,0.4);
+  color: rgba(255,255,255,0.6);
   line-height: 1;
 }
 
@@ -479,6 +498,65 @@ page {
   line-height: 1;
 }
 
+.agreement-section {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+.checkbox-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+}
+
+.checkbox {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  border: 1px solid rgba(255,255,255,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.checkbox-checked {
+  background: linear-gradient(135deg, #0F4C5C 0%, #14B8A6 100%);
+  border-color: transparent;
+}
+
+.checkbox-icon {
+  font-size: 10px;
+  color: #ffffff;
+  font-weight: bold;
+}
+
+.agreement-text {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+}
+
+.agreement-label {
+  font-size: 11px;
+  font-weight: 300;
+  color: rgba(255,255,255,0.5);
+  line-height: 1.4;
+}
+
+.agreement-link {
+  font-size: 11px;
+  font-weight: 400;
+  color: #14B8A6;
+  line-height: 1.4;
+}
+
 .footer {
   width: 100%;
   display: flex;
@@ -486,7 +564,7 @@ page {
   align-items: center;
   gap: 16px;
   margin-top: auto;
-  padding-top: 64px;
+  padding-top: 48px;
 }
 
 .footer-text {
@@ -496,25 +574,5 @@ page {
   letter-spacing: 0.15em;
   text-transform: uppercase;
   line-height: 1;
-}
-
-.footer-links {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.footer-link {
-  font-size: 11px;
-  font-weight: 300;
-  color: rgba(255,255,255,0.5);
-  letter-spacing: 0.15em;
-  line-height: 1;
-}
-
-.footer-divider {
-  width: 1px;
-  height: 12px;
-  background: rgba(255,255,255,0.2);
 }
 </style>

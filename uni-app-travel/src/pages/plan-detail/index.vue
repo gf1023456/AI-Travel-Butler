@@ -13,7 +13,7 @@
         <view class="hero-mask"></view>
         <view class="hero-content">
           <text class="hero-title">{{ plan.title || '精选旅行方案' }}</text>
-          <view class="hero-meta">
+          <view class="hero-meta" v-if="!hideSocial">
             <text v-if="plan.author" class="hero-author">👤 {{ plan.author }}</text>
             <text v-if="plan.likes" class="hero-likes">❤ {{ plan.likes }}</text>
           </view>
@@ -23,7 +23,7 @@
       <view v-else class="hero-section hero-fallback">
         <view class="hero-content">
           <text class="hero-title">{{ plan.title || '精选旅行方案' }}</text>
-          <view class="hero-meta">
+          <view class="hero-meta" v-if="!hideSocial">
             <text v-if="plan.author" class="hero-author">👤 {{ plan.author }}</text>
             <text v-if="plan.likes" class="hero-likes">❤ {{ plan.likes }}</text>
           </view>
@@ -87,13 +87,15 @@
     </scroll-view>
 
     <view class="footer-bar" :style="{ paddingBottom: (12 + safeAreaBottom) + 'px' }">
-      <button class="footer-btn secondary" @click="onToggleLike">
-        <text>{{ plan.is_liked ? '❤' : '🤍' }} {{ plan.likes || 0 }}</text>
-      </button>
-      <button class="footer-btn secondary" @click="onFavorite">
-        <text>{{ plan.is_favorite ? '📌' : '🔖' }} 收藏</text>
-      </button>
-      <button class="footer-btn primary" @click="copyPlanToMine">
+      <template v-if="!hideSocial">
+        <button class="footer-btn secondary" @click="onToggleLike">
+          <text>{{ plan.is_liked ? '❤' : '🤍' }} {{ plan.likes || 0 }}</text>
+        </button>
+        <button class="footer-btn secondary" @click="onFavorite">
+          <text>{{ plan.is_favorite ? '📌' : '🔖' }} 收藏</text>
+        </button>
+      </template>
+      <button class="footer-btn primary" :class="{ 'full-width': hideSocial }" @click="copyPlanToMine">
         <text>复制方案</text>
       </button>
     </view>
@@ -113,6 +115,12 @@ const userStore = useUserStore()
 const { statusBarHeight, safeAreaBottom } = useSafeArea()
 
 const plan = computed(() => travelStore.previewPlan || {})
+
+// 判断是否隐藏社交元素（从灵感库进入时不显示点赞、收藏、作者信息）
+const hideSocial = computed(() => {
+  // 如果方案没有作者信息，说明是从灵感库加载的
+  return !plan.value.author && !plan.value.likes
+})
 
 const useNestedDay = computed(() => {
   const dp = plan.value.dayPlan
@@ -425,4 +433,5 @@ const onToggleLike = async () => {
   color: var(--color-on-surface-variant);
 }
 .footer-btn.secondary:active { transform: scale(0.98); }
+.footer-btn.full-width { flex: 3; }
 </style>

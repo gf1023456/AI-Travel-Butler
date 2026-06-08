@@ -16,6 +16,7 @@ class ServerSettings(BaseModel):
     request_timeout_ms: int = 240000
     max_retries: int = 3
     public_base_url: str = "https://tonystark-ai.ccwu.cc"
+    refine_timeout_ms: int = 300000  # 优化接口专用超时：5分钟
 
 
 class RagSettings(BaseModel):

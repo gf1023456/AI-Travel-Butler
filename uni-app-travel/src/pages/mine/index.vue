@@ -151,8 +151,8 @@
     <!-- Bottom Navigation -->
     <nav class="bottom-nav" :style="{ bottom: (32 + safeAreaBottom) + 'px' }">
       <button class="nav-item" @click="goExplore">
-        <text class="nav-item-icon">🧭</text>
-        <text class="nav-item-label">探索</text>
+        <text class="nav-item-icon">💡</text>
+        <text class="nav-item-label">灵感</text>
       </button>
       <button class="nav-item" @click="goPlan">
         <text class="nav-item-icon">📅</text>
@@ -179,7 +179,7 @@ const userStore = useUserStore()
 const { statusBarHeight, safeAreaBottom } = useSafeArea()
 
 const goBack = () => uni.navigateBack({ delta: 1 })
-const goExplore = () => uni.navigateTo({ url: '/pages/explore/index' })
+const goExplore = () => uni.navigateTo({ url: '/pages/inspiration/index' })
 const goPlan = () => uni.navigateTo({ url: '/pages/plan/plan' })
 const goMine = () => uni.reLaunch({ url: '/pages/mine/index' })
 const defaultAvatar = 'https://ui-avatars.com/api/?name=行程一下&background=1a237e&color=fff&size=256'

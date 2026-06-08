@@ -72,6 +72,27 @@
         "navigationBarTitleText": "方案详情",
         "navigationStyle": "custom"
       }
+    },
+    {
+      "path": "pages/agreement/user",
+      "style": {
+        "navigationBarTitleText": "用户协议",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/agreement/privacy",
+      "style": {
+        "navigationBarTitleText": "隐私政策",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/inspiration/index",
+      "style": {
+        "navigationBarTitleText": "灵感库",
+        "navigationStyle": "custom"
+      }
     }
   ],
   "globalStyle": {

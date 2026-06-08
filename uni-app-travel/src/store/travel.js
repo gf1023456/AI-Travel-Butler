@@ -27,6 +27,13 @@ export const useTravelStore = defineStore('travel', {
       modelType: 'auto',
       isPlannerMode: false,
       travelMode: 'deep'
+    },
+    // 优化任务状态（持久化，跨页面保持）
+    refineTask: {
+      isRunning: false,
+      taskId: null,
+      startTime: null,
+      elapsed: 0
     }
   }),
 
@@ -185,9 +192,14 @@ export const useTravelStore = defineStore('travel', {
           if (errorMsg.includes('quota') || errorMsg.includes('配额') || errorMsg.includes('次数')) {
             uni.showModal({
               title: '配额不足',
-              content: '今日生成次数已用完，请明天再来或分享获取额外配额',
-              showCancel: false,
-              confirmText: '我知道了'
+              content: '今日生成次数已用完，每成功邀请1位好友即可获得3次额外额度！',
+              confirmText: '邀请好友',
+              cancelText: '取消',
+              success: (res) => {
+                if (res.confirm) {
+                  uni.reLaunch({ url: '/pages/mine/index' })
+                }
+              }
             })
             this.error = '今日配额已用完'
             return null
@@ -305,9 +317,14 @@ export const useTravelStore = defineStore('travel', {
           if (errorMsg.includes('quota') || errorMsg.includes('配额') || errorMsg.includes('次数')) {
             uni.showModal({
               title: '配额不足',
-              content: '今日生成次数已用完',
-              showCancel: false,
-              confirmText: '我知道了'
+              content: '今日生成次数已用完，每成功邀请1位好友即可获得3次额外额度！',
+              confirmText: '邀请好友',
+              cancelText: '取消',
+              success: (res) => {
+                if (res.confirm) {
+                  uni.reLaunch({ url: '/pages/mine/index' })
+                }
+              }
             })
             this.error = '今日配额已用完'
             return null
@@ -521,9 +538,14 @@ export const useTravelStore = defineStore('travel', {
           if (errorMsg.includes('quota') || errorMsg.includes('配额') || errorMsg.includes('次数')) {
             uni.showModal({
               title: '配额不足',
-              content: '今日生成次数已用完',
-              showCancel: false,
-              confirmText: '我知道了'
+              content: '今日生成次数已用完，每成功邀请1位好友即可获得3次额外额度！',
+              confirmText: '邀请好友',
+              cancelText: '取消',
+              success: (res) => {
+                if (res.confirm) {
+                  uni.reLaunch({ url: '/pages/mine/index' })
+                }
+              }
             })
             this.error = '今日配额已用完'
             return null
@@ -689,14 +711,21 @@ export const useTravelStore = defineStore('travel', {
     },
 
     /**
-     * 优化行程
+     * 优化行程（异步轮询模式）
+     * 支持后台运行，用户可以浏览其他页面
      */
     async refinePlan(params) {
+      // 检查是否已有正在运行的优化任务
+      if (this.refineTask.isRunning) {
+        throw new Error('已有优化任务正在进行中')
+      }
+
       this.loading = true
       this.error = null
-      
+
       try {
-        const result = await travelApi.refinePlan({
+        // 1. 创建异步优化任务
+        const createRes = await travelApi.refinePlanAsync({
           userInput: params.userInput,
           modelType: params.modelType,
           isPlannerMode: params.isPlannerMode !== false,
@@ -704,14 +733,74 @@ export const useTravelStore = defineStore('travel', {
           refineInstruction: params.refineInstruction,
           basePlan: params.basePlan
         })
-        this.currentPlan = result
-        this.planHistory.push(result)
-        return result
+
+        if (!createRes || !createRes.taskId) {
+          this.loading = false
+          throw new Error('创建优化任务失败')
+        }
+        const taskId = createRes.taskId
+
+        // 2. 记录优化任务状态（持久化）
+        this.refineTask = {
+          isRunning: true,
+          taskId: taskId,
+          startTime: Date.now(),
+          elapsed: 0
+        }
+
+        // 3. 轮询状态
+        const pollInterval = 3000
+        const maxWaitTime = 180000 // 3分钟
+
+        return new Promise((resolve, reject) => {
+          const poll = async () => {
+            try {
+              const elapsed = Date.now() - this.refineTask.startTime
+              this.refineTask.elapsed = Math.round(elapsed / 1000)
+
+              if (elapsed > maxWaitTime) {
+                this.loading = false
+                this.refineTask.isRunning = false
+                this.error = '优化任务超时，请稍后到历史记录查看'
+                reject(new Error('任务超时'))
+                return
+              }
+
+              const statusRes = await travelApi.getRefineStatus(taskId)
+              const status = statusRes.status
+              console.log('[TravelStore Refine] Status:', status)
+
+              if (status === 'completed') {
+                const result = await travelApi.getRefineResult(taskId)
+                this.currentPlan = result
+                this.planHistory.push(result)
+                this.loading = false
+                this.refineTask.isRunning = false
+                resolve(result)
+              } else if (status === 'failed') {
+                this.loading = false
+                this.refineTask.isRunning = false
+                this.error = statusRes.error || '优化失败'
+                reject(new Error(this.error))
+              } else {
+                // pending 或 running，继续轮询
+                setTimeout(poll, pollInterval)
+              }
+            } catch (err) {
+              this.loading = false
+              this.refineTask.isRunning = false
+              this.error = err.message || '查询优化状态失败'
+              reject(err)
+            }
+          }
+
+          poll()
+        })
       } catch (error) {
-        this.error = '优化失败，请稍后重试'
-        throw new Error(this.error)
-      } finally {
         this.loading = false
+        this.refineTask.isRunning = false
+        this.error = error.message || '优化失败'
+        throw error
       }
     },
 

@@ -1,9 +1,9 @@
 <template>
-  <view class="explore-page" :class="themeClass">
+  <view class="inspiration-page" :class="themeClass">
     <header class="top-bar" :style="{ paddingTop: (12 + statusBarHeight) + 'px' }">
       <view class="top-left">
         <button class="back-btn" @click="goBack"><text>←</text></button>
-        <text class="top-title">探索</text>
+        <text class="top-title">灵感库</text>
       </view>
       <view class="top-right">
         <button class="top-avatar-btn">
@@ -31,13 +31,7 @@
             <view class="card-body">
               <text class="card-title">{{ plan.title || '精选旅行方案' }}</text>
               <view class="card-footer">
-                <view class="card-author">
-                  <image class="card-avatar" :src="getCardAvatar(plan)" mode="aspectFill" />
-                  <text class="card-author-name">{{ plan.author || '匿名旅者' }}</text>
-                </view>
-                <view class="card-like" :class="{ 'card-like-active': plan.is_liked }" @click.stop="onToggleLike(plan)">
-                  <text>{{ plan.is_liked ? '❤' : '🤍' }} {{ plan.likes || 0 }}</text>
-                </view>
+                <text class="card-desc">{{ plan.user_input || '点击使用此灵感' }}</text>
               </view>
             </view>
           </view>
@@ -48,13 +42,7 @@
             <view class="card-body">
               <text class="card-title">{{ plan.title || '精选旅行方案' }}</text>
               <view class="card-footer">
-                <view class="card-author">
-                  <image class="card-avatar" :src="getCardAvatar(plan)" mode="aspectFill" />
-                  <text class="card-author-name">{{ plan.author || '匿名旅者' }}</text>
-                </view>
-                <view class="card-like" :class="{ 'card-like-active': plan.is_liked }" @click.stop="onToggleLike(plan)">
-                  <text>{{ plan.is_liked ? '❤' : '🤍' }} {{ plan.likes || 0 }}</text>
-                </view>
+                <text class="card-desc">{{ plan.user_input || '点击使用此灵感' }}</text>
               </view>
             </view>
           </view>
@@ -103,7 +91,7 @@
     <view v-if="showCreateSheet" class="sheet-mask" @click="showCreateSheet = false">
       <view class="sheet-panel" @click.stop>
         <view class="sheet-handle"></view>
-        <text class="sheet-title">生成旅行方案</text>
+        <text class="sheet-title">✨ 生成旅行方案</text>
         <text class="sheet-sub">描述你的旅行想法，为你规划专属行程</text>
 
         <!-- 旅行风格选择 -->
@@ -214,58 +202,35 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { onShareAppMessage } from '@dcloudio/uni-app'
 import { useTravelStore } from '@/store/travel.js'
 import { useUserStore } from '@/store/user.js'
-import { getPublicPlans, getPublicPlanDetail, likePlan } from '@/api/history.js'
+import { getPublicPlans, getPublicPlanDetail } from '@/api/history.js'
 import { getRandomCities } from '@/api/travel.js'
-import { getQuota, addBonus, getInviteInfo } from '@/api/quota.js'
+import { getQuota, addBonus } from '@/api/quota.js'
 import { useSafeArea } from '@/utils/safeArea.js'
 import { themeClass } from '@/utils/theme.js'
-import { TRAVEL_STYLES, getName } from '@/constants/travelStyles.js'
+import { TRAVEL_STYLES } from '@/constants/travelStyles.js'
 
 const travelStore = useTravelStore()
 const userStore = useUserStore()
 const { statusBarHeight, safeAreaBottom } = useSafeArea()
 
 const userAvatar = computed(() => userStore.avatarUrl || 'https://ui-avatars.com/api/?name=行程一下&background=0F4C5C&color=fff&size=64')
-const userNickname = computed(() => userStore.nickname || '行程一下')
-
-// 方案卡片头像：后端 author_avatar 优先，为空用默认
-const getCardAvatar = (plan) => {
-  if (plan.author_avatar) return plan.author_avatar
-  return `https://ui-avatars.com/api/?name=${encodeURIComponent(plan.author || '旅者')}&background=0F4C5C&color=fff&size=32`
-}
-
-// 分享（跳转首页，带邀请码）
-const myInviteCode = ref('')
-
-onShareAppMessage(() => ({
-  title: '行程一下 - 输入旅行想法，自动生成专属行程',
-  path: `/pages/login/index?invite=${myInviteCode.value || ''}`,
-  imageUrl: 'https://tonystark-ai.ccwu.cc/png/kfeng.png'
-}))
 
 onMounted(async () => {
   userStore.restoreFromStorage()
   loadPlazaPlans()
-  try {
-    const info = await getInviteInfo()
-    if (info && info.invite_code) myInviteCode.value = info.invite_code
-  } catch (e) { /* 未登录时静默失败 */ }
 })
 
 const goBack = () => uni.reLaunch({ url: '/pages/index/index' })
 
 // Categories（与后端 travel_styles.py 一致）
-// 顺序：全部 → 4 风格 → 热门
 const categories = [
   { slug: 'all', name: '全部', icon: '' },
   { slug: 'light', ...TRAVEL_STYLES.light },
   { slug: 'deep', ...TRAVEL_STYLES.deep },
   { slug: 'food', ...TRAVEL_STYLES.food },
-  { slug: 'outdoor', ...TRAVEL_STYLES.outdoor },
-  { slug: 'hot', name: '热门', icon: '🔥' }
+  { slug: 'outdoor', ...TRAVEL_STYLES.outdoor }
 ]
 const activeCategory = ref('all')
 
@@ -280,9 +245,8 @@ const plazaPage = ref(1)
 const plazaPageSize = 12
 const plazaHasMore = ref(true)
 const plazaLoadingMore = ref(false)
-// scroll-view 自带下拉刷新（refresher-enabled + @refresherrefresh）
-// 关键：用受控的 :refresher-triggered 布尔值，true→false 才会真正收起 spinner
 const plazaRefreshing = ref(false)
+
 const onPlazaRefresh = async () => {
   plazaRefreshing.value = true
   try {
@@ -313,12 +277,11 @@ const loadPlazaPlans = async (append = false) => {
     plazaLoadingMore.value = true
   }
   try {
-    const sort = activeCategory.value === 'hot' ? 'hot' : (activeCategory.value === 'all' ? 'hot' : 'hot')
     const data = await getPublicPlans({
       page: plazaPage.value,
       pageSize: plazaPageSize,
       category: activeCategory.value,
-      sort
+      sort: 'hot'
     })
     const list = data?.list || []
     if (append) {
@@ -328,10 +291,10 @@ const loadPlazaPlans = async (append = false) => {
     }
     plazaHasMore.value = list.length >= plazaPageSize
   } catch (e) {
-    console.error('[explore] 加载广场方案失败:', e)
+    console.error('[inspiration] 加载灵感库失败:', e)
     if (!append) {
       planList.value = []
-      uni.showToast({ title: '广场加载失败', icon: 'none' })
+      uni.showToast({ title: '灵感库加载失败', icon: 'none' })
     }
   } finally {
     plazaLoading.value = false
@@ -351,43 +314,21 @@ const onScrollToLower = () => {
   loadPlazaPlans(true)
 }
 
-// 点赞（乐观更新 + 失败回滚）
-const onToggleLike = async (plan) => {
-  if (!userStore.hasToken) {
-    uni.showToast({ title: '请先登录', icon: 'none' })
-    setTimeout(() => uni.reLaunch({ url: '/pages/login/index' }), 800)
-    return
-  }
-  const wasLiked = plan.is_liked
-  const oldLikes = plan.likes || 0
-  // 乐观更新
-  plan.is_liked = !wasLiked
-  plan.likes = oldLikes + (wasLiked ? -1 : 1)
-  try {
-    const res = await likePlan(plan.id)
-    plan.is_liked = res.is_liked
-    plan.likes = res.likes
-  } catch (e) {
-    // 回滚
-    plan.is_liked = wasLiked
-    plan.likes = oldLikes
-    uni.showToast({ title: e.message || '操作失败', icon: 'none' })
-  }
-}
+// 移除点赞功能
 
 const getFallbackPlans = () => [
-  { id: 1, title: '上海3日深度游：外滩法租界美食探索', author: '旅行达人小王', likes: 234, cover: 'https://tonystark-ai.ccwu.cc/png/fed79683-fbb6-44ac-9327-44c2f269cc47.png', user_input: '上海 3天 深度游，住外滩附近' },
-  { id: 2, title: '东京樱花季4天行程攻略', author: '樱花猎人', likes: 567, cover: 'https://tonystark-ai.ccwu.cc/png/600dc4e1-70ed-491a-85d4-a0edea269eb8.png', user_input: '东京 樱花季 4天' },
-  { id: 3, title: '成都美食之旅3天', author: '吃货联盟', likes: 189, cover: 'https://tonystark-ai.ccwu.cc/png/79b1c1f7-445f-49bc-a075-e44c66b289d8.png', user_input: '成都 美食之旅 3天' },
-  { id: 4, title: '三亚5天海滨度假', author: '海岛控', likes: 423, cover: 'https://tonystark-ai.ccwu.cc/png/fed79683-fbb6-44ac-9327-44c2f269cc47.png', user_input: '三亚 5天 度假' },
-  { id: 5, title: '西安古都文化深度游', author: '历史爱好者', likes: 312, cover: 'https://tonystark-ai.ccwu.cc/png/600dc4e1-70ed-491a-85d4-a0edea269eb8.png', user_input: '西安 3天 文化游' },
-  { id: 6, title: '丽江大理7天慢旅行', author: '慢旅行者', likes: 678, cover: 'https://tonystark-ai.ccwu.cc/png/79b1c1f7-445f-49bc-a075-e44c66b289d8.png', user_input: '丽江大理 7天' },
-  { id: 7, title: '新疆伊犁5天花海之旅', author: '西域行者', likes: 432, cover: 'https://tonystark-ai.ccwu.cc/png/fed79683-fbb6-44ac-9327-44c2f269cc47.png', user_input: '新疆 伊犁 5天 花海' },
-  { id: 8, title: '杭州西湖3天诗意漫游', author: '江南旅人', likes: 345, cover: 'https://tonystark-ai.ccwu.cc/png/600dc4e1-70ed-491a-85d4-a0edea269eb8.png', user_input: '杭州 西湖 3天 漫游' },
-  { id: 9, title: '桂林阳朔4天山水画卷', author: '山水之间', likes: 287, cover: 'https://tonystark-ai.ccwu.cc/png/79b1c1f7-445f-49bc-a075-e44c66b289d8.png', user_input: '桂林 阳朔 4天 山水' },
-  { id: 10, title: '重庆3天火锅江湖之旅', author: '辣味人生', likes: 521, cover: 'https://tonystark-ai.ccwu.cc/png/fed79683-fbb6-44ac-9327-44c2f269cc47.png', user_input: '重庆 3天 火锅' },
-  { id: 11, title: '大理洱海5天环湖慢生活', author: '风花雪月', likes: 398, cover: 'https://tonystark-ai.ccwu.cc/png/600dc4e1-70ed-491a-85d4-a0edea269eb8.png', user_input: '大理 洱海 5天 环湖' },
-  { id: 12, title: '哈尔滨冰雪7天奇幻之旅', author: '冰雪奇缘', likes: 456, cover: 'https://tonystark-ai.ccwu.cc/png/79b1c1f7-445f-49bc-a075-e44c66b289d8.png', user_input: '哈尔滨 冰雪 7天' },
+  { id: 1, title: '上海3日深度游：外滩法租界美食探索', user_input: '上海 3天 深度游，住外滩附近', cover: 'https://tonystark-ai.ccwu.cc/png/fed79683-fbb6-44ac-9327-44c2f269cc47.png' },
+  { id: 2, title: '东京樱花季4天行程攻略', user_input: '东京 樱花季 4天', cover: 'https://tonystark-ai.ccwu.cc/png/600dc4e1-70ed-491a-85d4-a0edea269eb8.png' },
+  { id: 3, title: '成都美食之旅3天', user_input: '成都 美食之旅 3天', cover: 'https://tonystark-ai.ccwu.cc/png/79b1c1f7-445f-49bc-a075-e44c66b289d8.png' },
+  { id: 4, title: '三亚5天海滨度假', user_input: '三亚 5天 度假', cover: 'https://tonystark-ai.ccwu.cc/png/fed79683-fbb6-44ac-9327-44c2f269cc47.png' },
+  { id: 5, title: '西安古都文化深度游', user_input: '西安 3天 文化游', cover: 'https://tonystark-ai.ccwu.cc/png/600dc4e1-70ed-491a-85d4-a0edea269eb8.png' },
+  { id: 6, title: '丽江大理7天慢旅行', user_input: '丽江大理 7天', cover: 'https://tonystark-ai.ccwu.cc/png/79b1c1f7-445f-49bc-a075-e44c66b289d8.png' },
+  { id: 7, title: '新疆伊犁5天花海之旅', user_input: '新疆 伊犁 5天 花海', cover: 'https://tonystark-ai.ccwu.cc/png/fed79683-fbb6-44ac-9327-44c2f269cc47.png' },
+  { id: 8, title: '杭州西湖3天诗意漫游', user_input: '杭州 西湖 3天 漫游', cover: 'https://tonystark-ai.ccwu.cc/png/600dc4e1-70ed-491a-85d4-a0edea269eb8.png' },
+  { id: 9, title: '桂林阳朔4天山水画卷', user_input: '桂林 阳朔 4天 山水', cover: 'https://tonystark-ai.ccwu.cc/png/79b1c1f7-445f-49bc-a075-e44c66b289d8.png' },
+  { id: 10, title: '重庆3天火锅江湖之旅', user_input: '重庆 3天 火锅', cover: 'https://tonystark-ai.ccwu.cc/png/fed79683-fbb6-44ac-9327-44c2f269cc47.png' },
+  { id: 11, title: '大理洱海5天环湖慢生活', user_input: '大理 洱海 5天 环湖', cover: 'https://tonystark-ai.ccwu.cc/png/600dc4e1-70ed-491a-85d4-a0edea269eb8.png' },
+  { id: 12, title: '哈尔滨冰雪7天奇幻之旅', user_input: '哈尔滨 冰雪 7天', cover: 'https://tonystark-ai.ccwu.cc/png/79b1c1f7-445f-49bc-a075-e44c66b289d8.png' },
 ]
 
 const getPlaceholderImg = (idx) => {
@@ -399,43 +340,39 @@ const getPlaceholderImg = (idx) => {
   return imgs[idx % imgs.length]
 }
 
-// Plan detail popup (now navigates to /pages/plan-detail/index)
+// Plan detail - 点击查看方案详情
 const onPlanCardClick = async (plan) => {
-  if (plan.id) {
-    uni.showLoading({ title: '加载中...' })
-    try {
-      const detail = await getPublicPlanDetail(plan.id)
-      uni.hideLoading()
-      if (detail) {
-        const rawDays = detail.day_plan || []
-        const dayPlan = Array.isArray(rawDays)
-          ? rawDays.map((d, i) => typeof d === 'object' && d.items
-              ? d
-              : { summary: detail.itinerary_summary || `第 ${i + 1} 天`, items: Array.isArray(d) ? d : (d ? [d] : []) })
-          : typeof rawDays === 'object'
-            ? Object.entries(rawDays).map(([k, v]) => ({ summary: `第 ${k} 天`, items: Array.isArray(v) ? v : [] }))
-            : []
-        travelStore.previewPlan = {
-          id: detail.id,
-          title: detail.title || plan.title,
-          cover: detail.cover || plan.cover,
-          author: detail.author || plan.author,
-          likes: detail.likes || plan.likes,
-          userInput: detail.user_input || plan.user_input || '',
-          dayPlan: dayPlan,
-          itinerarySummary: detail.itinerary_summary || detail.summary || ''
-        }
-        uni.navigateTo({ url: '/pages/plan-detail/index' })
-        return
+  if (!plan.id) return
+  
+  uni.showLoading({ title: '加载中...' })
+  try {
+    const detail = await getPublicPlanDetail(plan.id)
+    uni.hideLoading()
+    if (detail) {
+      const rawDays = detail.day_plan || []
+      const dayPlan = Array.isArray(rawDays)
+        ? rawDays.map((d, i) => typeof d === 'object' && d.items
+            ? d
+            : { summary: detail.itinerary_summary || `第 ${i + 1} 天`, items: Array.isArray(d) ? d : (d ? [d] : []) })
+        : typeof rawDays === 'object'
+          ? Object.entries(rawDays).map(([k, v]) => ({ summary: `第 ${k} 天`, items: Array.isArray(v) ? v : [] }))
+          : []
+      
+      travelStore.previewPlan = {
+        id: detail.id,
+        title: detail.title || plan.title,
+        cover: detail.cover || plan.cover,
+        userInput: detail.user_input || plan.user_input || '',
+        dayPlan: dayPlan,
+        itinerarySummary: detail.itinerary_summary || detail.summary || '',
+        category: detail.category || plan.category || 'deep'
       }
-    } catch (e) {
-      uni.hideLoading()
-      console.warn('[Explore] 加载方案详情失败:', e)
+      uni.navigateTo({ url: '/pages/plan-detail/index' })
     }
-  }
-  if (plan.user_input) {
-    userInput.value = plan.user_input
-    showCreateSheet.value = true
+  } catch (e) {
+    uni.hideLoading()
+    console.warn('[Inspiration] 加载方案详情失败:', e)
+    uni.showToast({ title: '加载失败，请重试', icon: 'none' })
   }
 }
 
@@ -445,7 +382,7 @@ const onShareSuccess = async () => {
     await addBonus('share')
     uni.showToast({ title: '分享成功 +3 次配额', icon: 'success' })
   } catch (err) {
-    console.warn('[Explore] 分享加分失败:', err)
+    console.warn('[Inspiration] 分享加分失败:', err)
   }
 }
 
@@ -520,7 +457,7 @@ const startRandomWheel = async () => {
       }))
     }
   } catch (e) {
-    console.warn('[Explore] 获取随机城市失败，使用默认:', e)
+    console.warn('[Inspiration] 获取随机城市失败，使用默认:', e)
     const fallback = ['上海', '成都', '西安', '丽江', '桂林', '三亚']
     wheelDestinations.value = fallback.map((name, i) => ({
       name, province: '', tags: [], desc: '', color: wheelColors[i]
@@ -655,7 +592,7 @@ const onFabClick = () => {
 </script>
 
 <style scoped>
-.explore-page {
+.inspiration-page {
   height: 100vh;
   display: flex; flex-direction: column;
   background: #f8f9fa;
@@ -721,22 +658,18 @@ const onFabClick = () => {
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
 }
 .card-footer {
-  display: flex; align-items: center; justify-content: space-between; margin-top: 10px;
+  display: flex; align-items: center; margin-top: 10px;
 }
-.card-author { display: flex; align-items: center; gap: 6px; }
-.card-avatar { width: 20px; height: 20px; border-radius: 50%; }
-.card-author-name { font-size: 11px; color: var(--color-on-surface-variant); opacity: 0.7; }
-.card-likes { font-size: 12px; color: var(--color-on-surface-variant); opacity: 0.7; }
-.card-like {
-  display: flex; align-items: center; gap: 2px;
-  padding: 4rpx 10rpx; border-radius: 999rpx;
-  font-size: 12px;
+.card-desc {
+  font-size: 11px;
   color: var(--color-on-surface-variant);
-  background: rgba(15,76,92,0.06);
-  transition: all 0.15s;
+  opacity: 0.7;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
 }
-.card-like-active { color: #ef4444; background: rgba(239,68,68,0.10); }
-.card-like:active { transform: scale(0.92); }
 
 .empty-hint { display: flex; flex-direction: column; align-items: center; padding: 80rpx 0; }
 .empty-icon { font-size: 48px; margin-bottom: 16px; }
@@ -971,15 +904,15 @@ const onFabClick = () => {
   font-size: 16px; font-weight: 600; border: none;
 }
 .quota-modal-btn::after { border: none; }
+.quota-modal-btn.secondary {
+  background: var(--color-surface-container); color: var(--color-on-surface-variant);
+}
+.quota-modal-btn.secondary:active { opacity: 0.7; }
 .quota-modal-btn.primary {
   background: linear-gradient(135deg, #0F4C5C 0%, #14B8A6 100%);
   color: #ffffff; box-shadow: 0 8px 24px rgba(15,76,92,0.25);
 }
-.quota-modal-btn.secondary {
-  background: var(--color-surface-container); color: var(--color-on-surface-variant);
-}
 .quota-modal-btn.primary:active { transform: scale(0.97); }
-.quota-modal-btn.secondary:active { opacity: 0.7; }
 
 /* Skeleton status */
 .skeleton-status {

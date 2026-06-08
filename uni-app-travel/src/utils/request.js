@@ -111,6 +111,19 @@ export function request(options) {
             }, 1500)
           }
           reject(new Error('请先登录'))
+        } else if (res.statusCode === 403) {
+          // 403 配额不足
+          console.log('检测到403配额不足:', res.data)
+          var responseData = res.data
+          var errorMsg = '今日次数已用完，邀请好友可获得额外配额'
+          
+          if (typeof responseData === 'object' && responseData.detail) {
+            if (typeof responseData.detail === 'string') {
+              errorMsg = responseData.detail
+            }
+          }
+          
+          reject(new Error(errorMsg))
         } else if (res.statusCode === 422) {
           // 422 可能是未登录、token 过期、或配额不足
           console.log('检测到422验证错误:', res.data)

@@ -80,11 +80,43 @@
         </view>
       </view>
     </scroll-view>
+
+    <!-- 优化中状态弹窗 -->
+    <view v-if="isRefining" class="refine-overlay" @click.stop>
+      <view class="refine-modal">
+        <view class="refine-icon">✨</view>
+        <view class="refine-info">
+          <text class="refine-title">行程优化中</text>
+          <text class="refine-sub">预计需要 2-3 分钟，您可以先浏览其他页面</text>
+          <text class="refine-time" v-if="refineElapsed">已耗时 {{ refineElapsed }}s</text>
+        </view>
+        <view class="refine-spinner">
+          <view class="spinner-ring"></view>
+        </view>
+        <button class="refine-close-btn" @click="goBack">
+          <text>返回首页浏览</text>
+        </button>
+      </view>
+    </view>
+
+    <!-- 优化完成提示 -->
+    <view v-if="showComplete" class="refine-overlay" @click.stop>
+      <view class="refine-modal complete">
+        <view class="refine-icon complete-icon">🎉</view>
+        <view class="refine-info">
+          <text class="refine-title">优化完成！</text>
+          <text class="refine-sub">行程已根据您的需求优化完成</text>
+        </view>
+        <button class="refine-view-btn" @click="goToPlan">
+          <text>查看优化后的行程</text>
+        </button>
+      </view>
+    </view>
   </view>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useTravelStore } from '@/store/travel.js'
 import { useUserStore } from '@/store/user.js'
 import { useSafeArea } from '@/utils/safeArea.js'
@@ -96,6 +128,54 @@ const { statusBarHeight } = useSafeArea()
 
 const refineRequest = ref('')
 const charCount = computed(() => refineRequest.value.length)
+
+// 优化中状态 - 从 store 获取（持久化）
+const isRefining = computed(() => travelStore.refineTask.isRunning)
+const showComplete = ref(false)
+let refineTimer = null
+
+// 优化耗时
+const refineElapsed = computed(() => travelStore.refineTask.elapsed)
+
+// 页面加载时检查是否有正在进行的优化任务
+onMounted(() => {
+  userStore.restoreFromStorage()
+  if (!userStore.hasToken) {
+    uni.showToast({ title: '请先登录', icon: 'none' })
+    setTimeout(() => uni.reLaunch({ url: '/pages/login/index' }), 1500)
+    return
+  }
+
+  // 如果有正在进行的优化任务，启动计时器
+  if (travelStore.refineTask.isRunning) {
+    startRefineTimer()
+  }
+})
+
+const startRefineTimer = () => {
+  if (refineTimer) return
+  refineTimer = setInterval(() => {
+    if (travelStore.refineTask.startTime) {
+      travelStore.refineTask.elapsed = Math.round((Date.now() - travelStore.refineTask.startTime) / 1000)
+    }
+  }, 1000)
+}
+
+const stopRefineTimer = () => {
+  if (refineTimer) {
+    clearInterval(refineTimer)
+    refineTimer = null
+  }
+}
+
+const cleanup = () => {
+  showComplete.value = false
+  stopRefineTimer()
+}
+
+onUnmounted(() => {
+  cleanup()
+})
 
 const currentTitle = computed(() => {
   const plan = travelStore.currentPlan
@@ -113,33 +193,116 @@ const suggestions = [
   { icon: '🏛️', text: '增加文化体验' },
 ]
 
-onMounted(() => {
-  userStore.restoreFromStorage()
-  if (!userStore.hasToken) {
-    uni.showToast({ title: '请先登录', icon: 'none' })
-    setTimeout(() => uni.reLaunch({ url: '/pages/login/index' }), 1500)
-  }
-})
-
 const goBack = () => uni.reLaunch({ url: '/pages/index/index' })
 
 const handleRefine = async () => {
+  // 检查是否已有优化任务在进行中
+  if (travelStore.refineTask.isRunning) {
+    uni.showModal({
+      title: '优化进行中',
+      content: '当前已有优化任务在进行中，请等待完成后再试',
+      showCancel: false,
+      confirmText: '知道了'
+    })
+    return
+  }
+
   if (!refineRequest.value.trim()) {
     uni.showToast({ title: '请输入优化需求', icon: 'none' })
     return
   }
-  try {
-    const result = await travelStore.refinePlanV4({
-      refineRequest: refineRequest.value,
-      currentPlan: travelStore.currentPlan
-    })
-    if (result) {
-      uni.showToast({ title: '优化完成', icon: 'success' })
-      uni.reLaunch({ url: '/pages/index/index' })
-    }
-  } catch {
-    uni.showToast({ title: '优化失败，请稍后重试', icon: 'none' })
+
+  const currentPlan = travelStore.currentPlan
+  if (!currentPlan) {
+    uni.showToast({ title: '请先创建行程', icon: 'none' })
+    return
   }
+
+  try {
+    // 提取关键行程信息用于优化（控制数据量）
+    const extractKeyInfo = (plan) => {
+      if (!plan?.dayPlanItinerary || !Array.isArray(plan.dayPlanItinerary)) {
+        return { summary: plan?.itinerarySummary || '', items: [] }
+      }
+
+      const dayGroups = {}
+      plan.dayPlanItinerary.forEach(item => {
+        const dayNum = item.day || 1
+        if (!dayGroups[dayNum]) {
+          dayGroups[dayNum] = []
+        }
+        dayGroups[dayNum].push(item)
+      })
+
+      const sortedDays = Object.keys(dayGroups).sort((a, b) => parseInt(a) - parseInt(b)).slice(0, 5)
+      const dailyItems = sortedDays.map(dayNum => ({
+        day: parseInt(dayNum),
+        items: dayGroups[dayNum].slice(0, 4).map(item => ({
+          name: item.name || '',
+          type: item.type || '',
+          city: item.city || ''
+        }))
+      }))
+
+      return {
+        summary: plan.itinerarySummary?.substring(0, 200) || '',
+        items: dailyItems
+      }
+    }
+
+    const basePlanInfo = extractKeyInfo(currentPlan)
+
+    // 启动优化，启动计时器
+    startRefineTimer()
+
+    const result = await travelStore.refinePlan({
+      userInput: currentPlan?.userInput || '',
+      modelType: currentPlan?.modelType || 'default',
+      isPlannerMode: currentPlan?.isPlannerMode !== false,
+      travelMode: currentPlan?.travelMode || 'deep',
+      refineInstruction: refineRequest.value,
+      basePlan: basePlanInfo
+    })
+
+    // 优化完成
+    cleanup()
+    if (result) {
+      showComplete.value = true
+      // 3秒后自动跳转
+      setTimeout(() => {
+        showComplete.value = false
+        uni.reLaunch({ url: '/pages/index/index' })
+      }, 2500)
+    }
+  } catch (err) {
+    console.error('[Refine] 优化失败:', err)
+    cleanup()
+
+    // 检查是否是额度不足错误
+    const errorMsg = err.message || ''
+    if (errorMsg.includes('次数已用完') || errorMsg.includes('配额') || err.status === 403) {
+      uni.showModal({
+        title: '次数已用完',
+        content: '今日优化次数已用完，邀请好友可获得额外配额',
+        showCancel: true,
+        cancelText: '取消',
+        confirmText: '去邀请',
+        success: (res) => {
+          if (res.confirm) {
+            // 跳转到我的页面邀请好友
+            uni.navigateTo({ url: '/pages/mine/index' })
+          }
+        }
+      })
+    } else {
+      uni.showToast({ title: errorMsg || '优化失败，请稍后重试', icon: 'none' })
+    }
+  }
+}
+
+const goToPlan = () => {
+  showComplete.value = false
+  uni.reLaunch({ url: '/pages/index/index' })
 }
 </script>
 
@@ -268,4 +431,99 @@ const handleRefine = async () => {
 }
 .deco-title { font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 4px; line-height: 28px; }
 .deco-sub { font-size: 14px; color: rgba(255,255,255,0.8); font-weight: 500; }
+
+/* 优化中弹窗 */
+.refine-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,0.6);
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(8px);
+}
+.refine-modal {
+  width: 80%; max-width: 320px;
+  background: #fff; border-radius: 24px;
+  padding: 40rpx; text-align: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  animation: modal-pop 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes modal-pop {
+  from { transform: scale(0.8); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.refine-modal.complete {
+  background: linear-gradient(135deg, #0F4C5C 0%, #14B8A6 100%);
+  color: #fff;
+}
+.refine-icon {
+  font-size: 48px; margin-bottom: 16px;
+  animation: icon-bounce 1s ease-in-out infinite;
+}
+.refine-icon.complete-icon {
+  animation: icon-pop 0.5s cubic-bezier(0.17, 0.67, 0.12, 0.99);
+}
+@keyframes icon-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+@keyframes icon-pop {
+  0% { transform: scale(0.5); opacity: 0; }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); opacity: 1; }
+}
+.refine-info { margin-bottom: 24px; }
+.refine-title {
+  font-size: 20px; font-weight: 700;
+  color: var(--color-primary); margin-bottom: 8px;
+  display: block;
+}
+.refine-modal.complete .refine-title {
+  color: #fff;
+}
+.refine-sub {
+  font-size: 14px; color: var(--color-on-surface-variant);
+  opacity: 0.7; line-height: 1.5;
+  display: block;
+}
+.refine-modal.complete .refine-sub {
+  color: rgba(255,255,255,0.8);
+}
+.refine-time {
+  font-size: 12px; color: var(--color-primary);
+  margin-top: 8px; display: block;
+}
+.refine-modal.complete .refine-time {
+  color: rgba(255,255,255,0.6);
+}
+.refine-spinner {
+  margin: 20px auto;
+  width: 60px; height: 60px;
+}
+.spinner-ring {
+  width: 100%; height: 100%;
+  border: 4px solid rgba(15,76,92,0.1);
+  border-top-color: #0F4C5C;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.refine-close-btn {
+  width: 100%; height: 48px;
+  background: var(--color-surface-container);
+  border-radius: 12px;
+  font-size: 15px; font-weight: 600;
+  color: var(--color-on-surface-variant);
+  border: none;
+}
+.refine-close-btn::after { border: none; }
+.refine-close-btn:active { opacity: 0.7; }
+.refine-view-btn {
+  width: 100%; height: 48px;
+  background: #fff; border-radius: 12px;
+  font-size: 15px; font-weight: 600;
+  color: #0F4C5C; border: none;
+}
+.refine-view-btn::after { border: none; }
+.refine-view-btn:active { opacity: 0.8; }
 </style>

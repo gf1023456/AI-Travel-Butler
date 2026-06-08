@@ -50,8 +50,8 @@
       <section class="empty-state" v-if="!travelStore.currentPlan">
         <text class="empty-icon">✨</text>
         <text class="empty-title">快去生成你的专属方案吧</text>
-        <button class="empty-btn" @click="goExplore">
-          <text>开始探索</text>
+        <button class="empty-btn" @click="goInspiration">
+          <text>获取灵感</text>
         </button>
       </section>
 
@@ -110,14 +110,7 @@
         <text>本行程仅供参考，出行前请核实相关信息</text>
       </view>
 
-      <!-- 公开到广场开关（生成完毕后才显示） -->
-      <view v-if="travelStore.currentPlan && !isSkeleton && !travelStore.currentPlan.isFromHistory" class="publish-row">
-        <view class="publish-info">
-          <text class="publish-title">🌍 公开到探索广场</text>
-          <text class="publish-sub">开启后其他用户可在「探索」中看到这份方案</text>
-        </view>
-        <switch :checked="isPublic" @change="e => isPublic = e.detail.value" color="#0F4C5C" />
-      </view>
+      <!-- 发布到广场功能已移除，仅管理员(userID=1)自动发布 -->
     </scroll-view>
 
     <!-- Bottom Action Bar -->
@@ -148,7 +141,7 @@
           v-if="!travelStore.currentPlan.isFromHistory"
         >
           <text>💾</text>
-          <text>{{ isSkeleton ? '生成中' : (saveLock ? '保存中…' : (isPublic ? '发布' : '保存')) }}</text>
+          <text>{{ isSkeleton ? '生成中' : (saveLock ? '保存中…' : '保存') }}</text>
         </button>
       </template>
       <template v-else>
@@ -407,6 +400,7 @@ const getPlaceholderImg = (idx) => {
 
 const goBack = () => uni.redirectTo({ url: '/pages/index/index' })
 const goExplore = () => uni.navigateTo({ url: '/pages/explore/index' })
+const goInspiration = () => uni.navigateTo({ url: '/pages/inspiration/index' })
 const goRefine = () => uni.navigateTo({ url: '/pages/refine/refine' })
 
 const previewImage = (current) => {
@@ -471,8 +465,8 @@ const shareToOfficial = () => {
   // #endif
 }
 
-// 公开到广场开关
-const isPublic = ref(false)
+// 公开到广场开关 - 仅管理员自动发布
+const isPublic = computed(() => userStore.userId === 1 || userStore.userId === '1')
 // 保存防抖锁（1.5s 内禁止重复点击）
 const saveLock = ref(false)
 
@@ -487,9 +481,8 @@ const travelStyleSlug = computed(() => {
 const saveToHistory = async () => {
   if (isSkeleton.value || saveLock.value) return
   if (!dayPlanItinerary.value.length) { uni.showToast({ title: '无行程可保存', icon: 'none' }); return }
-  if (isPublic.value && !travelStyleSlug.value) {
-    uni.showToast({ title: '请选择旅行风格', icon: 'none' }); return
-  }
+  // 自动发布检查：如果是管理员且没有分类，使用默认值
+  const finalCategory = travelStyleSlug.value || 'deep'
 
   // 立刻上锁，避免狂点
   saveLock.value = true
@@ -499,7 +492,7 @@ const saveToHistory = async () => {
   const coverUrl = (dayPlanItinerary.value.find(i => i.image)?.image) || ''
 
   try {
-    uni.showLoading({ title: isPublic.value ? '发布到广场…' : '保存中…' })
+    uni.showLoading({ title: '保存中…' })
     const result = await saveHistory({
       userInput: travelStore.currentPlan?.userInput || travelStore.preferences?.userInput || '行程方案',
       modelType: 'auto',
@@ -510,16 +503,14 @@ const saveToHistory = async () => {
       evidence: [],
       warnings: [],
       // v1.1+
-      category: travelStyleSlug.value,
+      category: finalCategory,
       is_public: isPublic.value,
       cover_url: coverUrl
     })
     uni.hideLoading()
-    if (result?.id) {
+      if (result?.id) {
       if (result.deduped) {
         uni.showToast({ title: '已存在相同方案', icon: 'none' })
-      } else if (isPublic.value) {
-        uni.showToast({ title: '已发布到广场', icon: 'success' })
       } else {
         uni.showToast({ title: '保存成功', icon: 'success' })
       }
@@ -598,17 +589,7 @@ const generateBackendLongPoster = async () => {
 
 .disclaimer { text-align: center; padding: 48rpx 40rpx 16rpx; font-size: 12px; color: #999; }
 
-.publish-row {
-  display: flex; align-items: center; justify-content: space-between;
-  margin: 0 32rpx 32rpx;
-  padding: 24rpx 28rpx;
-  border-radius: 20rpx;
-  background: linear-gradient(90deg, rgba(15,76,92,0.05), rgba(20,184,166,0.08));
-  border: 1px solid rgba(15,76,92,0.10);
-}
-.publish-info { display: flex; flex-direction: column; gap: 4rpx; flex: 1; }
-.publish-title { font-size: 14px; font-weight: 600; color: var(--color-primary); }
-.publish-sub { font-size: 11px; color: var(--color-on-surface-variant); opacity: 0.7; }
+/* 发布到广场样式已移除 */
 
 .hero-card {
   position: relative; overflow: hidden; border-radius: 16px;

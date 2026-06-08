@@ -64,7 +64,7 @@ V4_SKELETON_PROMPT = """你是一位行程规划专家。请根据用户需求�
 - 相邻天的地点应地理接近，合理安排路线
 - 如果用户未指定天数，默认 1 天
 - 必须输出真实经纬度（lat/lng）
-
+- 输出完毕之前在检查一下地点是否真实存在
 输出格式（严格 JSON，不要额外文字）：
 ```json
 {{
@@ -155,7 +155,7 @@ def _build_fill_prompt(skeleton: dict) -> str:
 
 # ========== 模型调用 ==========
 
-async def _call_model(provider: str, model: str, messages: List[Dict], request_id: str, max_tokens: int = 3000) -> Dict:
+async def _call_model(provider: str, model: str, messages: List[Dict], request_id: str) -> Dict:
     """单轮调用 AI 模型"""
     endpoint = API_ENDPOINTS.get(provider)
     api_keys = {
@@ -172,7 +172,7 @@ async def _call_model(provider: str, model: str, messages: List[Dict], request_i
     body = {
         "model": model,
         "messages": messages,
-        "max_tokens": max_tokens,
+        "max_tokens": 3000,
         "temperature": 0.15,
     }
 
@@ -366,26 +366,10 @@ def _build_framework(skeleton: dict, task_id: str) -> dict:
     }
 
 
-def _merge_fill_result(framework: dict, fill_data) -> dict:
+def _merge_fill_result(framework: dict, fill_data: dict) -> dict:
     """将填充结果合并到框架中"""
-    if not fill_data:
-        return framework
-
-    if isinstance(fill_data, list):
-        filled_itinerary = fill_data
-        social_recommendations = []
-    elif isinstance(fill_data, dict):
-        filled_itinerary = fill_data.get("itinerary", [])
-        social_recommendations = fill_data.get("socialRecommendations", [])
-    else:
-        return framework
-
-    name_to_filled = {}
-    for item in filled_itinerary:
-        if isinstance(item, dict):
-            name = item.get("name", "")
-            if name:
-                name_to_filled[name] = item
+    filled_itinerary = fill_data.get("itinerary", [])
+    name_to_filled = {item.get("name", ""): item for item in filled_itinerary}
 
     for item in framework.get("dayPlanItinerary", []):
         name = item.get("name", "")
@@ -397,12 +381,9 @@ def _merge_fill_result(framework: dict, fill_data) -> dict:
             item["time"] = filled.get("time", item.get("time", ""))
             item["transit_hint"] = filled.get("transit_hint", item.get("transit_hint", ""))
             item["city"] = filled.get("city", item.get("city", ""))
-            image_val = filled.get("image") or filled.get("image_url")
-            if image_val:
-                item["image"] = image_val
 
-    if social_recommendations:
-        framework["socialRecommendations"] = social_recommendations
+    if fill_data.get("socialRecommendations"):
+        framework["socialRecommendations"] = fill_data["socialRecommendations"]
 
     return framework
 
@@ -507,16 +488,15 @@ async def _execute_plan_v4_task(task_id: str, payload: Dict):
         ]
 
         print(f"[PlanV4 {task_id}] Step 1/3: Generating skeleton...")
-        skeleton_msg = await _call_model(provider, model, skeleton_messages, task_id, max_tokens=5000)
+        skeleton_msg = await _call_model(provider, model, skeleton_messages, task_id)
         skeleton_content = skeleton_msg.get("content", "")
 
         if not skeleton_content:
             raise ValueError("骨架生成失败：模型返回为空")
 
         skeleton = _parse_json_from_model(skeleton_content)
-        if not skeleton or not isinstance(skeleton, dict):
-            print(f"[PlanV4 {task_id}] 骨架解析失败, content_len={len(skeleton_content)}, head={skeleton_content[:200]!r}, tail={skeleton_content[-200:]!r}")
-            raise ValueError(f"骨架解析失败：长度={len(skeleton_content)} 头={skeleton_content[:120]!r}")
+        if not skeleton or not skeleton.get("daily_plan"):
+            raise ValueError(f"骨架解析失败：{skeleton_content[:200]}")
 
         city = skeleton.get("city", "")
         days = skeleton.get("days", 1)
@@ -568,14 +548,17 @@ async def _execute_plan_v4_task(task_id: str, payload: Dict):
 
         if fill_content:
             fill_data = _parse_json_from_model(fill_content)
-            if fill_data:
+            if fill_data and isinstance(fill_data, dict):
                 framework = _merge_fill_result(framework, fill_data)
-                if isinstance(fill_data, list):
-                    fill_count = len(fill_data)
-                else:
-                    fill_count = len(fill_data.get("itinerary", []))
-                mcp_trace.append(f"plan_v4:{task_id}:fill_merged:{fill_count}_items")
-                print(f"[PlanV4 {task_id}] Fill merged: {fill_count} items")
+                mcp_trace.append(f"plan_v4:{task_id}:fill_merged:{len(fill_data.get('itinerary', []))}_items")
+                print(f"[PlanV4 {task_id}] Fill merged: {len(fill_data.get('itinerary', []))} items")
+            elif fill_data and isinstance(fill_data, list):
+                # AI 返回了数组格式，尝试转换
+                mcp_trace.append(f"plan_v4:{task_id}:fill_list_converted")
+                print(f"[PlanV4 {task_id}] Fill returned list, converting...")
+                fill_dict = {"itinerary": fill_data}
+                framework = _merge_fill_result(framework, fill_dict)
+                mcp_trace.append(f"plan_v4:{task_id}:fill_merged:{len(fill_data)}_items")
             else:
                 mcp_trace.append(f"plan_v4:{task_id}:fill_parse_failed")
                 print(f"[PlanV4 {task_id}] Fill parse failed, using skeleton only")
