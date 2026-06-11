@@ -1,0 +1,14 @@
+{
+  "pages": [
+    {
+      "path": "pages/ai-plan-detail/index",
+      "name": "行程详情",
+      "description": "展示完整旅行行程方案，包含每日景点安排、天气、交通和社交推荐"
+    },
+    {
+      "path": "pages/plan/plan",
+      "name": "行程详情",
+      "description": "展示用户已保存的完整行程方案时间线"
+    }
+  ]
+}

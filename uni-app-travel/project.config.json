@@ -18,7 +18,12 @@
   "simulatorPluginLibVersion": {},
   "packOptions": {
     "ignore": [],
-    "include": []
+    "include": [
+      {
+        "value": "ai-skill/**",
+        "type": "folder"
+      }
+    ]
   },
   "appid": "touristappid",
   "editorSetting": {}

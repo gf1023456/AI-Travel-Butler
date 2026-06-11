@@ -20,7 +20,26 @@
       "urlCheck": false
     },
     "usingComponents": true,
-    "requiredPrivateInfos": ["getLocation", "chooseLocation"]
+    "lazyCodeLoading": "requiredComponents",
+    "requiredPrivateInfos": ["getLocation", "chooseLocation"],
+    "subPackages": [
+      {
+        "root": "ai-skill",
+        "independent": true,
+        "pages": []
+      }
+    ],
+    "agent": {
+      "skills": [
+        {
+          "name": "travel-plan",
+          "description": "AI智能旅行规划",
+          "path": "ai-skill/travel-plan"
+        }
+      ],
+      "instruction": "ai-skill/AGENTS.md",
+      "pageMetadata": "ai-skill/page-meta.json"
+    }
   },
   "h5": {
     "title": "行程一下旅行助手",

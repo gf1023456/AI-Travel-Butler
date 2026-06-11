@@ -93,6 +93,13 @@
         "navigationBarTitleText": "灵感库",
         "navigationStyle": "custom"
       }
+    },
+    {
+      "path": "pages/ai-plan-detail/index",
+      "style": {
+        "navigationBarTitleText": "行程方案",
+        "navigationStyle": "custom"
+      }
     }
   ],
   "globalStyle": {

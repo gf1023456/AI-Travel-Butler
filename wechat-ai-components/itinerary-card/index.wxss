@@ -1,0 +1,75 @@
+.card {
+  padding: 14px;
+  background: #ffffff;
+  border-radius: 12px;
+}
+
+/* header */
+.header { margin-bottom: 12px; }
+.header-top { display: flex; align-items: center; justify-content: space-between; }
+.title { font-size: 17px; font-weight: 700; color: #0f172a; }
+.days-badge {
+  font-size: 11px; font-weight: 600; color: #2563eb;
+  background: #eff6ff; padding: 2px 8px; border-radius: 6px;
+}
+.style-tag {
+  font-size: 12px; color: #64748b; margin-top: 2px; display: block;
+}
+.weather-bar { display: flex; gap: 10px; margin-top: 6px; }
+.weather-item { display: flex; align-items: center; gap: 2px; }
+.weather-icon { font-size: 14px; }
+.weather-temp { font-size: 11px; color: #64748b; }
+
+/* day block */
+.day-block { margin-bottom: 12px; }
+.day-header { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.day-label {
+  font-size: 12px; font-weight: 600; color: #2563eb;
+  background: #eff6ff; padding: 1px 8px; border-radius: 4px;
+}
+.day-date { font-size: 11px; color: #94a3b8; }
+
+/* poi item */
+.poi-item {
+  display: flex; align-items: flex-start;
+  padding: 8px; margin-bottom: 6px;
+  background: #f8fafc; border-radius: 8px;
+}
+.poi-left { width: 58px; flex-shrink: 0; }
+.poi-time { font-size: 10px; color: #94a3b8; }
+.poi-dot {
+  width: 6px; height: 6px; background: #2563eb;
+  border-radius: 50%; margin: 4px 8px 0 0; flex-shrink: 0;
+}
+.poi-body { flex: 1; min-width: 0; }
+.poi-title-row { display: flex; align-items: center; gap: 6px; }
+.poi-name { font-size: 13px; font-weight: 500; color: #0f172a; }
+.poi-category {
+  font-size: 9px; color: #8b5cf6; background: #f5f3ff;
+  padding: 0 5px; border-radius: 3px;
+}
+.poi-desc { font-size: 11px; color: #64748b; margin-top: 2px; display: block; }
+.poi-meta { display: flex; gap: 8px; margin-top: 3px; flex-wrap: wrap; }
+.meta-weather { font-size: 10px; color: #f59e0b; }
+.meta-transit { font-size: 10px; color: #3b82f6; }
+
+/* recommend */
+.recommend { margin-top: 8px; padding-top: 10px; border-top: 1px solid #f1f5f9; }
+.section-title { font-size: 12px; font-weight: 600; color: #0f172a; margin-bottom: 6px; display: block; }
+.rec-scroll { display: flex; flex-direction: row; overflow-x: auto; white-space: nowrap; }
+.rec-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: #fef2f2; border-radius: 16px;
+  padding: 4px 10px; margin-right: 6px;
+}
+.rec-rank { font-size: 10px; font-weight: 600; color: #ef4444; }
+.rec-name { font-size: 11px; color: #0f172a; }
+.rec-score { font-size: 9px; color: #f97316; background: #fff7ed; padding: 0 4px; border-radius: 3px; }
+
+/* actions */
+.actions { display: flex; gap: 8px; margin-top: 10px; }
+.btn { flex: 1; border-radius: 8px; padding: 10px; text-align: center; }
+.btn-primary { background: #2563eb; }
+.btn-primary text { font-size: 12px; font-weight: 500; color: #ffffff; }
+.btn-secondary { background: #f1f5f9; }
+.btn-secondary text { font-size: 12px; font-weight: 500; color: #475569; }

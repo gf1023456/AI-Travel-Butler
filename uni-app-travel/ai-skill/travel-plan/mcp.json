@@ -1,0 +1,83 @@
+{
+  "apis": [
+    {
+      "name": "generateTravelPlan",
+      "description": "根据用户目的地、天数、风格偏好生成完整旅行行程，包含每日景点安排、社交推荐和天气信息",
+      "_meta": {
+        "ui": {
+          "componentPath": "components/itinerary-card"
+        }
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "destination": {
+            "type": "string",
+            "description": "目的地城市名，如『西安』『成都』『北京』。用户说想去哪里就填哪里。"
+          },
+          "days": {
+            "type": "number",
+            "description": "旅行天数。如用户说『三天』则填 3，说『周末』则填 2。未明确说出天数时不要填写。"
+          },
+          "style": {
+            "type": "string",
+            "description": "旅行风格，可选：深度文化慢游 | 特种兵极限打卡 | 躺平休闲度假 | 摄影出片之旅。未明确说出风格时不要填写。"
+          },
+          "preferences": {
+            "type": "string",
+            "description": "用户额外偏好描述，如『喜欢美食』『带老人小孩』『预算有限』。用户未提及时不填。"
+          }
+        },
+        "required": ["destination"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "destination": { "type": "string" },
+          "days": { "type": "number" },
+          "dayPlanItinerary": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "day": { "type": "number" },
+                "sequence": { "type": "number" },
+                "name": { "type": "string" },
+                "description": { "type": "string" },
+                "time": { "type": "string" },
+                "lat": { "type": "string" },
+                "lng": { "type": "string" },
+                "category": { "type": "string" },
+                "weather_icon": { "type": "string" },
+                "temperature": { "type": "string" },
+                "transit_hint": { "type": "string" },
+                "visit_duration": { "type": "string" }
+              }
+            }
+          },
+          "socialRecommendations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "rank": { "type": "number" },
+                "title": { "type": "string" },
+                "platform": { "type": "string" },
+                "hot_score": { "type": "string" },
+                "reason": { "type": "string" }
+              }
+            }
+          },
+          "weatherSummary": { "type": "array" },
+          "requestId": { "type": "string" }
+        }
+      }
+    }
+  ],
+  "components": [
+    {
+      "path": "components/itinerary-card",
+      "relatedPage": "/pages/ai-plan-detail/index"
+    }
+  ]
+}

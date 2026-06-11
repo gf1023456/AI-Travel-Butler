@@ -1,0 +1,78 @@
+<view class="card">
+  <!-- 头部：目的地 + 天气概览 -->
+  <view class="header">
+    <view class="header-top">
+      <text class="title">{{destination}}</text>
+      <text class="days-badge">{{daysNum}}天</text>
+    </view>
+    <text class="style-tag">{{style}}</text>
+    <view class="weather-bar" wx:if="{{weatherSummary.length}}">
+      <view class="weather-item" wx:for="{{weatherSummary}}" wx:key="index">
+        <text class="weather-icon">{{item.icon}}</text>
+        <text class="weather-temp">{{item.temp}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 每日行程预览（只展示第1天） -->
+  <view class="day-block" wx:for="{{previewDays}}" wx:key="day">
+    <view class="day-header">
+      <text class="day-label">第{{item.day}}天</text>
+      <text class="day-date">{{item.date}}</text>
+    </view>
+    <view class="poi-list">
+      <view
+        class="poi-item"
+        wx:for="{{item.pois}}"
+        wx:key="sequence"
+        data-index="{{index}}"
+        data-day="{{item.day}}"
+        catch:tap="onPoiTap"
+      >
+        <view class="poi-left">
+          <text class="poi-time">{{item.time}}</text>
+        </view>
+        <view class="poi-dot"></view>
+        <view class="poi-body">
+          <view class="poi-title-row">
+            <text class="poi-name">{{item.name}}</text>
+            <text class="poi-category" wx:if="{{item.category}}">{{item.category}}</text>
+          </view>
+          <text class="poi-desc">{{item.description}}</text>
+          <view class="poi-meta">
+            <text class="meta-weather" wx:if="{{item.weather_icon}}">{{item.weather_icon}} {{item.temperature}}</text>
+            <text class="meta-transit" wx:if="{{item.transit_hint}}">{{item.transit_hint}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 社交推荐 -->
+  <view class="recommend" wx:if="{{socialRecommendations.length}}">
+    <text class="section-title">🔥 热门推荐</text>
+    <scroll-view scroll-x class="rec-scroll">
+      <view
+        class="rec-chip"
+        wx:for="{{socialRecommendations}}"
+        wx:key="rank"
+        data-name="{{item.title}}"
+        catch:tap="onRecommendTap"
+      >
+        <text class="rec-rank">#{{item.rank}}</text>
+        <text class="rec-name">{{item.title}}</text>
+        <text class="rec-score">{{item.hot_score}}</text>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 操作按钮 -->
+  <view class="actions">
+    <view catch:tap="onViewDetail" class="btn btn-primary">
+      <text>查看完整行程</text>
+    </view>
+    <view catch:tap="onViewMap" class="btn btn-secondary" wx:if="{{hasCoordinates}}">
+      <text>🗺️ 地图</text>
+    </view>
+  </view>
+</view>
