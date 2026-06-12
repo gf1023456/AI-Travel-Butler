@@ -3,7 +3,6 @@ const skill = wx.modelContext.createSkill('ai-skill/travel-plan')
 
 skill.registerAPI('generateTravelPlan', generatePlan)
 
-// 中间件：统一登录态 + 错误上报
 skill.use(async (ctx, next) => {
   const start = Date.now()
   try {

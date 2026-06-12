@@ -14,18 +14,19 @@ Component({
           daysNum: plan.days || days.length,
           style: guessStyle(plan.itinerarySummary),
           weatherSummary: plan.weatherSummary || extractWeather(pois),
-          previewDays: days.slice(0, 1),
-          moreDays: Math.max(0, days.length - 1),
+          allDays: days,
           socialRecommendations: (plan.socialRecommendations || []).slice(0, 5),
           planId: plan.requestId || ''
         })
 
-        this._fullDays = days
         this._fullPois = pois
-        this._planData = plan
 
         const viewCtx = wx.modelContext.getViewContext(this)
         viewCtx.setRelatedPage({ query: `planId=${plan.requestId || ''}` })
+
+        try {
+          wx.setStorageSync('ai_current_plan', plan)
+        } catch (e) {}
       })
     }
   },

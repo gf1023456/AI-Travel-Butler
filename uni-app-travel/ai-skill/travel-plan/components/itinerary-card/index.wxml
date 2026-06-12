@@ -1,5 +1,4 @@
 <view class="card">
-  <!-- 头部 -->
   <view class="header">
     <view class="header-top">
       <text class="title">{{destination}}</text>
@@ -14,56 +13,23 @@
     </view>
   </view>
 
-  <!-- 每日行程预览（只展示第1天） -->
-  <view class="day-block" wx:for="{{previewDays}}" wx:key="day">
-    <view class="day-header">
-      <text class="day-label">第{{item.day}}天</text>
-      <text class="day-theme" wx:if="{{item.theme}}">{{item.theme}}</text>
-    </view>
-    <view class="poi-list">
-      <view
-        class="poi-item"
-        wx:for="{{item.pois}}"
-        wx:key="sequence"
-        data-day="{{item.day}}"
-        data-seq="{{item.sequence}}"
-        catch:tap="onPoiTap"
-      >
-        <view class="poi-left">
-          <text class="poi-time">{{item.time}}</text>
-        </view>
-        <view class="poi-dot"></view>
-        <view class="poi-body">
-          <view class="poi-title-row">
-            <text class="poi-name">{{item.name}}</text>
-            <text class="poi-cat" wx:if="{{item.category}}">{{item.category}}</text>
-          </view>
-          <text class="poi-desc">{{item.description}}</text>
-          <view class="poi-meta">
-            <text class="meta-weather" wx:if="{{item.weather_icon}}">{{item.weather_icon}} {{item.temperature}}</text>
-            <text class="meta-transit" wx:if="{{item.transit_hint}}">{{item.transit_hint}}</text>
-          </view>
-        </view>
+  <view class="preview" wx:if="{{allDays.length}}">
+    <view class="day-block" wx:for="{{allDays}}" wx:key="day">
+      <view class="day-head">
+        <text class="day-label">D{{item.day}}</text>
+        <text class="day-theme" wx:if="{{item.theme}}">{{item.theme}}</text>
+      </view>
+      <view class="poi-chips">
+        <text class="poi-chip" wx:for="{{item.pois}}" wx:key="sequence" data-day="{{item.day}}" data-seq="{{item.sequence}}" catch:tap="onPoiTap">
+          {{item.name}}
+        </text>
       </view>
     </view>
   </view>
 
-  <!-- 剩余天数提示 -->
-  <view class="more-hint" wx:if="{{moreDays > 0}}" catch:tap="onViewDetail">
-    <text>还有 {{moreDays}} 天行程 👉 查看完整方案</text>
-  </view>
-
-  <!-- 社交推荐 -->
   <view class="recommend" wx:if="{{socialRecommendations.length}}">
-    <text class="section-title">🔥 热门推荐</text>
-    <scroll-view scroll-x class="rec-scroll" scroll-with-animation="{{false}}">
-      <view
-        class="rec-chip"
-        wx:for="{{socialRecommendations}}"
-        wx:key="rank"
-        data-name="{{item.title}}"
-        catch:tap="onRecommendTap"
-      >
+    <scroll-view scroll-x class="rec-scroll">
+      <view class="rec-chip" wx:for="{{socialRecommendations}}" wx:key="rank" data-name="{{item.title}}" catch:tap="onRecommendTap">
         <text class="rec-rank">#{{item.rank}}</text>
         <text class="rec-name">{{item.title}}</text>
         <text class="rec-score" wx:if="{{item.hot_score}}">{{item.hot_score}}</text>
@@ -71,10 +37,7 @@
     </scroll-view>
   </view>
 
-  <!-- 操作按钮 -->
-  <view class="actions">
-    <view catch:tap="onViewDetail" class="btn btn-primary">
-      <text>查看完整行程</text>
-    </view>
+  <view catch:tap="onViewDetail" class="btn">
+    <text>查看完整行程方案</text>
   </view>
 </view>

@@ -5,7 +5,7 @@
       "description": "根据用户目的地、天数、风格偏好生成完整旅行行程，包含每日景点安排、社交推荐和天气信息",
       "_meta": {
         "ui": {
-          "componentPath": "components/itinerary-card"
+          "componentPath": "components/itinerary-card/index"
         }
       },
       "inputSchema": {
@@ -76,7 +76,7 @@
   ],
   "components": [
     {
-      "path": "components/itinerary-card",
+      "path": "components/itinerary-card/index",
       "relatedPage": "/pages/ai-plan-detail/index"
     }
   ]

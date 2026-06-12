@@ -33,7 +33,7 @@
       "skills": [
         {
           "name": "travel-plan",
-          "description": "AI智能旅行规划",
+          "description": "智能旅行规划",
           "path": "ai-skill/travel-plan"
         }
       ],

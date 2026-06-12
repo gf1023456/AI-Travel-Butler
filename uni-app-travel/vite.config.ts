@@ -20,6 +20,24 @@ function copyAiSkillPlugin() {
         if (!fs.existsSync(path.dirname(distDir))) continue
         copyRecursive(srcDir, distDir)
         console.log(`[copy-ai-skill] Copied to ${distDir}`)
+        // Also patch project.config.json to include ai-skill files
+        const projectConfigPath = path.resolve(distDir, '..', 'project.config.json')
+        if (fs.existsSync(projectConfigPath)) {
+          try {
+            let raw = fs.readFileSync(projectConfigPath, 'utf-8')
+            raw = raw.replace(/^\uFEFF/, '')
+            const cfg = JSON.parse(raw)
+            if (!cfg.packOptions) cfg.packOptions = {}
+            if (!cfg.packOptions.includes) cfg.packOptions.includes = []
+            if (!cfg.packOptions.includes.find(i => i.value === 'ai-skill/**')) {
+              cfg.packOptions.includes.push({ value: 'ai-skill/**' })
+            }
+            fs.writeFileSync(projectConfigPath, JSON.stringify(cfg, null, 2), 'utf-8')
+            console.log(`[copy-ai-skill] Patched ${projectConfigPath}`)
+          } catch (e) {
+            console.error(`[copy-ai-skill] Failed to patch project.config.json:`, e)
+          }
+        }
       }
     }
   }
