@@ -191,7 +191,7 @@ const copyPlanToMine = () => {
     evidence: p.evidence || [],
     warnings: p.warnings || [],
     // 保留原方案的 category（旅行风格）到 currentPlan，让保存页能取到
-    category: p.category || travelStore.preferences?.travelMode || 'family',
+    category: p.category || travelStore.preferences?.travelMode || 'city',
     isFromHistory: true,
     historyId: p.id
   }

@@ -408,16 +408,15 @@ const userInput = ref('')
 const travelModeIndex = ref(0)
 const charCount = computed(() => userInput.value.length)
 
-// 8 风格（平台主推）
+// 7 风格（平台主推）
 const travelStyles = [
-  { slug: 'family',  name: TRAVEL_STYLES.family.name,  icon: TRAVEL_STYLES.family.icon },
-  { slug: 'couple',  name: TRAVEL_STYLES.couple.name,  icon: TRAVEL_STYLES.couple.icon },
+  { slug: 'city',    name: TRAVEL_STYLES.city.name,    icon: TRAVEL_STYLES.city.icon },
   { slug: 'photo',   name: TRAVEL_STYLES.photo.name,   icon: TRAVEL_STYLES.photo.icon },
-  { slug: 'walk',    name: TRAVEL_STYLES.walk.name,    icon: TRAVEL_STYLES.walk.icon },
   { slug: 'food',    name: TRAVEL_STYLES.food.name,    icon: TRAVEL_STYLES.food.icon },
+  { slug: 'couple',  name: TRAVEL_STYLES.couple.name,  icon: TRAVEL_STYLES.couple.icon },
+  { slug: 'family',  name: TRAVEL_STYLES.family.name,  icon: TRAVEL_STYLES.family.icon },
   { slug: 'rusher',  name: TRAVEL_STYLES.rusher.name,  icon: TRAVEL_STYLES.rusher.icon },
-  { slug: 'budget',  name: TRAVEL_STYLES.budget.name,  icon: TRAVEL_STYLES.budget.icon },
-  { slug: 'slow',    name: TRAVEL_STYLES.slow.name,    icon: TRAVEL_STYLES.slow.icon },
+  { slug: 'road',    name: TRAVEL_STYLES.road.name,    icon: TRAVEL_STYLES.road.icon },
 ]
 
 // Spinning wheel
