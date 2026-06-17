@@ -61,6 +61,7 @@ V4_SKELETON_PROMPT = """你是一位行程规划专家。请根据用户需求�
 - 每天至少 3 个地点
 - 地点必须是真实存在的景点
 - 每个地点需要一句话简介（15-30字），包含看点或特色
+- 每个地点需要一句话推荐理由（15-25字，有温度感，像朋友在推荐）
 - 相邻天的地点应地理接近，合理安排路线
 - 如果用户未指定天数，默认 1 天
 - 必须输出真实经纬度（lat/lng）
@@ -76,9 +77,9 @@ V4_SKELETON_PROMPT = """你是一位行程规划专家。请根据用户需求�
     {{
       "day": 1,
       "locations": [
-        {{"name": "景点1", "brief": "景点简介（15-30字）", "lat": 39.9, "lng": 116.4}},
-        {{"name": "景点2", "brief": "景点简介（15-30字）", "lat": 39.95, "lng": 116.45}},
-        {{"name": "景点3", "brief": "景点简介（15-30字）", "lat": 40.0, "lng": 116.5}}
+        {{"name": "景点1", "brief": "景点简介（15-30字）", "reason": "推荐理由（15-25字，有温度感）", "lat": 39.9, "lng": 116.4}},
+        {{"name": "景点2", "brief": "景点简介（15-30字）", "reason": "推荐理由（15-25字，有温度感）", "lat": 39.95, "lng": 116.45}},
+        {{"name": "景点3", "brief": "景点简介（15-30字）", "reason": "推荐理由（15-25字，有温度感）", "lat": 40.0, "lng": 116.5}}
       ]
     }}
   ]
@@ -118,6 +119,7 @@ def _build_fill_prompt(skeleton: dict) -> str:
 
 请为每个地点输出：
 - description: 50字以上介绍（包含看点和游玩建议）
+- reason: 一句话推荐理由（为什么推荐这个景点给用户，15-25字，要有温度感，像朋友在推荐）
 - lat: 真实纬度
 - lng: 真实经度
 - time: 建议游览时间段（如 "09:00 - 11:00"）
@@ -130,6 +132,7 @@ def _build_fill_prompt(skeleton: dict) -> str:
     {{
       "name": "地点名",
       "description": "...",
+      "reason": "推荐理由（一句话，有温度感）",
       "lat": 39.9,
       "lng": 116.4,
       "time": "09:00 - 11:00",
@@ -155,7 +158,7 @@ def _build_fill_prompt(skeleton: dict) -> str:
 
 # ========== 模型调用 ==========
 
-async def _call_model(provider: str, model: str, messages: List[Dict], request_id: str) -> Dict:
+async def _call_model(provider: str, model: str, messages: List[Dict], request_id: str, max_tokens: int = 5000) -> Dict:
     """单轮调用 AI 模型"""
     endpoint = API_ENDPOINTS.get(provider)
     api_keys = {
@@ -172,7 +175,7 @@ async def _call_model(provider: str, model: str, messages: List[Dict], request_i
     body = {
         "model": model,
         "messages": messages,
-        "max_tokens": 3000,
+        "max_tokens": max_tokens,
         "temperature": 0.15,
     }
 
@@ -203,32 +206,70 @@ async def _call_model(provider: str, model: str, messages: List[Dict], request_i
 
 # ========== 解析函数 ==========
 
+def _extract_balanced_json(text: str, start: int = 0, open_char: str = '{', close_char: str = '}') -> str:
+    """通过括号深度匹配提取嵌套 JSON 字符串"""
+    i = start
+    # 跳过开头空白
+    while i < len(text) and text[i] in ' \t\n\r':
+        i += 1
+    if i >= len(text) or text[i] != open_char:
+        return ''
+    
+    depth = 0
+    in_string = False
+    escape = False
+    for j in range(i, len(text)):
+        c = text[j]
+        if escape:
+            escape = False
+            continue
+        if c == '\\' and in_string:
+            escape = True
+            continue
+        if c == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if c == open_char:
+            depth += 1
+        elif c == close_char:
+            depth -= 1
+            if depth == 0:
+                return text[i:j+1]
+    return ''
+
+
 def _parse_json_from_model(content: str) -> dict:
     """从模型输出中提取 JSON，增强容错性"""
     if not content:
         return {}
     
-    # 方法1：尝试从代码 block 中提取
-    match = re.search(r'```json\s*(\[[\s\S]*?\]|\{[\s\S]*?\})\s*```', content, re.DOTALL)
+    # 方法1：尝试从代码 block 中提取（支持嵌套）
+    match = re.search(r'```json\s*', content, re.DOTALL)
     if match:
+        start = match.end()
+        # 用括号深度匹配找到对应的结束位置
+        json_str = _extract_balanced_json(content, start)
+        if json_str:
+            try:
+                return json.loads(json_str)
+            except:
+                pass
+    
+    # 方法2：尝试提取数组形式 [ ... ]（支持嵌套）
+    json_str = _extract_balanced_json(content, 0, open_char='[', close_char=']')
+    if json_str:
         try:
-            return json.loads(match.group(1))
+            return json.loads(json_str)
         except:
             pass
     
-    # 方法2：尝试提取数组形式 [ ... ]
-    match = re.search(r'\[\s*\{[\s\S]*?\}\s*\]', content, re.DOTALL)
-    if match:
+    # 方法3：尝试提取对象形式 { ... }（支持嵌套）
+    json_str = _extract_balanced_json(content, 0, open_char='{', close_char='}')
+    if json_str:
         try:
-            return json.loads(match.group(0))
-        except:
-            pass
-    
-    # 方法3：尝试提取对象形式 { ... }
-    match = re.search(r'\{[\s\S]*\}', content, re.DOTALL)
-    if match:
-        try:
-            result = json.loads(match.group(0))
+            result = json.loads(json_str)
             if isinstance(result, dict):
                 return result
         except:
@@ -341,6 +382,7 @@ def _build_framework(skeleton: dict, task_id: str) -> dict:
                 "name": name,
                 "city": city,
                 "description": brief,
+                "reason": loc_info.get("reason", "") if isinstance(loc_info, dict) else "",
                 "lat": item_lat,
                 "lng": item_lng,
                 "time": "",
@@ -376,6 +418,7 @@ def _merge_fill_result(framework: dict, fill_data: dict) -> dict:
         if name in name_to_filled:
             filled = name_to_filled[name]
             item["description"] = filled.get("description", item.get("description", ""))
+            item["reason"] = filled.get("reason", "")
             item["lat"] = filled.get("lat", item.get("lat", 0.0))
             item["lng"] = filled.get("lng", item.get("lng", 0.0))
             item["time"] = filled.get("time", item.get("time", ""))

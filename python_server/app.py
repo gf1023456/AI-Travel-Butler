@@ -63,6 +63,7 @@ from routes import user_router, history_router, quota_router, weather_router, lo
 from routes.plan_v2 import router as plan_v2_router
 from routes.plan_v3 import router as plan_v3_router
 from routes.plan_v4 import router as plan_v4_router
+from routes.skeleton_confirm import router as skeleton_confirm_router
 
 from routes.poster import router as poster_router
 from routes.random_city import router as random_city_router
@@ -81,15 +82,18 @@ app.include_router(location_router)
 app.include_router(plan_v2_router)
 app.include_router(plan_v3_router)
 app.include_router(plan_v4_router)
+app.include_router(skeleton_confirm_router)
 
 @app.on_event("startup")
 async def startup_plan_cleanup():
     from routes.plan_v2 import _cleanup_old_tasks as v2_cleanup
     from routes.plan_v3 import _cleanup_old_tasks as v3_cleanup
     from routes.plan_v4 import _cleanup_v4_tasks as v4_cleanup
+    from routes.skeleton_confirm import _cleanup_skeleton_confirm_tasks as skeleton_cleanup
     asyncio.create_task(v2_cleanup())
     asyncio.create_task(v3_cleanup())
     asyncio.create_task(v4_cleanup())
+    asyncio.create_task(skeleton_cleanup())
 
 knowledge_cache = None
 execution_log_store: Dict[str, Dict] = {}

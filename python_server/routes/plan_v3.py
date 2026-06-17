@@ -87,6 +87,7 @@ DAY_FILL_PROMPT = """你是一位专业的旅游规划专家。请为指定城�
       "name": "地点名称（必须与列表中一致）",
       "city": "{city}",
       "description": "景点介绍（50字以上，包含看点和游玩建议）",
+      "reason": "推荐理由（一句话，15-25字，有温度感）",
       "lat": 39.9042,
       "lng": 116.4074,
       "time": "09:00 - 11:00",
@@ -329,6 +330,7 @@ def _build_framework_from_skeleton(skeleton: dict, task_id: str, provider: str) 
                 "name": name,
                 "city": city,
                 "description": brief,  # 使用 brief 作为 description
+                "reason": "",
                 "lat": round(center["lat"] + offset, 4),
                 "lng": round(center["lng"] + offset, 4),
                 "time": slot["time"],
@@ -373,6 +375,8 @@ def _merge_day_fill(framework: dict, day_num: int, filled_items: List[Dict]) -> 
             filled = name_to_filled[name]
             if filled.get("description"):
                 item["description"] = filled["description"]
+            if filled.get("reason"):
+                item["reason"] = filled["reason"]
             if filled.get("lat") and filled["lat"] != 0.0:
                 item["lat"] = filled["lat"]
             if filled.get("lng") and filled["lng"] != 0.0:

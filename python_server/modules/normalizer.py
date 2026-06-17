@@ -61,6 +61,7 @@ def normalize_location(item: Dict[str, Any], provider: str) -> Dict[str, Any]:
         "name": str(name) if name else "未知地点",
         "city": str(city) if city else "",
         "description": str(item.get("description", "")),
+        "reason": str(item.get("reason", "")),
         "lat": float(lat) if lat else 34.3416,
         "lng": float(lng) if lng else 108.9398,
         "time": str(item.get("time", "")),
