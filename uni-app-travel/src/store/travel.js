@@ -26,7 +26,7 @@ export const useTravelStore = defineStore('travel', {
       userInput: '',
       modelType: 'auto',
       isPlannerMode: false,
-      travelMode: 'deep'
+      travelMode: 'city'
     },
     // 优化任务状态（持久化，跨页面保持）
     refineTask: {
@@ -103,7 +103,7 @@ export const useTravelStore = defineStore('travel', {
           userInput: params.userInput,
           modelType: params.modelType,
           isPlannerMode: params.isPlannerMode || false,
-          travelMode: params.travelMode || 'deep'
+          travelMode: params.travelMode || 'city'
         }).catch(async (apiError) => {
           // 检查是否是配额不足的错误
           const errorMsg = apiError.message || ''
@@ -186,7 +186,7 @@ export const useTravelStore = defineStore('travel', {
         const createRes = await travelApi.createPlanV2({
           userInput: params.userInput,
           modelType: params.modelType || 'auto',
-          travelMode: params.travelMode || 'deep'
+          travelMode: params.travelMode || 'city'
         }).catch((apiError) => {
           const errorMsg = apiError.message || ''
           if (errorMsg.includes('quota') || errorMsg.includes('配额') || errorMsg.includes('次数')) {
@@ -311,7 +311,7 @@ export const useTravelStore = defineStore('travel', {
         const createRes = await travelApi.createPlanV3({
           userInput: params.userInput,
           modelType: params.modelType || 'auto',
-          travelMode: params.travelMode || 'deep'
+          travelMode: params.travelMode || 'city'
         }).catch((apiError) => {
           const errorMsg = apiError.message || ''
           if (errorMsg.includes('quota') || errorMsg.includes('配额') || errorMsg.includes('次数')) {
@@ -532,7 +532,7 @@ export const useTravelStore = defineStore('travel', {
         const createRes = await travelApi.createPlanV4({
           userInput: params.userInput,
           modelType: params.modelType || 'auto',
-          travelMode: params.travelMode || 'deep'
+          travelMode: params.travelMode || 'city'
         }).catch((apiError) => {
           const errorMsg = apiError.message || ''
           if (errorMsg.includes('quota') || errorMsg.includes('配额') || errorMsg.includes('次数')) {
@@ -581,19 +581,19 @@ export const useTravelStore = defineStore('travel', {
               console.log('[TravelStore V4] Status:', status)
 
               if (status === 'skeleton_ready') {
-                // 骨架已就绪，立即存储并跳转，让用户有感知
+                // 骨架已就绪，立即存储并跳转到确认页
                 const skeleton = await travelApi.getPlanV4Result(taskId)
                 console.log('[TravelStore V4] Skeleton ready, locations:', (skeleton.dayPlanItinerary && skeleton.dayPlanItinerary.length) || 0)
 
-                // 标记为骨架态：保存/分享按钮要禁用，等填充完毕才放开
+                // 标记为骨架态
                 skeleton.isSkeleton = true
                 skeleton._taskId = taskId
 
-                // 先存储骨架数据，让前端可以立即展示
+                // 先存储骨架数据
                 this.currentPlan = skeleton
                 this.planHistory.push(skeleton)
 
-                // 骨架阶段立即扣减配额，让用户感知"已开始使用"
+                // 骨架阶段立即扣减配额
                 try {
                   await useQuota()
                   console.log('[TravelStore V4] 骨架就绪，配额已扣减')
@@ -601,14 +601,11 @@ export const useTravelStore = defineStore('travel', {
                   console.error('[TravelStore V4] 配额扣减失败:', quotaError)
                 }
 
-                // 骨架阶段就先跳转页面，用户可以看到行程列表
+                // P1: 跳转到确认/调整页，让用户确认后再生成完整方案
                 uni.hideLoading()
-                this.loading = false // 重置 loading 状态
-                uni.showToast({ title: '骨架已生成，正在填充详情...', icon: 'none', duration: 2000 })
-                uni.reLaunch({ url: '/pages/index/index' })
+                this.loading = false
+                uni.navigateTo({ url: '/pages/skeleton-confirm/index' })
 
-                // 继续在后台轮询直到完成（不影响用户操作）
-                this._v4BackgroundPoll(taskId)
                 resolve(skeleton)
                 return
               }
@@ -729,7 +726,7 @@ export const useTravelStore = defineStore('travel', {
           userInput: params.userInput,
           modelType: params.modelType,
           isPlannerMode: params.isPlannerMode !== false,
-          travelMode: params.travelMode || 'deep',
+          travelMode: params.travelMode || 'city',
           refineInstruction: params.refineInstruction,
           basePlan: params.basePlan
         })
@@ -868,6 +865,119 @@ export const useTravelStore = defineStore('travel', {
       if (!this.currentPlan?.dayPlanItinerary) return
       this.currentPlan.dayPlanItinerary[index].time = time
       this.currentPlan = { ...this.currentPlan }
+    },
+
+    /**
+     * P1: 确认骨架并生成完整方案
+     * @param {Object} params - 包含 confirmedSpots, adjustments, onSuccess, onError
+     */
+    async confirmAndGenerateFullPlan(params) {
+      console.log('[TravelStore] confirmAndGenerateFullPlan 被调用', params)
+      const { confirmedSpots, adjustments, onSuccess, onError } = params
+      
+      console.log('[TravelStore] currentPlan:', this.currentPlan?._taskId ? '有taskId' : '无taskId', this.currentPlan?._taskId)
+      this.loading = true
+      this.error = null
+      
+      try {
+        // 1. 调用确认API
+        console.log('[TravelStore] 即将调用 confirmSkeleton, taskId:', this.currentPlan?._taskId)
+        const confirmRes = await travelApi.confirmSkeleton({
+          taskId: this.currentPlan?._taskId,
+          confirmedSpots: confirmedSpots,
+          adjustments: adjustments || {}
+        })
+        
+        if (!confirmRes || !confirmRes.confirmId) {
+          throw new Error('确认骨架失败')
+        }
+        
+        const confirmId = confirmRes.confirmId
+        
+        // 2. 轮询填充状态
+        const pollInterval = 2000
+        const maxWaitTime = 120000
+        
+        return new Promise((resolve, reject) => {
+          const startTime = Date.now()
+          
+          const poll = async () => {
+            try {
+              const elapsed = Date.now() - startTime
+              if (elapsed > maxWaitTime) {
+                this.loading = false
+                this.error = '生成完整方案超时'
+                reject(new Error('超时'))
+                return
+              }
+              
+              const statusRes = await travelApi.getConfirmStatus(confirmId)
+              const status = statusRes.status
+              
+              if (status === 'completed') {
+                const result = await travelApi.getConfirmResult(confirmId)
+                result.isSkeleton = false
+                result._confirmId = confirmId
+                
+                // 更新当前方案
+                this.currentPlan = result
+                
+                // 更新历史记录
+                const idx = this.planHistory.findIndex(p => p && p._taskId === this.currentPlan?._taskId)
+                if (idx >= 0) {
+                  this.planHistory.splice(idx, 1, result)
+                }
+                
+                this.loading = false
+                if (onSuccess) onSuccess(result)
+                resolve(result)
+              } else if (status === 'failed') {
+                this.loading = false
+                this.error = '生成完整方案失败'
+                reject(new Error(this.error))
+              } else {
+                // filling 或 confirmed，继续轮询
+                setTimeout(poll, pollInterval)
+              }
+            } catch (err) {
+              this.loading = false
+              this.error = err.message || '查询状态失败'
+              reject(err)
+            }
+          }
+          
+          poll()
+        })
+      } catch (error) {
+        this.loading = false
+        this.error = error.message || '确认骨架失败'
+        if (onError) onError(error)
+        throw error
+      }
+    },
+
+    /**
+     * P1: 重新生成骨架
+     * @param {Object} params - 包含 userInput, modelType, travelMode
+     */
+    async regenerateSkeleton(params) {
+      this.loading = true
+      this.error = null
+      
+      try {
+        const result = await travelApi.regenerateSkeleton({
+          userInput: params.userInput,
+          modelType: params.modelType || 'auto',
+          travelMode: params.travelMode || 'city'
+        })
+        
+        return result
+      } catch (error) {
+        this.error = error.message || '重新生成失败'
+        throw error
+      } finally {
+        this.loading = false
+      }
     }
   }
 })

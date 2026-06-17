@@ -1,9 +1,16 @@
 {
   "pages": [
     {
-      "path": "pages/index/index",
+      "path": "pages/inspiration/index",
       "style": {
         "navigationBarTitleText": "行程一下",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/index/index",
+      "style": {
+        "navigationBarTitleText": "行程地图",
         "enablePullDownRefresh": false,
         "navigationStyle": "custom"
       }
@@ -67,7 +74,7 @@
       }
     },
     {
-      "path": "pages/plan-detail/index",
+      "path": "pages/ai-plan-detail/index",
       "style": {
         "navigationBarTitleText": "方案详情",
         "navigationStyle": "custom"
@@ -88,9 +95,9 @@
       }
     },
     {
-      "path": "pages/inspiration/index",
+      "path": "pages/skeleton-confirm/index",
       "style": {
-        "navigationBarTitleText": "灵感库",
+        "navigationBarTitleText": "确认行程",
         "navigationStyle": "custom"
       }
     }
@@ -103,6 +110,32 @@
     "app-plus": {
       "safeArea": "auto"
     }
+  },
+  "tabBar": {
+    "color": "#8E8E93",
+    "selectedColor": "#0F4C5C",
+    "backgroundColor": "#FFFFFF",
+    "borderStyle": "white",
+    "list": [
+      {
+        "pagePath": "pages/inspiration/index",
+        "text": "灵感",
+        "iconPath": "static/icons/menu/linggan.png",
+        "selectedIconPath": "static/icons/menu/linggan-active.png"
+      },
+      {
+        "pagePath": "pages/index/index",
+        "text": "地图",
+        "iconPath": "static/icons/menu/ditu.png",
+        "selectedIconPath": "static/icons/menu/ditu-active.png"
+      },
+      {
+        "pagePath": "pages/mine/index",
+        "text": "我的",
+        "iconPath": "static/icons/menu/wode.png",
+        "selectedIconPath": "static/icons/menu/wode-active.png"
+      }
+    ]
   },
   "uniIdRouter": {}
 }

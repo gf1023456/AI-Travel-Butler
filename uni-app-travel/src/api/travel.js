@@ -19,7 +19,7 @@ export const createPlan = (params) => {
     userInput: params.userInput,
     modelType: params.modelType,
     isPlannerMode: params.isPlannerMode || false,
-    travelMode: params.travelMode || 'deep'
+    travelMode: params.travelMode || 'city'
   })
 }
 
@@ -27,7 +27,7 @@ export const createPlanV2 = (params) => {
   return post('/plan/v3', {
     userInput: params.userInput,
     modelType: params.modelType || 'auto',
-    travelMode: params.travelMode || 'deep'
+    travelMode: params.travelMode || 'city'
   })
 }
 
@@ -58,7 +58,7 @@ export const createPlanV4 = (params) => {
   return post('/plan/v4', {
     userInput: params.userInput,
     modelType: params.modelType || 'auto',
-    travelMode: params.travelMode || 'deep'
+    travelMode: params.travelMode || 'city'
   })
 }
 
@@ -72,7 +72,7 @@ export const createPlanV3 = (params) => {
   return post('/plan/v3', {
     userInput: params.userInput,
     modelType: params.modelType || 'auto',
-    travelMode: params.travelMode || 'deep'
+    travelMode: params.travelMode || 'city'
   })
 }
 
@@ -122,7 +122,7 @@ export const refinePlan = (params) => {
     userInput: params.userInput,
     modelType: params.modelType,
     isPlannerMode: params.isPlannerMode !== false,
-    travelMode: params.travelMode || 'deep',
+    travelMode: params.travelMode || 'city',
     refineInstruction: params.refineInstruction,
     basePlan: params.basePlan
   })
@@ -138,7 +138,7 @@ export const refinePlanAsync = (params) => {
     userInput: params.userInput,
     modelType: params.modelType,
     isPlannerMode: params.isPlannerMode !== false,
-    travelMode: params.travelMode || 'deep',
+    travelMode: params.travelMode || 'city',
     refineInstruction: params.refineInstruction,
     basePlan: params.basePlan
   })
@@ -168,6 +168,57 @@ export const getRefineResult = (taskId) => {
  */
 export const getFrontendConfig = () => {
   return post('/frontend-config', {})
+}
+
+/**
+ * 确认骨架并生成完整方案
+ * @param {Object} params - 确认参数
+ * @param {string} params.taskId - 原任务ID
+ * @param {Array} params.confirmedSpots - 确认的景点列表
+ * @param {Object} params.adjustments - 调整参数
+ * @returns {Promise}
+ */
+export const confirmSkeleton = (params) => {
+  console.log('[API] confirmSkeleton 被调用, params:', JSON.stringify(params))
+  return post('/skeleton/confirm', {
+    taskId: params.taskId,
+    confirmedSpots: params.confirmedSpots,
+    adjustments: params.adjustments || {}
+  })
+}
+
+/**
+ * 查询确认任务状态
+ * @param {string} confirmId - 确认任务ID
+ * @returns {Promise}
+ */
+export const getConfirmStatus = (confirmId) => {
+  return get(`/skeleton/confirm/status/${confirmId}`)
+}
+
+/**
+ * 获取确认后的完整方案
+ * @param {string} confirmId - 确认任务ID
+ * @returns {Promise}
+ */
+export const getConfirmResult = (confirmId) => {
+  return get(`/skeleton/confirm/result/${confirmId}`)
+}
+
+/**
+ * 重新生成骨架
+ * @param {Object} params - 生成参数
+ * @param {string} params.userInput - 用户输入
+ * @param {string} params.modelType - 模型类型
+ * @param {string} params.travelMode - 旅行风格
+ * @returns {Promise}
+ */
+export const regenerateSkeleton = (params) => {
+  return post('/skeleton/regenerate', {
+    userInput: params.userInput,
+    modelType: params.modelType || 'auto',
+    travelMode: params.travelMode || 'city'
+  })
 }
 
 /**
@@ -207,8 +258,15 @@ export default {
   getPlanV3Status,
   getPlanV3Result,
   refinePlan,
+  refinePlanAsync,
+  getRefineStatus,
+  getRefineResult,
   getFrontendConfig,
   getCurrentModel,
   getRandomCity,
-  getRandomCities
+  getRandomCities,
+  confirmSkeleton,
+  getConfirmStatus,
+  getConfirmResult,
+  regenerateSkeleton
 }

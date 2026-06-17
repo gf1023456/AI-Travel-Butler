@@ -13,7 +13,8 @@ import { getQuota } from './api/quota.js'
 // 添加更多的公共无需登录页面到白名单
 const whiteList = [
   '/pages/login/index',
-  '/pages/index/index',  // 公共主页一般不需要登录
+  '/pages/inspiration/index',  // 灵感页（首页）无需登录
+  '/pages/explore/index',       // 探索页无需登录
 ]
 
 onLaunch(() => {

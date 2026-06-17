@@ -151,21 +151,6 @@
       </section>
     </scroll-view>
 
-    <!-- Bottom Navigation -->
-    <nav class="bottom-nav" :style="{ bottom: (32 + safeAreaBottom) + 'px' }">
-      <button class="nav-item" @click="goExplore">
-        <text class="nav-item-icon">💡</text>
-        <text class="nav-item-label">灵感</text>
-      </button>
-      <button class="nav-item" @click="goPlan">
-        <text class="nav-item-icon">📅</text>
-        <text class="nav-item-label">行程</text>
-      </button>
-      <button :class="['nav-item', 'nav-active']" @click="goMine">
-        <text class="nav-item-icon">👤</text>
-        <text class="nav-item-label">我的</text>
-      </button>
-    </nav>
   </view>
 </template>
 
@@ -183,7 +168,7 @@ const { statusBarHeight, safeAreaBottom } = useSafeArea()
 
 const goBack = () => uni.navigateBack({ delta: 1 })
 const goExplore = () => uni.navigateTo({ url: '/pages/inspiration/index' })
-const goPlan = () => uni.navigateTo({ url: '/pages/plan/plan' })
+const goPlan = () => uni.navigateTo({ url: '/pages/ai-plan-detail/index' })
 const goMine = () => uni.reLaunch({ url: '/pages/mine/index' })
 const defaultAvatar = 'https://ui-avatars.com/api/?name=行程一下&background=1a237e&color=fff&size=256'
 
@@ -570,30 +555,4 @@ const goTo = (url) => uni.navigateTo({ url })
   box-shadow: 0 8px 32px rgba(31,38,135,0.07), inset 0 0 0 1px rgba(255,255,255,0.2);
 }
 .logout-icon { font-size: 20px; }
-
-/* Bottom Navigation - 与首页统一风格 */
-.bottom-nav {
-  position: fixed; left: 48rpx; right: 48rpx; z-index: 10;
-  display: flex; align-items: center; justify-content: space-around;
-  height: 72px; padding: 0 8px;
-  background: rgba(255,255,255,0.7); backdrop-filter: blur(30px);
-  -webkit-backdrop-filter: blur(30px);
-  border: 1px solid rgba(255,255,255,0.5);
-  border-radius: 999px;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-}
-.nav-item {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  padding: 8px 24px; border-radius: 999px;
-  color: var(--color-on-surface-variant); opacity: 0.6;
-  background: transparent; border: none;
-}
-.nav-item::after { border: none; }
-.nav-active {
-  background: var(--color-primary-container);
-  color: var(--color-on-primary-container); opacity: 1;
-  box-shadow: 0 4px 12px rgba(15,76,92,0.15);
-}
-.nav-item-icon { font-size: 22px; margin-bottom: 2px; }
-.nav-item-label { font-size: 10px; font-weight: 700; letter-spacing: 0.02em; }
 </style>

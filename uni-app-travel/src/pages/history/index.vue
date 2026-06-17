@@ -224,7 +224,7 @@ const loadHistory = async (item) => {
     isFromHistory: true,
     historyId: sourceItem.id
   }
-  uni.reLaunch({ url: '/pages/index/index' })
+  uni.reLaunch({ url: '/pages/ai-plan-detail/index' })
 }
 
 const showDetails = async (item) => {
@@ -280,7 +280,7 @@ const loadDetailToPlan = () => {
     isFromHistory: true,
     historyId: selectedDetail.value.id
   }
-  uni.reLaunch({ url: '/pages/index/index' })
+  uni.reLaunch({ url: '/pages/ai-plan-detail/index' })
   closeDetailPopup()
 }
 

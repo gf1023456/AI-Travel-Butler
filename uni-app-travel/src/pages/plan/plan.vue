@@ -470,19 +470,19 @@ const isPublic = computed(() => userStore.userId === 1 || userStore.userId === '
 // 保存防抖锁（1.5s 内禁止重复点击）
 const saveLock = ref(false)
 
-// 旅行风格 slug（从 currentPlan.category 继承，或回退到 preferences.travelMode，再不行 default 'deep'）
+// 旅行风格 slug（从 currentPlan.category 继承，或回退到 preferences.travelMode，再不行 default 'city'）
 const travelStyleSlug = computed(() => {
   const cp = travelStore.currentPlan
   if (cp?.category) return cp.category
   if (travelStore.preferences?.travelMode) return travelStore.preferences.travelMode
-  return 'deep'
+  return 'city'
 })
 
 const saveToHistory = async () => {
   if (isSkeleton.value || saveLock.value) return
   if (!dayPlanItinerary.value.length) { uni.showToast({ title: '无行程可保存', icon: 'none' }); return }
   // 自动发布检查：如果是管理员且没有分类，使用默认值
-  const finalCategory = travelStyleSlug.value || 'deep'
+  const finalCategory = travelStyleSlug.value || 'city'
 
   // 立刻上锁，避免狂点
   saveLock.value = true

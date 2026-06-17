@@ -2,8 +2,7 @@
   <view class="inspiration-page" :class="themeClass">
     <header class="top-bar" :style="{ paddingTop: (12 + statusBarHeight) + 'px' }">
       <view class="top-left">
-        <button class="back-btn" @click="goBack"><text>←</text></button>
-        <text class="top-title">灵感库</text>
+        <text class="top-title">行程一下</text>
       </view>
       <view class="top-right">
         <button class="top-avatar-btn">
@@ -202,6 +201,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import { useTravelStore } from '@/store/travel.js'
 import { useUserStore } from '@/store/user.js'
 import { getPublicPlans, getPublicPlanDetail } from '@/api/history.js'
@@ -222,15 +222,28 @@ onMounted(async () => {
   loadPlazaPlans()
 })
 
-const goBack = () => uni.reLaunch({ url: '/pages/index/index' })
+onShow(() => {
+  if (!travelStore.loading && isGenerating.value) {
+    cleanup()
+  }
+})
 
-// Categories（与后端 travel_styles.py 一致）
+// 首页不需要返回按钮
+const goBack = () => {
+  loadPlazaPlans(false)
+  uni.showToast({ title: '已刷新', icon: 'none', duration: 800 })
+}
+
+// Categories（7大玩法体系）
 const categories = [
   { slug: 'all', name: '全部', icon: '' },
-  { slug: 'light', ...TRAVEL_STYLES.light },
-  { slug: 'deep', ...TRAVEL_STYLES.deep },
+  { slug: 'city', ...TRAVEL_STYLES.city },
+  { slug: 'photo', ...TRAVEL_STYLES.photo },
   { slug: 'food', ...TRAVEL_STYLES.food },
-  { slug: 'outdoor', ...TRAVEL_STYLES.outdoor }
+  { slug: 'couple', ...TRAVEL_STYLES.couple },
+  { slug: 'family', ...TRAVEL_STYLES.family },
+  { slug: 'rusher', ...TRAVEL_STYLES.rusher },
+  { slug: 'road', ...TRAVEL_STYLES.road },
 ]
 const activeCategory = ref('all')
 
@@ -365,9 +378,9 @@ const onPlanCardClick = async (plan) => {
         userInput: detail.user_input || plan.user_input || '',
         dayPlan: dayPlan,
         itinerarySummary: detail.itinerary_summary || detail.summary || '',
-        category: detail.category || plan.category || 'deep'
+        category: detail.category || plan.category || 'city'
       }
-      uni.navigateTo({ url: '/pages/plan-detail/index' })
+      uni.navigateTo({ url: '/pages/ai-plan-detail/index' })
     }
   } catch (e) {
     uni.hideLoading()
@@ -395,12 +408,16 @@ const userInput = ref('')
 const travelModeIndex = ref(0)
 const charCount = computed(() => userInput.value.length)
 
-// 4 风格（与后端 travel_styles.py 一致）
+// 8 风格（平台主推）
 const travelStyles = [
-  { slug: 'light',   name: TRAVEL_STYLES.light.name,   icon: TRAVEL_STYLES.light.icon },
-  { slug: 'deep',    name: TRAVEL_STYLES.deep.name,    icon: TRAVEL_STYLES.deep.icon },
+  { slug: 'family',  name: TRAVEL_STYLES.family.name,  icon: TRAVEL_STYLES.family.icon },
+  { slug: 'couple',  name: TRAVEL_STYLES.couple.name,  icon: TRAVEL_STYLES.couple.icon },
+  { slug: 'photo',   name: TRAVEL_STYLES.photo.name,   icon: TRAVEL_STYLES.photo.icon },
+  { slug: 'walk',    name: TRAVEL_STYLES.walk.name,    icon: TRAVEL_STYLES.walk.icon },
   { slug: 'food',    name: TRAVEL_STYLES.food.name,    icon: TRAVEL_STYLES.food.icon },
-  { slug: 'outdoor', name: TRAVEL_STYLES.outdoor.name, icon: TRAVEL_STYLES.outdoor.icon }
+  { slug: 'rusher',  name: TRAVEL_STYLES.rusher.name,  icon: TRAVEL_STYLES.rusher.icon },
+  { slug: 'budget',  name: TRAVEL_STYLES.budget.name,  icon: TRAVEL_STYLES.budget.icon },
+  { slug: 'slow',    name: TRAVEL_STYLES.slow.name,    icon: TRAVEL_STYLES.slow.icon },
 ]
 
 // Spinning wheel
@@ -518,6 +535,8 @@ watch(() => travelStore.loading, (loading) => {
     skeletonElapsed.value = 0
     skeletonStatusText.value = '正在规划行程...'
     updateSkeleton()
+  } else if (!loading && isGenerating.value) {
+    cleanup()
   }
 })
 
@@ -567,8 +586,8 @@ const handleGenerate = async () => {
 
     cleanup()
     if (result && result.dayPlanItinerary?.length > 0) {
-      uni.showToast({ title: '行程已生成', icon: 'success' })
-      uni.reLaunch({ url: '/pages/index/index' })
+      // P0-2: 不reLaunch，而是跳转到确认/调整页
+      uni.navigateTo({ url: '/pages/skeleton-confirm/index' })
     }
   } catch {
     cleanup()
@@ -620,7 +639,7 @@ const onFabClick = () => {
 
 .content {
   flex: 1; min-height: 0;
-  padding: 260rpx 24rpx 80rpx;
+  padding: 100rpx 24rpx 120rpx;
   box-sizing: border-box;
 }
 

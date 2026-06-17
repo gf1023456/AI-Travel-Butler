@@ -105,22 +105,6 @@
       <text class="ai-text">快来生成你得专属攻略吧</text>
     </button>
 
-    <!-- Bottom Navigation -->
-    <nav class="bottom-nav" :style="{ bottom: (32 + safeAreaBottom) + 'px' }">
-      <button :class="['nav-item', 'nav-active']" @click="goInspiration">
-        <text class="nav-item-icon">💡</text>
-        <text class="nav-item-label">灵感</text>
-      </button>
-      <button class="nav-item" @click="goPlan">
-        <text class="nav-item-icon">📅</text>
-        <text class="nav-item-label">行程</text>
-      </button>
-      <button class="nav-item" @click="goMine">
-        <text class="nav-item-icon">👤</text>
-        <text class="nav-item-label">我的</text>
-      </button>
-    </nav>
-
     <!-- Detail Bottom Sheet -->
     <view v-if="showDetail" class="sheet-overlay" @click="closeDetail">
       <view class="sheet-container" @click.stop @touchstart="onTouchStart" @touchmove="onTouchMove" @touchend="onTouchEnd">
@@ -425,7 +409,7 @@ export default {
     },
     goExplore() { uni.navigateTo({ url: '/pages/explore/index' }) },
     goInspiration() { uni.navigateTo({ url: '/pages/inspiration/index' }) },
-    goPlan() { uni.navigateTo({ url: '/pages/plan/plan' }) },
+    goPlan() { uni.navigateTo({ url: '/pages/ai-plan-detail/index' }) },
     goMine() { uni.navigateTo({ url: '/pages/mine/index' }) },
     // Quick Card 滑动切换方法
     onQuickCardTouchStart(e) {
@@ -788,29 +772,6 @@ export default {
 }
 .ai-icon { font-size: 22px; }
 .ai-text { font-size: 14px; font-weight: 600; line-height: 22px; white-space: nowrap; }
-
-.bottom-nav {
-  position: fixed; left: 48rpx; right: 48rpx; z-index: 10;
-  display: flex; align-items: center; justify-content: space-around;
-  height: 72px; padding: 0 8px;
-  background: rgba(255,255,255,0.7); backdrop-filter: blur(30px);
-  -webkit-backdrop-filter: blur(30px);
-  border: 1px solid rgba(255,255,255,0.5);
-  border-radius: 999px;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-}
-.nav-item {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  padding: 8px 24px; border-radius: 999px;
-  color: var(--color-on-surface-variant); opacity: 0.6;
-}
-.nav-active {
-  background: var(--color-primary-container);
-  color: var(--color-on-primary-container); opacity: 1;
-  box-shadow: 0 4px 12px rgba(15,76,92,0.15);
-}
-.nav-item-icon { font-size: 22px; margin-bottom: 2px; }
-.nav-item-label { font-size: 10px; font-weight: 700; letter-spacing: 0.02em; }
 
 .sheet-overlay {
   position: fixed; inset: 0; z-index: 100;

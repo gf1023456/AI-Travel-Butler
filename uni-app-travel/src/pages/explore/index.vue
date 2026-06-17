@@ -2,7 +2,6 @@
   <view class="explore-page" :class="themeClass">
     <header class="top-bar" :style="{ paddingTop: (12 + statusBarHeight) + 'px' }">
       <view class="top-left">
-        <button class="back-btn" @click="goBack"><text>←</text></button>
         <text class="top-title">探索</text>
       </view>
       <view class="top-right">
@@ -214,7 +213,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { onShareAppMessage } from '@dcloudio/uni-app'
+import { onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import { useTravelStore } from '@/store/travel.js'
 import { useUserStore } from '@/store/user.js'
 import { getPublicPlans, getPublicPlanDetail, likePlan } from '@/api/history.js'
@@ -255,16 +254,26 @@ onMounted(async () => {
   } catch (e) { /* 未登录时静默失败 */ }
 })
 
-const goBack = () => uni.reLaunch({ url: '/pages/index/index' })
+onShow(() => {
+  // 页面重新显示时，如果 store 不再 loading，重置本地生成状态
+  if (!travelStore.loading && isGenerating.value) {
+    cleanup()
+  }
+})
+
+const goBack = () => uni.switchTab({ url: '/pages/inspiration/index' })
 
 // Categories（与后端 travel_styles.py 一致）
-// 顺序：全部 → 4 风格 → 热门
+// 顺序：全部 → 7 风格 → 热门
 const categories = [
   { slug: 'all', name: '全部', icon: '' },
-  { slug: 'light', ...TRAVEL_STYLES.light },
-  { slug: 'deep', ...TRAVEL_STYLES.deep },
+  { slug: 'city', ...TRAVEL_STYLES.city },
+  { slug: 'photo', ...TRAVEL_STYLES.photo },
   { slug: 'food', ...TRAVEL_STYLES.food },
-  { slug: 'outdoor', ...TRAVEL_STYLES.outdoor },
+  { slug: 'couple', ...TRAVEL_STYLES.couple },
+  { slug: 'family', ...TRAVEL_STYLES.family },
+  { slug: 'rusher', ...TRAVEL_STYLES.rusher },
+  { slug: 'road', ...TRAVEL_STYLES.road },
   { slug: 'hot', name: '热门', icon: '🔥' }
 ]
 const activeCategory = ref('all')
@@ -425,7 +434,7 @@ const onPlanCardClick = async (plan) => {
           dayPlan: dayPlan,
           itinerarySummary: detail.itinerary_summary || detail.summary || ''
         }
-        uni.navigateTo({ url: '/pages/plan-detail/index' })
+        uni.navigateTo({ url: '/pages/ai-plan-detail/index' })
         return
       }
     } catch (e) {
@@ -458,12 +467,16 @@ const userInput = ref('')
 const travelModeIndex = ref(0)
 const charCount = computed(() => userInput.value.length)
 
-// 4 风格（与后端 travel_styles.py 一致）
+// 8 风格（平台主推）
 const travelStyles = [
-  { slug: 'light',   name: TRAVEL_STYLES.light.name,   icon: TRAVEL_STYLES.light.icon },
-  { slug: 'deep',    name: TRAVEL_STYLES.deep.name,    icon: TRAVEL_STYLES.deep.icon },
+  { slug: 'family',  name: TRAVEL_STYLES.family.name,  icon: TRAVEL_STYLES.family.icon },
+  { slug: 'couple',  name: TRAVEL_STYLES.couple.name,  icon: TRAVEL_STYLES.couple.icon },
+  { slug: 'photo',   name: TRAVEL_STYLES.photo.name,   icon: TRAVEL_STYLES.photo.icon },
+  { slug: 'walk',    name: TRAVEL_STYLES.walk.name,    icon: TRAVEL_STYLES.walk.icon },
   { slug: 'food',    name: TRAVEL_STYLES.food.name,    icon: TRAVEL_STYLES.food.icon },
-  { slug: 'outdoor', name: TRAVEL_STYLES.outdoor.name, icon: TRAVEL_STYLES.outdoor.icon }
+  { slug: 'rusher',  name: TRAVEL_STYLES.rusher.name,  icon: TRAVEL_STYLES.rusher.icon },
+  { slug: 'budget',  name: TRAVEL_STYLES.budget.name,  icon: TRAVEL_STYLES.budget.icon },
+  { slug: 'slow',    name: TRAVEL_STYLES.slow.name,    icon: TRAVEL_STYLES.slow.icon },
 ]
 
 // Spinning wheel
@@ -581,6 +594,8 @@ watch(() => travelStore.loading, (loading) => {
     skeletonElapsed.value = 0
     skeletonStatusText.value = '正在规划行程...'
     updateSkeleton()
+  } else if (!loading && isGenerating.value) {
+    cleanup()
   }
 })
 
@@ -683,7 +698,7 @@ const onFabClick = () => {
 
 .content {
   flex: 1; min-height: 0;
-  padding: 260rpx 24rpx 80rpx;
+  padding: 100rpx 24rpx 120rpx;
   box-sizing: border-box;
 }
 

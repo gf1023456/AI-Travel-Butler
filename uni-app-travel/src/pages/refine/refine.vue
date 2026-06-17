@@ -259,7 +259,7 @@ const handleRefine = async () => {
       userInput: currentPlan?.userInput || '',
       modelType: currentPlan?.modelType || 'default',
       isPlannerMode: currentPlan?.isPlannerMode !== false,
-      travelMode: currentPlan?.travelMode || 'deep',
+      travelMode: currentPlan?.travelMode || 'city',
       refineInstruction: refineRequest.value,
       basePlan: basePlanInfo
     })
