@@ -1,27 +1,24 @@
 <template>
   <view class="explore-page" :class="themeClass">
-    <header class="top-bar" :style="{ paddingTop: (12 + statusBarHeight) + 'px' }">
-      <view class="top-left">
+    <!-- 顶栏 + 分类合并 -->
+    <header class="top-bar" :style="{ paddingTop: (8 + statusBarHeight) + 'px' }">
+      <view class="top-row">
         <text class="top-title">探索</text>
-      </view>
-      <view class="top-right">
         <button class="top-avatar-btn">
           <image class="top-avatar" :src="userAvatar" mode="aspectFill" />
         </button>
       </view>
-    </header>
-
-    <scroll-view scroll-y class="content" show-scrollbar="false" :scroll-top="scrollTop" :scroll-with-animation="true" :refresher-enabled="true" :refresher-triggered="plazaRefreshing" refresher-background="transparent" @refresherrefresh="onPlazaRefresh" @scrolltolower="onScrollToLower" @scroll="onScroll">
-      <!-- 分类标签 -->
-      <view class="category-scroll">
+      <scroll-view scroll-x class="category-scroll" :show-scrollbar="false">
         <text
-          v-for="(cat, idx) in categories"
+          v-for="cat in categories"
           :key="cat.slug"
           :class="['cat-chip', activeCategory === cat.slug ? 'cat-active' : '']"
           @click="onCategoryClick(cat)"
         >{{ cat.icon ? cat.icon + ' ' : '' }}{{ cat.name }}</text>
-      </view>
+      </scroll-view>
+    </header>
 
+    <scroll-view scroll-y class="content" show-scrollbar="false" :scroll-top="scrollTop" :scroll-with-animation="true" :refresher-enabled="true" :refresher-triggered="plazaRefreshing" refresher-background="transparent" @refresherrefresh="onPlazaRefresh" @scrolltolower="onScrollToLower" @scroll="onScroll">
       <!-- 瀑布流方案列表 -->
       <view v-if="planList.length > 0" class="waterfall">
         <view class="waterfall-col">
@@ -96,6 +93,45 @@
     >
       <text v-if="!isGenerating" class="fab-icon">+</text>
       <view v-else class="fab-spinner"></view>
+    </view>
+
+    <!-- FAB 菜单 -->
+    <view v-if="showFabMenu" class="fab-menu-mask" @click="showFabMenu = false">
+      <view class="fab-menu" @click.stop :style="{ bottom: (100 + safeAreaBottom) + 'px' }">
+        <view class="fab-menu-item" @click="showFabMenu = false; showCreateSheet = true">
+          <text class="fab-menu-icon">✨</text>
+          <text class="fab-menu-text">生成行程</text>
+        </view>
+        <view class="fab-menu-item" @click="showFabMenu = false; showImportSheet = true">
+          <text class="fab-menu-icon">📋</text>
+          <text class="fab-menu-text">从链接导入</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 导入笔记底部弹窗 -->
+    <view v-if="showImportSheet" class="sheet-mask" @click="showImportSheet = false">
+      <view class="sheet-panel" @click.stop>
+        <view class="sheet-handle"></view>
+        <text class="sheet-title">导入小红书笔记</text>
+        <text class="sheet-sub">粘贴分享内容，自动提取链接解析</text>
+
+        <textarea
+          v-model="importUrl"
+          class="import-textarea"
+          placeholder="粘贴小红书分享内容..."
+          :disabled="importing"
+          auto-height
+          :maxlength="-1"
+        />
+
+        <view class="sheet-actions">
+          <button class="sheet-btn-cancel" @click="showImportSheet = false">取消</button>
+          <button class="sheet-btn-primary" @click="importFromXhs" :disabled="importing || !importUrl">
+            {{ importing ? '解析中...' : '导入' }}
+          </button>
+        </view>
+      </view>
     </view>
 
     <!-- 生成方案底部弹窗 -->
@@ -217,7 +253,7 @@ import { onShareAppMessage, onShow } from '@dcloudio/uni-app'
 import { useTravelStore } from '@/store/travel.js'
 import { useUserStore } from '@/store/user.js'
 import { getPublicPlans, getPublicPlanDetail, likePlan } from '@/api/history.js'
-import { getRandomCities } from '@/api/travel.js'
+import { getRandomCities, importXhsNote } from '@/api/travel.js'
 import { getQuota, addBonus, getInviteInfo } from '@/api/quota.js'
 import { useSafeArea } from '@/utils/safeArea.js'
 import { themeClass } from '@/utils/theme.js'
@@ -463,6 +499,10 @@ const showQuotaModal = ref(false)
 
 // Create sheet
 const showCreateSheet = ref(false)
+const showFabMenu = ref(false)
+const showImportSheet = ref(false)
+const importUrl = ref('')
+const importing = ref(false)
 const userInput = ref('')
 const travelModeIndex = ref(0)
 const charCount = computed(() => userInput.value.length)
@@ -664,7 +704,41 @@ const onFabClick = () => {
     uni.showToast({ title: '方案生成中，请稍候…', icon: 'none' })
     return
   }
-  showCreateSheet.value = true
+  showFabMenu.value = true
+}
+
+async function importFromXhs() {
+  if (!importUrl.value || importing.value) return
+  importing.value = true
+  try {
+    const res = await importXhsNote({ url: importUrl.value })
+    if (res.code === 0) {
+      const data = res.data
+      travelStore.currentPlan = {
+        itinerarySummary: data.itinerary_summary,
+        dayPlanItinerary: data.day_plan,
+        socialRecommendations: [],
+        evidence: [],
+        warnings: [],
+        category: data.category,
+        noteCoverUrl: data.note?.cover_url || '',
+        noteImages: data.note?.images || [],
+        noteAuthor: data.note?.author || '',
+        noteLikes: data.note?.likes || 0,
+        isFromHistory: true,
+        historyId: data.plan_id,
+      }
+      showImportSheet.value = false
+      importUrl.value = ''
+      uni.navigateTo({ url: '/pages/ai-plan-detail/index' })
+    } else {
+      uni.showToast({ title: res.msg || '导入失败', icon: 'none' })
+    }
+  } catch (e) {
+    uni.showToast({ title: '导入失败: ' + (e.message || '网络错误'), icon: 'none' })
+  } finally {
+    importing.value = false
+  }
 }
 </script>
 
@@ -678,38 +752,35 @@ const onFabClick = () => {
 
 .top-bar {
   position: fixed; top: 0; left: 0; right: 0; z-index: 10;
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 24rpx 40rpx 24rpx;
-  background: rgba(255,255,255,0.7); backdrop-filter: blur(40px);
+  padding: 0 24rpx;
+  background: rgba(255,255,255,0.85); backdrop-filter: blur(40px);
   -webkit-backdrop-filter: blur(40px);
-  border-bottom: 1px solid rgba(255,255,255,0.2);
+  border-bottom: 1px solid rgba(0,0,0,0.05);
 }
-.top-left { display: flex; align-items: center; gap: 12px; }
-.back-btn {
-  width: 36px; height: 36px; display: flex; align-items: center;
-  justify-content: center; font-size: 20px; color: var(--color-primary);
+.top-row {
+  display: flex; align-items: center; justify-content: space-between;
+  height: 44px;
 }
-.top-title { font-size: 24px; font-weight: 700; color: var(--color-primary); letter-spacing: -0.01em; line-height: 32px; }
-.top-right { display: flex; align-items: center; gap: 12px; }
-.top-avatar { width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.4); }
+.top-title { font-size: 20px; font-weight: 700; color: var(--color-primary); }
+.top-avatar { width: 28px; height: 28px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.4); }
 .top-avatar-btn { padding: 0; margin: 0; border: none; background: transparent; line-height: 0; }
 .top-avatar-btn::after { border: none; }
 
 .content {
   flex: 1; min-height: 0;
-  padding: 100rpx 24rpx 120rpx;
+  padding: 110rpx 24rpx 120rpx;
   box-sizing: border-box;
 }
 
 .category-scroll {
-  display: flex; gap: 12px; padding: 0 4rpx 24rpx;
-  overflow-x: auto; white-space: nowrap;
+  display: flex; gap: 8px; padding: 4rpx 0 12rpx;
+  white-space: nowrap;
 }
 .category-scroll::-webkit-scrollbar { display: none; }
 .cat-chip {
-  padding: 8px 20px; border-radius: 999px;
-  font-size: 13px; font-weight: 600; letter-spacing: 0.03em;
-  background: rgba(255,255,255,0.7); border: 1px solid rgba(0,0,0,0.06);
+  padding: 5px 14px; border-radius: 999px;
+  font-size: 12px; font-weight: 500;
+  background: rgba(0,0,0,0.04); border: 1px solid transparent;
   color: var(--color-on-surface-variant); flex-shrink: 0;
 }
 .cat-active {
@@ -787,9 +858,66 @@ const onFabClick = () => {
 }
 @keyframes fab-spin { to { transform: rotate(360deg); } }
 
+/* FAB Menu */
+.fab-menu-mask {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 55;
+  background: transparent;
+}
+.fab-menu {
+  position: fixed; right: 32rpx; z-index: 56;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.fab-menu-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 20px; border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+  white-space: nowrap;
+  animation: fabItemIn 0.2s ease-out;
+}
+.fab-menu-item:active { transform: scale(0.96); background: #f5f5f5; }
+.fab-menu-icon { font-size: 20px; }
+.fab-menu-text { font-size: 15px; color: #2C2C2C; font-weight: 600; }
+@keyframes fabItemIn { from { opacity: 0; transform: translateY(8px) scale(0.9); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+/* Import Sheet */
+.import-input {
+  width: 100%; height: 48px; margin: 16px 0 24px;
+  padding: 0 16px; border: 1.5px solid rgba(0,0,0,0.08); border-radius: 14px;
+  font-size: 15px; color: #2C2C2C; background: rgba(255,255,255,0.7);
+  box-sizing: border-box;
+}
+.import-textarea {
+  width: 100%; min-height: 80px; max-height: 200px; margin: 16px 0 24px;
+  padding: 12px 16px; border: 1.5px solid rgba(0,0,0,0.08); border-radius: 14px;
+  font-size: 14px; color: #2C2C2C; background: rgba(255,255,255,0.7);
+  box-sizing: border-box; line-height: 1.5;
+}
+.import-textarea:disabled { opacity: 0.5; }
+.import-input:disabled { opacity: 0.5; }
+.sheet-actions { display: flex; gap: 12px; }
+.sheet-btn-cancel {
+  flex: 1; height: 48px; border-radius: 14px;
+  background: rgba(0,0,0,0.04); border: none;
+  font-size: 15px; font-weight: 600; color: #5A5A5A;
+  display: flex; align-items: center; justify-content: center;
+}
+.sheet-btn-cancel::after { border: none; }
+.sheet-btn-primary {
+  flex: 1; height: 48px; border-radius: 14px;
+  background: linear-gradient(135deg, #0F4C5C 0%, #14B8A6 50%, #2DD4BF 100%);
+  border: none;
+  font-size: 15px; font-weight: 700; color: #fff;
+  box-shadow: 0 4px 16px rgba(15,76,92,0.2);
+  display: flex; align-items: center; justify-content: center;
+}
+.sheet-btn-primary::after { border: none; }
+.sheet-btn-primary:active { transform: scale(0.97); }
+.sheet-btn-primary:disabled { opacity: 0.4; }
+
 /* Sheet */
 .sheet-mask {
-  position: fixed; inset: 0; z-index: 500;
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 500;
   background: rgba(0,0,0,0.5);
   display: flex; align-items: flex-end;
 }

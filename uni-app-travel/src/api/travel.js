@@ -221,6 +221,15 @@ export const regenerateSkeleton = (params) => {
   })
 }
 
+// ===== 小红书导入 =====
+export const importXhsNote = (params) => {
+  return post('/xhs/import', params)
+}
+
+export const importXhsText = (params) => {
+  return post('/xhs/parse', params)
+}
+
 /**
  * 获取当前激活的AI模型名称
  * @returns {Promise}
@@ -268,5 +277,7 @@ export default {
   confirmSkeleton,
   getConfirmStatus,
   getConfirmResult,
-  regenerateSkeleton
+  regenerateSkeleton,
+  importXhsNote,
+  importXhsText,
 }

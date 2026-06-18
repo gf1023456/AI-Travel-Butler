@@ -44,6 +44,15 @@
         </view>
       </view>
 
+      <!-- ===== 小红书来源 ===== -->
+      <view class="note-source" v-if="plan?.noteAuthor">
+        <text class="note-source-label">📖 来自小红书</text>
+        <view class="note-source-info">
+          <text class="note-author">@{{ plan.noteAuthor }}</text>
+          <text class="note-likes" v-if="plan.noteLikes">❤ {{ plan.noteLikes }}</text>
+        </view>
+      </view>
+
       <!-- ===== 信息胶囊 ===== -->
       <view class="info-chips">
         <view class="chip" v-if="physicalLevel">
@@ -129,7 +138,7 @@
       </view>
 
       <!-- ===== CTA ===== -->
-      <view class="cta-section">
+      <view class="cta-section" v-if="!plan.isFromHistory">
         <text class="cta-title">还想看更多？</text>
         <text class="cta-sub">我们为你整理了{{ destination }}的隐藏玩法</text>
         <button class="cta-btn" @click="goAdjust">
@@ -143,7 +152,7 @@
     <!-- 底部操作栏 -->
     <view class="footer-bar" :style="{ paddingBottom: (12 + safeAreaBottom) + 'px' }">
       <view class="footer-btns">
-        <button class="footer-btn" @click="goAdjust">
+        <button class="footer-btn" v-if="!plan.isFromHistory" @click="goAdjust">
           <text class="btn-icon">✏️</text>
           <text class="btn-label">微调</text>
         </button>
@@ -187,6 +196,7 @@ const { statusBarHeight, safeAreaBottom } = useSafeArea()
 
 const plan = ref({})
 const saveLock = ref(false)
+const shareThumbnailPath = ref('')
 
 // 管理员自动发布到广场
 const isPublic = computed(() => userStore.userId === 1 || userStore.userId === '1')
@@ -225,6 +235,7 @@ const destination = computed(() => {
 })
 
 const heroImage = computed(() => {
+  if (plan.value?.noteCoverUrl) return plan.value.noteCoverUrl
   const spots = allSpots.value
   for (const s of spots) {
     if (s.image) return s.image
@@ -420,6 +431,7 @@ function getTransitionText(from, to) {
 function goBack() { uni.navigateBack() }
 
 function goAdjust() {
+  if (plan.value?.isFromHistory) return
   uni.navigateTo({ url: '/pages/skeleton-confirm/index' })
 }
 
@@ -543,6 +555,44 @@ async function sharePoster() {
   }
 }
 
+function generateShareThumbnail() {
+  return new Promise((resolve) => {
+    const ctx = uni.createCanvasContext('posterCanvas', instance)
+    const W = 750, H = 1200
+
+    ctx.setFillStyle('#F8F4EC')
+    ctx.fillRect(0, 0, W, H)
+
+    ctx.setFillStyle('#C9A96E')
+    ctx.fillRect(0, 0, W, 200)
+
+    ctx.setFillStyle('#FFFFFF')
+    ctx.setFontSize(36)
+    ctx.fillText(`${destination.value} · ${daysCount.value}天行程`, 40, 100)
+
+    ctx.setFontSize(18)
+    ctx.setFillStyle('rgba(255,255,255,0.85)')
+    const summary = (plan.value?.itinerarySummary || '行程一下').slice(0, 30)
+    ctx.fillText(summary, 40, 145)
+
+    ctx.setFillStyle('#C9A96E')
+    ctx.setFontSize(16)
+    ctx.setTextAlign('center')
+    ctx.fillText('行程一下 · 让灵感即刻启程', W / 2, H - 60)
+    ctx.setTextAlign('left')
+
+    ctx.draw(false, () => {
+      setTimeout(() => {
+        uni.canvasToTempFilePath({
+          canvasId: 'posterCanvas',
+          success: (res) => resolve(res.tempFilePath),
+          fail: () => resolve(null)
+        }, instance)
+      }, 500)
+    })
+  })
+}
+
 function generateLocalPoster() {
   return new Promise((resolve) => {
     const ctx = uni.createCanvasContext('posterCanvas', instance)
@@ -651,27 +701,33 @@ onShareAppMessage(() => {
   return {
     title,
     path,
-    imageUrl: (heroImage.value && heroImage.value.startsWith('http') ? heroImage.value : '') || 'https://tonystark-ai.ccwu.cc/png/kfeng.png'
+    imageUrl: shareThumbnailPath.value || 'https://tonystark-ai.ccwu.cc/png/kfeng.png'
   }
 })
 
-onLoad((options) => {
+onLoad(async (options) => {
   // 恢复用户信息（管理员自动发布依赖 userId）
   userStore.restoreFromStorage()
 
   if (travelStore.currentPlan) {
     plan.value = travelStore.currentPlan
-    return
+  } else {
+    const planId = options?.planId
+    if (planId) {
+      const found = (travelStore.planHistory || []).find(h => h._taskId === planId || h.requestId === planId)
+      if (found) plan.value = found
+    }
+    if (!plan.value?.dayPlanItinerary) {
+      try {
+        const cached = uni.getStorageSync('ai_current_plan')
+        if (cached) plan.value = cached
+      } catch (e) {}
+    }
   }
-  const planId = options?.planId
-  if (planId) {
-    const found = (travelStore.planHistory || []).find(h => h._taskId === planId || h.requestId === planId)
-    if (found) { plan.value = found; return }
-  }
-  try {
-    const cached = uni.getStorageSync('ai_current_plan')
-    if (cached) { plan.value = cached }
-  } catch (e) {}
+
+  // 预生成分享缩略图
+  const thumb = await generateShareThumbnail()
+  if (thumb) shareThumbnailPath.value = thumb
 })
 </script>
 
@@ -777,6 +833,28 @@ onLoad((options) => {
 .letter-sign {
   display: block; font-size: 24rpx; color: #0F4C5C;
   text-align: right; font-weight: 500;
+}
+
+/* ===== 小红书来源 ===== */
+.note-source {
+  margin: 16rpx 32rpx 0;
+  padding: 20rpx 24rpx;
+  background: #FFFDF8;
+  border: 1rpx solid #E5DED1;
+  border-radius: 16rpx;
+}
+.note-source-label {
+  font-size: 22rpx; color: #999;
+}
+.note-source-info {
+  display: flex; align-items: center; gap: 16rpx;
+  margin-top: 8rpx;
+}
+.note-author {
+  font-size: 24rpx; color: #C9A96E; font-weight: 500;
+}
+.note-likes {
+  font-size: 22rpx; color: #FF6B6B;
 }
 
 /* ===== 信息胶囊 ===== */

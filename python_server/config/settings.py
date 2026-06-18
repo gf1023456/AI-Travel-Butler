@@ -64,6 +64,10 @@ class WeChatSettings(BaseModel):
     secret: str = "3c38e48ffe8bf2075c4bbc314a770616"
 
 
+class XhsSettings(BaseModel):
+    cookie: str = "abRequestId=0f92185b-1213-5ce1-92b7-26cc493997ba; a1=19cadaf304dzgdwcgew4uwfrgqlk9m0ehmx6036dx50000208982; webId=3554cd13845969a25bf33dc7661ef98a; gid=yjS0f0iqfdxyyjS0f0iq86qK4fukfESkdE47CfCEiFkA1K28Tj68d8888J8YjYJ8qJDd8Siy; ets=1781748835555; webBuild=6.20.2; unread={%22ub%22:%226a0d32d1000000000803f2fe%22%2C%22ue%22:%226a0923900000000036018ed5%22%2C%22uc%22:30}; web_session=040069b864fb418e6578cd2906384bb1683585; id_token=VjEAAKGfOdJuo3coJyoQso72UJ/G0A/mNl4mQQIIwtq0V0ATG9MnWhlxDR7JAcFxzFcAD7PPyapnPNCa0EFE/tUBZt5qFFkseLNi7Jg9JmJIETqfP97VcjJWRoAjZv1eYLAHbzEt; x-rednote-datactry=CN; x-rednote-holderctry=CN; acw_tc=0a0b121217817529575244794e0a2f32984ecc73837a4620d92be11ba2f7b2; customer-sso-sid=68c517652572050125766657rdu6xuklwgndqj5m; x-user-id-ad-market.xiaohongshu.com=6910b809000000003700352e; customerClientId=329193766973764; access-token-ad-market.xiaohongshu.com=customer.ad_market.AT-68c517652572050125783042aanffzhxztdkaur6; websectiga=984412fef754c018e472127b8effd174be8a5d51061c991aadd200c69a2801d6; sec_poison_id=888607b7-6321-4bba-8728-c0026279013b; xsecappid=xhs-pc-web; loadts=1781753370176"
+
+
 class DatabaseSettings(BaseModel):
    # host: str = "localhost"
     host: str = "47.108.24.14"
@@ -84,6 +88,7 @@ class Settings(BaseSettings):
     providers: ProviderSettings = ProviderSettings()
     external_apis: ExternalApiSettings = ExternalApiSettings()
     wechat: WeChatSettings = WeChatSettings()
+    xhs: XhsSettings = XhsSettings()
     database: DatabaseSettings = DatabaseSettings()
 
     class Config:

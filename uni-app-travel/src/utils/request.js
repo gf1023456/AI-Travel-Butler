@@ -124,6 +124,18 @@ export function request(options) {
           }
           
           reject(new Error(errorMsg))
+        } else if (res.statusCode === 400) {
+          // 400 请求错误
+          var responseData = res.data
+          var errorMsg = '请求参数错误'
+          
+          if (typeof responseData === 'object' && responseData.detail) {
+            if (typeof responseData.detail === 'string') {
+              errorMsg = responseData.detail
+            }
+          }
+          
+          reject(new Error(errorMsg))
         } else if (res.statusCode === 422) {
           // 422 可能是未登录、token 过期、或配额不足
           console.log('检测到422验证错误:', res.data)

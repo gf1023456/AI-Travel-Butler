@@ -10,6 +10,9 @@ import sys
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 
+# from dotenv import load_dotenv
+# load_dotenv()
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -69,6 +72,7 @@ from routes.poster import router as poster_router
 from routes.random_city import router as random_city_router
 from routes.plan_likes import router as plan_likes_router
 from routes.refine import router as refine_router
+from routes.xhs import router as xhs_router
 
 app.include_router(refine_router)
 app.include_router(poster_router)
@@ -83,6 +87,7 @@ app.include_router(plan_v2_router)
 app.include_router(plan_v3_router)
 app.include_router(plan_v4_router)
 app.include_router(skeleton_confirm_router)
+app.include_router(xhs_router)
 
 @app.on_event("startup")
 async def startup_plan_cleanup():

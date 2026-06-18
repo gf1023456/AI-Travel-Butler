@@ -207,20 +207,20 @@ class Database:
             db_config = settings.database
             db_url = f"postgresql://{db_config.username}:{db_config.password}@{db_config.host}:{db_config.port}/{db_config.name}"
 
-            # 连接池配置 - 从环境变量读取
-            pool_size = 5
-            max_overflow = 10
-            pool_timeout = 30
+        # 连接池配置
+        pool_size = 5
+        max_overflow = 10
+        pool_timeout = 30
 
-            self.engine = create_engine(
-                db_url,
-                pool_size=pool_size,
-                max_overflow=max_overflow,
-                pool_pre_ping=True,  # 使用前检查连接是否有效
-                pool_recycle=3600,  # 1小时回收连接，防止数据库端超时
-                pool_timeout=pool_timeout,  # 获取连接超时
-                echo=False
-            )
+        self.engine = create_engine(
+            db_url,
+            pool_size=pool_size,
+            max_overflow=max_overflow,
+            pool_pre_ping=True,
+            pool_recycle=3600,
+            pool_timeout=pool_timeout,
+            echo=False
+        )
         self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
         self._initialized = True
     
