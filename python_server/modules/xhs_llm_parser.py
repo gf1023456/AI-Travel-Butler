@@ -64,6 +64,9 @@ async def _call_llm(messages: List[Dict], timeout: float = 30) -> Optional[str]:
         api_key = settings.providers.deepseek_api_key
         model = settings.providers.default_deepseek_model
 
+    print(f"[XHS-LLM] provider={provider}, endpoint={endpoint}, model={model}")
+    print(f"[XHS-LLM] api_key length={len(api_key) if api_key else 0}")
+
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {api_key}"
@@ -83,24 +86,30 @@ async def _call_llm(messages: List[Dict], timeout: float = 30) -> Optional[str]:
     max_retries = settings.server.max_retries
     for attempt in range(max_retries + 1):
         try:
+            print(f"[XHS-LLM] attempt {attempt + 1}/{max_retries + 1}")
             async with httpx.AsyncClient(timeout=timeout) as client:
                 response = await client.post(endpoint, headers=headers, json=body)
+                print(f"[XHS-LLM] response status={response.status_code}")
                 if response.status_code != 200:
-                    print(f"[XHS-LLM] provider={provider} status={response.status_code}")
+                    print(f"[XHS-LLM] error body: {response.text[:500]}")
                     if attempt < max_retries:
                         await asyncio.sleep(0.3 * (attempt + 1))
                         continue
                     return None
 
                 data = response.json()
+                print(f"[XHS-LLM] response keys: {list(data.keys())}")
                 message = data.get("choices", [{}])[0].get("message", {})
                 content = message.get("content", "")
+                print(f"[XHS-LLM] content length={len(content) if content else 0}")
                 if content:
                     return content
                 return None
 
         except Exception as e:
-            print(f"[XHS-LLM] attempt {attempt + 1} failed: {e}")
+            import traceback
+            print(f"[XHS-LLM] attempt {attempt + 1} failed: {type(e).__name__}: {e}")
+            print(f"[XHS-LLM] traceback: {traceback.format_exc()}")
             if attempt < max_retries:
                 await asyncio.sleep(0.3 * (attempt + 1))
                 continue
