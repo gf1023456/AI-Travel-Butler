@@ -181,14 +181,24 @@ def _parse_note_card(note_card: Dict, note_id: str) -> Optional[Dict]:
     user = note_card.get("user", {})
     interact = note_card.get("interact_info", {})
 
+    # 提取作者名（兼容多种字段名）
+    author = (user.get("nickname") or 
+              user.get("nickName") or 
+              user.get("nick_name") or "")
+    
+    # 提取点赞数（兼容多种字段名）
+    likes = (interact.get("liked_count") or 
+             interact.get("likes") or 
+             interact.get("like_count") or 0)
+
     return {
         "note_id": note_id,
         "title": title,
         "content": content,
         "images": images,
         "tags": tags,
-        "author": user.get("nickname", ""),
-        "likes": int(interact.get("liked_count", 0) or 0),
+        "author": author,
+        "likes": int(likes) if likes else 0,
         "cover_url": images[0] if images else "",
     }
 
