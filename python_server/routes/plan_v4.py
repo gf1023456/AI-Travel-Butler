@@ -609,9 +609,9 @@ async def _execute_plan_v4_task(task_id: str, payload: Dict):
             mcp_trace.append(f"plan_v4:{task_id}:fill_empty")
             print(f"[PlanV4 {task_id}] Fill empty, using skeleton only")
 
-        # 等待图片和天气
+        # 等待图片和天气（图片含下载+压缩,留 30s 余量）
         try:
-            await asyncio.wait_for(image_task, timeout=15.0)
+            await asyncio.wait_for(image_task, timeout=30.0)
         except asyncio.TimeoutError:
             mcp_trace.append("image:global_timeout_fallback")
             print(f"[PlanV4 {task_id}] Image fetch timeout")

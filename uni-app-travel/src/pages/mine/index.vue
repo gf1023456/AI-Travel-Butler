@@ -167,7 +167,7 @@ const userStore = useUserStore()
 const { statusBarHeight, safeAreaBottom } = useSafeArea()
 
 const goBack = () => uni.navigateBack({ delta: 1 })
-const goExplore = () => uni.navigateTo({ url: '/pages/inspiration/index' })
+const goInspiration = () => uni.navigateTo({ url: '/pages/inspiration/index' })
 const goPlan = () => uni.navigateTo({ url: '/pages/ai-plan-detail/index' })
 const goMine = () => uni.reLaunch({ url: '/pages/mine/index' })
 const defaultAvatar = 'https://ui-avatars.com/api/?name=行程一下&background=1a237e&color=fff&size=256'

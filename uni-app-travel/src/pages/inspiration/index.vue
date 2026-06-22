@@ -655,7 +655,7 @@ async function importFromXhs() {
       const data = res.data
       travelStore.currentPlan = {
         itinerarySummary: data.itinerary_summary,
-        dayPlanItinerary: data.day_plan,
+        dayPlan: data.day_plan,
         socialRecommendations: [],
         evidence: [],
         warnings: [],

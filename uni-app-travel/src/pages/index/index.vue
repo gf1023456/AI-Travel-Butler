@@ -407,7 +407,7 @@ export default {
         this.zoom = 14
       }
     },
-    goExplore() { uni.navigateTo({ url: '/pages/explore/index' }) },
+    goInspiration() { uni.navigateTo({ url: '/pages/inspiration/index' }) },
     goInspiration() { uni.navigateTo({ url: '/pages/inspiration/index' }) },
     goPlan() { uni.navigateTo({ url: '/pages/ai-plan-detail/index' }) },
     goMine() { uni.navigateTo({ url: '/pages/mine/index' }) },

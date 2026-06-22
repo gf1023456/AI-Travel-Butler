@@ -12,7 +12,8 @@
   },
   "dependencies": {
     "@google/genai": "^0.7.0",
-    "leaflet": "1.9.4"
+    "leaflet": "1.9.4",
+    "webpack": "^5.107.2"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

@@ -111,6 +111,14 @@
             <!-- 描述 -->
             <text class="spot-desc" v-if="loc.description">{{ loc.description }}</text>
 
+            <!-- 小提醒 -->
+            <view class="spot-tips" v-if="loc.tips" style="margin-top: 8rpx;">
+              <view class="tip-icon">💡</view>
+              <view class="tip-content">
+                <text class="tip-main">{{ loc.tips }}</text>
+              </view>
+            </view>
+
             <!-- 摄影建议 / 实用信息 -->
             <view class="spot-tips" v-if="loc.visit_duration || loc.estimated_cost || loc.weather_icon">
               <view class="tip-icon">📷</view>
@@ -152,11 +160,11 @@
     <!-- 底部操作栏 -->
     <view class="footer-bar" :style="{ paddingBottom: (12 + safeAreaBottom) + 'px' }">
       <view class="footer-btns">
-        <button class="footer-btn" v-if="!plan.isFromHistory" @click="goAdjust">
+        <button class="footer-btn" v-if="!plan.isFromHistory && !plan.isFromPlaza" @click="goAdjust">
           <text class="btn-icon">✏️</text>
           <text class="btn-label">微调</text>
         </button>
-        <button class="footer-btn" :class="{ 'btn-disabled': saveLock }" @click="saveToHistory" :disabled="saveLock">
+        <button class="footer-btn" v-if="!plan.isFromPlaza" :class="{ 'btn-disabled': saveLock }" @click="saveToHistory" :disabled="saveLock">
           <text class="btn-icon">{{ saveLock ? '✓' : '💾' }}</text>
           <text class="btn-label">{{ saveLock ? '已保存' : '保存' }}</text>
         </button>
@@ -182,11 +190,11 @@
 
 <script setup>
 import { ref, computed, getCurrentInstance } from 'vue'
-import { onLoad, onShareAppMessage } from '@dcloudio/uni-app'
+import { onLoad, onShow, onShareAppMessage } from '@dcloudio/uni-app'
 import { useTravelStore } from '@/store/travel'
 import { useUserStore } from '@/store/user'
 import { useSafeArea } from '@/utils/safeArea.js'
-import { saveHistory } from '@/api/history.js'
+import { saveHistory, getPublicPlanDetail, getSharePlan } from '@/api/history.js'
 import { generatePoster as generateBackendPoster, downloadPoster } from '@/api/poster.js'
 
 const instance = getCurrentInstance()
@@ -197,11 +205,13 @@ const { statusBarHeight, safeAreaBottom } = useSafeArea()
 const plan = ref({})
 const saveLock = ref(false)
 const shareThumbnailPath = ref('')
+const isLoadingShare = ref(false)
 
 // 管理员自动发布到广场
 const isPublic = computed(() => userStore.userId === 1 || userStore.userId === '1')
 
 const days = computed(() => {
+  // 格式1: plan.days = [{day, itinerary, theme}]
   if (plan.value?.days && plan.value.days.length > 0) {
     return plan.value.days.map(d => ({
       day: d.day,
@@ -209,15 +219,46 @@ const days = computed(() => {
       theme: d.theme || ''
     }))
   }
+  // 格式2: plan.dayPlanItinerary = [{day, name, ...}] 扁平景点列表
   const items = plan.value?.dayPlanItinerary || []
-  if (!items.length) return []
-  const map = {}
-  for (const p of items) {
-    const key = p.day || 1
-    if (!map[key]) map[key] = { day: key, pois: [], theme: '' }
-    map[key].pois.push(p)
+  if (items.length) {
+    const map = {}
+    for (const p of items) {
+      const key = p.day || 1
+      if (!map[key]) map[key] = { day: key, pois: [], theme: '' }
+      map[key].pois.push(p)
+    }
+    return Object.values(map).sort((a, b) => a.day - b.day)
   }
-  return Object.values(map).sort((a, b) => a.day - b.day)
+  // 格式3: plan.dayPlan = [{summary, items}] 或 {dayKey: items[]} 广场/探索页来源
+  const dayPlan = plan.value?.dayPlan
+  if (!dayPlan) return []
+  if (Array.isArray(dayPlan) && dayPlan.length) {
+    // 检查是否扁平格式: [{day: 1, name: "...", image: "..."}]
+    if (dayPlan[0]?.name && dayPlan[0]?.day) {
+      const map = {}
+      for (const p of dayPlan) {
+        const key = p.day || 1
+        if (!map[key]) map[key] = { day: key, pois: [], theme: '' }
+        map[key].pois.push(p)
+      }
+      return Object.values(map).sort((a, b) => a.day - b.day)
+    }
+    // 嵌套格式: [{summary: "第1天", items: [...]}]
+    return dayPlan.map((d, i) => ({
+      day: i + 1,
+      pois: d.items || (Array.isArray(d) ? d : []),
+      theme: d.summary || ''
+    }))
+  }
+  if (typeof dayPlan === 'object') {
+    return Object.entries(dayPlan).map(([k, v]) => ({
+      day: parseInt(k) || 1,
+      pois: Array.isArray(v) ? v : [],
+      theme: ''
+    }))
+  }
+  return []
 })
 
 const daysCount = computed(() => days.value.length)
@@ -236,6 +277,7 @@ const destination = computed(() => {
 
 const heroImage = computed(() => {
   if (plan.value?.noteCoverUrl) return plan.value.noteCoverUrl
+  if (plan.value?.cover) return plan.value.cover
   const spots = allSpots.value
   for (const s of spots) {
     if (s.image) return s.image
@@ -428,7 +470,7 @@ function getTransitionText(from, to) {
   return `接下来去${to.name}。`
 }
 
-function goBack() { uni.navigateBack() }
+function goBack() { uni.navigateBack({ fail: () => uni.reLaunch({ url: '/pages/inspiration/index' }) }) }
 
 function goAdjust() {
   if (plan.value?.isFromHistory) return
@@ -443,7 +485,6 @@ async function saveToHistory() {
     return
   }
   saveLock.value = true
-  setTimeout(() => { saveLock.value = false }, 1500)
 
   const coverUrl = allSpots.value.find(s => s.image)?.image || ''
 
@@ -464,35 +505,21 @@ async function saveToHistory() {
     })
     uni.hideLoading()
     if (result?.id) {
-      uni.showToast({ title: result.deduped ? '已存在相同方案' : '已保存到我的行程', icon: 'none' })
+      plan.value.id = result.id
+      uni.showToast({ title: result.deduped ? '已存在相同方案' : '保存成功', icon: 'none' })
     } else {
-      saveToLocal()
+      uni.showToast({ title: '保存失败，请重试', icon: 'none' })
     }
   } catch (e) {
     uni.hideLoading()
     uni.showToast({ title: e.message || '保存失败', icon: 'none' })
-    saveToLocal()
-  }
-}
-
-function saveToLocal() {
-  try {
-    const history = JSON.parse(uni.getStorageSync('travel_history') || '[]')
-    history.unshift({
-      id: Date.now(),
-      timestamp: new Date().toLocaleString(),
-      summary: plan.value?.itinerarySummary || '',
-      itinerary: allSpots.value
-    })
-    if (history.length > 30) history.pop()
-    uni.setStorageSync('travel_history', JSON.stringify(history))
-    uni.showToast({ title: '已保存到本地', icon: 'success' })
-  } catch {
-    uni.showToast({ title: '保存失败', icon: 'error' })
+  } finally {
+    saveLock.value = false
   }
 }
 
 // ===== 分享海报 =====
+
 async function sharePoster() {
   if (!allSpots.value.length) {
     uni.showToast({ title: '无行程可分享', icon: 'none' })
@@ -691,13 +718,27 @@ function fallbackCopyText() {
 
 // ===== 地图 =====
 function goMap() {
+  // 把当前方案数据同步给地图页（地图页读 currentPlan）
+  const src = plan.value
+  if (src) {
+    const spots = days.value.flatMap(d => d.pois)
+    travelStore.currentPlan = {
+      ...src,
+      dayPlanItinerary: spots.map((s, i) => ({
+        ...s,
+        day: s.day || 1,
+        sequence: s.sequence ?? (i + 1)
+      }))
+    }
+  }
   uni.switchTab({ url: '/pages/index/index' })
 }
 
 // ===== 微信分享 =====
 onShareAppMessage(() => {
   const title = `${destination.value}${daysCount.value}天行程 — ${plan.value?.itinerarySummary || '行程一下'}`
-  const path = `/pages/ai-plan-detail/index?planId=${plan.value?._taskId || plan.value?.requestId || ''}`
+  const planId = plan.value?.id || plan.value?.historyId || ''
+  const path = `/pages/ai-plan-detail/index?planId=${planId}`
   return {
     title,
     path,
@@ -709,15 +750,55 @@ onLoad(async (options) => {
   // 恢复用户信息（管理员自动发布依赖 userId）
   userStore.restoreFromStorage()
 
-  if (travelStore.currentPlan) {
+  const isShareLink = !!options?.planId
+
+  if (travelStore.currentPlan && !isShareLink) {
     plan.value = travelStore.currentPlan
+  } else if (travelStore.previewPlan && !isShareLink) {
+    plan.value = { ...travelStore.previewPlan, isFromPlaza: true }
   } else {
     const planId = options?.planId
     if (planId) {
-      const found = (travelStore.planHistory || []).find(h => h._taskId === planId || h.requestId === planId)
-      if (found) plan.value = found
+      isLoadingShare.value = true
+      // 先本地找
+      const found = (travelStore.planHistory || []).find(h => h._taskId === planId || h.requestId === planId || String(h.id) === String(planId))
+      if (found) {
+        plan.value = { ...found, isFromPlaza: true }
+      } else {
+        // 本地没有，从服务器拉取
+        try {
+          uni.showLoading({ title: '加载方案…' })
+          const detail = await getSharePlan(planId)
+          uni.hideLoading()
+          if (detail) {
+            const rawDays = detail.day_plan || []
+            const dayPlan = Array.isArray(rawDays)
+              ? rawDays.map((d, i) => typeof d === 'object' && d.items
+                  ? d
+                  : { summary: detail.itinerary_summary || `第 ${i + 1} 天`, items: Array.isArray(d) ? d : (d ? [d] : []) })
+              : typeof rawDays === 'object'
+                ? Object.entries(rawDays).map(([k, v]) => ({ summary: `第 ${k} 天`, items: Array.isArray(v) ? v : [] }))
+                : []
+            plan.value = {
+              id: detail.id,
+              title: detail.title || '',
+              cover: detail.cover || '',
+              userInput: detail.user_input || '',
+              dayPlan,
+              itinerarySummary: detail.itinerary_summary || detail.summary || '',
+              category: detail.category || 'city',
+              isFromPlaza: true
+            }
+          }
+        } catch (e) {
+          uni.hideLoading()
+          console.warn('[PlanDetail] 从服务器加载方案失败:', e)
+        } finally {
+          isLoadingShare.value = false
+        }
+      }
     }
-    if (!plan.value?.dayPlanItinerary) {
+    if (!plan.value?.dayPlanItinerary && !plan.value?.dayPlan) {
       try {
         const cached = uni.getStorageSync('ai_current_plan')
         if (cached) plan.value = cached
@@ -725,9 +806,30 @@ onLoad(async (options) => {
     }
   }
 
+  // 非分享链接、且还没有数据库 id → 自动保存（好友共创分享需要 planId）
+  if (!isShareLink && plan.value && !plan.value.id && !plan.value.historyId && allSpots.value.length) {
+    try {
+      await saveToHistory()
+    } catch (e) {
+      console.warn('[PlanDetail] 自动保存失败:', e)
+    }
+  }
+
   // 预生成分享缩略图
   const thumb = await generateShareThumbnail()
   if (thumb) shareThumbnailPath.value = thumb
+})
+
+// 每次页面显示时重新从 store 读取方案（解决返回后点新方案仍显示旧方案的问题）
+onShow(() => {
+  // 分享链接加载中或已加载的方案不覆盖
+  if (isLoadingShare.value) return
+  if (plan.value?.isFromPlaza && plan.value?.id) return
+  if (travelStore.currentPlan) {
+    plan.value = travelStore.currentPlan
+  } else if (travelStore.previewPlan) {
+    plan.value = { ...travelStore.previewPlan, isFromPlaza: true }
+  }
 })
 </script>
 
@@ -745,7 +847,7 @@ onLoad(async (options) => {
 .top-bar {
   position: fixed; top: 0; left: 0; right: 0;
   display: flex; align-items: center; justify-content: space-between;
-  padding: 12rpx 32rpx 8rpx;
+  padding: 80rpx 32rpx 8rpx;
   z-index: 100;
 }
 .back-btn {

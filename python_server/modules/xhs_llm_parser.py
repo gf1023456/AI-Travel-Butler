@@ -30,23 +30,27 @@ _XHS_PARSE_PROMPT = """你是一位旅行笔记解析专家。请将以下小红
       "sequence": 1,
       "name": "景点名（去掉emoji编号和装饰符号）",
       "city": "城市",
-      "description": "笔记中关于该景点的原文描述（50字以内，保留原文风味）",
+      "description": "笔记原文中关于该景点的描述，保留口语化表达、emoji、感叹词，200字以内",
+      "tips": "笔记中提到的实用小提醒，如营业时间、避坑、交通、穿搭建议等，没有则留空",
       "time": "建议时间（如上午、下午、晚上，根据笔记推断）",
-      "category": "SIGHT/FOOD/SHOPPING"
+      "category": "city/photo/food/couple/family/rusher/road"
     }}
   ]
 }}
 
 【规则】
-1. day_plan 按笔记原文的 Day/天 分组，保持原始顺序
-2. name 提取真实景点名（去掉 1⃣️ 2⃣️ ① ② 等 emoji 编号和装饰符号）
-3. description 保留笔记原文中对该景点的描述，不要编造
-4. 如果笔记没有明确 Day 分组，全部归为 day=1
-5. category 根据内容判断：景点=SIGHT，美食=FOOD，购物=SHOPPING
-6. 只输出 JSON，不要其他文字"""
+0. 如果正文结构简单（1天或1-2个景点），直接返回。
+1. day_plan 按笔记原文的 Day/天 分组，保持原始顺序（景点出现的先后顺序必须和笔记正文一致）
+2. name 提取景点的完整官方名称（如"赛格国际购物中心"而不是"赛格"，"陕西历史博物馆"保持完整）。去掉 1⃣️ 2⃣️ ① ② 等 emoji 编号和装饰符号
+3. description 必须保留笔记原文的口语风格！不要改写成书面语。保留原文中的 emoji（如 🔥 ）、感叹（如 "绝绝子！"）、口语（如 "yyds" "避雷" "冲"）。字数限制200字以内，但尽量多保留原文内容
+4. tips 提取笔记中零散的实用信息：门票价格、开放时间、交通方式、穿搭建议、避坑提醒、最佳拍照时间等。如果没有明显的小提醒则留空字符串
+5. 如果笔记没有明确 Day 分组，全部归为 day=1
+6. category 根据内容判断，只能是以下之一：city/photo/food/couple/family/rusher/road
+7. city 输出城市简称，不带"市/省/自治区"后缀（如"西安"而非"西安市"，"北京"而非"北京市"）
+8. 只输出 JSON，不要其他文字"""
 
 
-async def _call_llm(messages: List[Dict], timeout: float = 30) -> Optional[str]:
+async def _call_llm(messages: List[Dict], timeout: float = 60) -> Optional[str]:
     """调用 LLM API（简化版，不走 tools）"""
     provider = settings.rollout.primary_provider
     endpoint = API_ENDPOINTS.get(provider, API_ENDPOINTS["deepseek"])
@@ -190,14 +194,15 @@ async def llm_parse_note(
         }
         失败返回 None
     """
-    prompt = _XHS_PARSE_PROMPT.format(title=title, content=content[:3000])
+    # 图片不传给 LLM，节省 token；解析完后按笔记顺序分配
+    prompt = _XHS_PARSE_PROMPT.format(title=title, content=content[:5000])
 
     messages = [
         {"role": "system", "content": "你是旅行笔记解析专家，只输出 JSON。"},
         {"role": "user", "content": prompt}
     ]
 
-    response_text = await _call_llm(messages, timeout=30)
+    response_text = await _call_llm(messages, timeout=60)
     if not response_text:
         print("[XHS-LLM] LLM 返回为空")
         return None
@@ -220,6 +225,7 @@ async def llm_parse_note(
         spot.setdefault('day', 1)
         spot.setdefault('sequence', i + 1)
         spot.setdefault('description', '')
+        spot.setdefault('tips', '')
         spot.setdefault('reason', '')
         spot.setdefault('time', '')
         spot.setdefault('category', 'SIGHT')
@@ -227,9 +233,11 @@ async def llm_parse_note(
     # 过滤无效景点
     day_plan = [s for s in day_plan if isinstance(s, dict) and s.get('name')]
 
-    # 分配图片
+    # 按笔记原始顺序分配图片（LLM 保持了笔记顺序，直接按位置对应）
     if images:
-        day_plan = _assign_images(day_plan, images)
+        for i, spot in enumerate(day_plan):
+            if i < len(images):
+                spot['image'] = images[i]
 
     category = _infer_category(title, content)
     inferred_city = city or data.get('city', '')

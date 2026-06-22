@@ -10,6 +10,38 @@ from database import db
 from database.models import TravelPlan, PlanLike
 from constants.travel_styles import is_valid_slug
 
+
+def _ensure_https(url: str) -> str:
+    """http → https 统一转换"""
+    if url and url.startswith("http://"):
+        return "https://" + url[7:]
+    return url
+
+
+def _fix_image_urls(day_plan: Any) -> Any:
+    """递归修复 day_plan 中所有图片 URL 为 https"""
+    if not day_plan:
+        return day_plan
+    if isinstance(day_plan, list):
+        for item in day_plan:
+            if isinstance(item, dict):
+                if "image" in item:
+                    item["image"] = _ensure_https(item["image"])
+                if "cover_url" in item:
+                    item["cover_url"] = _ensure_https(item["cover_url"])
+                # 递归处理 items 子列表
+                if "items" in item and isinstance(item["items"], list):
+                    for sub in item["items"]:
+                        if isinstance(sub, dict) and "image" in sub:
+                            sub["image"] = _ensure_https(sub["image"])
+    elif isinstance(day_plan, dict):
+        for _dk, day in day_plan.items():
+            if isinstance(day, list):
+                for item in day:
+                    if isinstance(item, dict) and "image" in item:
+                        item["image"] = _ensure_https(item["image"])
+    return day_plan
+
 # 创建路由实例
 router = APIRouter(prefix="/api/history", tags=["历史记录"])
 
@@ -29,7 +61,7 @@ class PlanSaveRequest(BaseModel):
     tokens_used: Optional[int] = None
     cost_estimate: Optional[float] = None
     # v1.1+: 广场/分类/封面
-    category: Optional[str] = None           # light/deep/food/outdoor
+    category: Optional[str] = None           # city/photo/food/couple/family/rusher/road
     is_public: Optional[bool] = False
     cover_url: Optional[str] = None
 
@@ -158,7 +190,7 @@ async def get_history_detail(
             "model_type": plan.model_type,
             "provider": plan.provider,
             "itinerary_summary": plan.itinerary_summary,
-            "day_plan": plan.day_plan,
+            "day_plan": _fix_image_urls(plan.day_plan),
             "social_recommendations": plan.social_recommendations,
             "evidence": plan.evidence,
             "warnings": plan.warnings,
@@ -193,10 +225,11 @@ async def save_plan_to_history(
     if not user_input_value:
         raise HTTPException(status_code=422, detail="user_input is required")
 
-    # v1.1: 校验 category 合法性
+    # v1.1: category 合法性检查，无效则降级为默认值
     category = getattr(request_data, 'category', None)
     if category and not is_valid_slug(category):
-        return {"code": 400, "msg": f"无效的 category: {category}"}
+        print(f"[save] 无效 category: {category}，降级为 city")
+        category = 'city'
 
     is_public = bool(getattr(request_data, 'is_public', False))
     if is_public and not category:
@@ -265,7 +298,7 @@ async def save_plan_to_history(
             "model_type": plan_entity.model_type,
             "provider": plan_entity.provider,
             "itinerary_summary": plan_entity.itinerary_summary,
-            "day_plan": plan_entity.day_plan,
+            "day_plan": _fix_image_urls(plan_entity.day_plan),
             "social_recommendations": plan_entity.social_recommendations,
             "evidence": plan_entity.evidence,
             "warnings": plan_entity.warnings,
@@ -354,7 +387,7 @@ async def toggle_plan_favorite(
 async def get_public_plans(
         page: int = Query(1, ge=1),
         page_size: int = Query(10, ge=1, le=50),
-        category: Optional[str] = Query(None, description="light/deep/food/outdoor，'all' 或空表示全部"),
+        category: Optional[str] = Query(None, description="city/photo/food/couple/family/rusher/road，'all' 或空表示全部"),
         sort: Optional[str] = Query("hot", description="hot(按点赞数) / new(按创建时间)"),
         authorization: Optional[str] = Header(None)
 ):
@@ -447,7 +480,7 @@ async def get_public_plans(
             title = (summary[:30] + "...") if len(summary) > 30 else (summary or "旅行方案")
 
             # 封面优先级：cover_url > 抓 day_plan image > fallback
-            cover = p.cover_url
+            cover = _ensure_https(p.cover_url or "")
             if not cover:
                 cover = _extract_first_image(p.day_plan) or fallback_covers[i % len(fallback_covers)]
 
@@ -528,7 +561,7 @@ async def get_public_plan_detail(plan_id: int, authorization: Optional[str] = He
             "user_input": plan.user_input,
             "model_type": plan.model_type,
             "itinerary_summary": plan.itinerary_summary,
-            "day_plan": plan.day_plan,
+            "day_plan": _fix_image_urls(plan.day_plan),
             "social_recommendations": plan.social_recommendations,
             "evidence": plan.evidence,
             "warnings": plan.warnings,
@@ -538,11 +571,40 @@ async def get_public_plan_detail(plan_id: int, authorization: Optional[str] = He
             "is_liked": is_liked,
             "is_favorited": is_favorited,
             "author": author.nickname if author else "匿名旅者",
-            "author_avatar": author.avatar_url if author else "",
+            "author_avatar": _ensure_https(author.avatar_url or "") if author else "",
             "created_at": plan.created_at.isoformat() if plan.created_at else None
         }
 
     return {"code": 0, "data": plan_dict}
+
+
+@router.get("/share/{plan_id}")
+async def get_share_plan(plan_id: int):
+    """
+    好友共创：通过 planId 直接查询方案详情，无需登录
+    """
+    from database.models import TravelPlan
+
+    with db.get_session() as session:
+        plan = session.query(TravelPlan).filter(
+            TravelPlan.id == plan_id,
+            TravelPlan.is_deleted == False
+        ).first()
+
+        if not plan:
+            return {"code": 404, "msg": "行程不存在"}
+
+        return {
+            "code": 0,
+            "data": {
+                "id": plan.id,
+                "itinerary_summary": plan.itinerary_summary or "",
+                "day_plan": plan.day_plan,
+                "category": plan.category or "city",
+                "cover": plan.cover_url or "",
+                "user_input": plan.user_input or "",
+            }
+        }
 
 
 @router.delete("/{plan_id}")

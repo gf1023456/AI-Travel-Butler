@@ -46,13 +46,6 @@
       }
     },
     {
-      "path": "pages/explore/index",
-      "style": {
-        "navigationBarTitleText": "灵感探索",
-        "navigationStyle": "custom"
-      }
-    },
-    {
       "path": "pages/history/index",
       "style": {
         "navigationBarTitleText": "历史记录",

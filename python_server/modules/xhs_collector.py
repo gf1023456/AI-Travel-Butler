@@ -160,12 +160,14 @@ class XhsCollector:
         return 0
 
     def _extract_image_url(self, image_info: Dict[str, Any]) -> str:
-        """提取图片链接"""
+        """提取图片链接（http 自动转 https）"""
         if not isinstance(image_info, dict):
             return ""
         for key in ("url_default", "url_pre", "url", "urlDefault", "urlPre"):
             url = image_info.get(key)
             if url:
+                if url.startswith("http://"):
+                    url = "https://" + url[7:]
                 return url
         info_list = image_info.get("infoList") or []
         if isinstance(info_list, list):

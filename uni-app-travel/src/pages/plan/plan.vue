@@ -398,8 +398,7 @@ const getPlaceholderImg = (idx) => {
   return imgs[idx % imgs.length]
 }
 
-const goBack = () => uni.redirectTo({ url: '/pages/index/index' })
-const goExplore = () => uni.navigateTo({ url: '/pages/explore/index' })
+const goBack = () => uni.navigateBack({ fallback: () => uni.reLaunch({ url: '/pages/inspiration/index' }) })
 const goInspiration = () => uni.navigateTo({ url: '/pages/inspiration/index' })
 const goRefine = () => uni.navigateTo({ url: '/pages/refine/refine' })
 
@@ -565,7 +564,7 @@ const generateBackendLongPoster = async () => {
 .top-bar {
   position: fixed; top: 0; left: 0; right: 0; z-index: 10;
   display: flex; align-items: center; justify-content: space-between;
-  padding: 24rpx 40rpx 24rpx;
+  padding: 80rpx 40rpx 24rpx;
   background: rgba(255,255,255,0.7); backdrop-filter: blur(40px);
   -webkit-backdrop-filter: blur(40px);
   border-bottom: 1px solid rgba(255,255,255,0.2);

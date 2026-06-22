@@ -168,9 +168,9 @@ export async function getPublicPlans({ page = 1, pageSize = 6, category = 'all',
     // 降级返回示例数据
     return {
       list: [
-        { id: 1, title: '东京樱花季5日游', author: '旅行达人小王', category: 'light', likes: 128, is_liked: false, cover: 'https://tonystark-ai.ccwu.cc/png/fed79683-fbb6-44ac-9327-44c2f269cc47.png' },
+        { id: 1, title: '东京樱花季5日游', author: '旅行达人小王', category: 'city', likes: 128, is_liked: false, cover: 'https://tonystark-ai.ccwu.cc/png/fed79683-fbb6-44ac-9327-44c2f269cc47.png' },
         { id: 2, title: '成都美食探店3日', author: '吃货阿杰', category: 'food', likes: 89, is_liked: false, cover: 'https://tonystark-ai.ccwu.cc/png/600dc4e1-70ed-491a-85d4-a0edea269eb8.png' },
-        { id: 3, title: '三亚亲子度假4日', author: '幸福家庭', category: 'light', likes: 256, is_liked: false, cover: 'https://tonystark-ai.ccwu.cc/png/79b1c1f7-445f-49bc-a075-e44c66b289d8.png' },
+        { id: 3, title: '三亚亲子度假4日', author: '幸福家庭', category: 'family', likes: 256, is_liked: false, cover: 'https://tonystark-ai.ccwu.cc/png/79b1c1f7-445f-49bc-a075-e44c66b289d8.png' },
         { id: 4, title: '丽江古城慢生活', author: '文艺青年', category: 'city', likes: 67, is_liked: false, cover: 'https://tonystark-ai.ccwu.cc/png/fed79683-fbb6-44ac-9327-44c2f269cc47.png' },
         { id: 5, title: '上海外滩深度游', author: '都市漫步者', category: 'photo', likes: 193, is_liked: false, cover: 'https://tonystark-ai.ccwu.cc/png/600dc4e1-70ed-491a-85d4-a0edea269eb8.png' },
         { id: 6, title: '西安古都探秘', author: '历史爱好者', category: 'rusher', likes: 145, is_liked: false, cover: 'https://tonystark-ai.ccwu.cc/png/79b1c1f7-445f-49bc-a075-e44c66b289d8.png' }
@@ -213,4 +213,18 @@ export async function likePlan(planId) {
     return data.data
   }
   throw new Error(data?.msg || '点赞失败')
+}
+
+/**
+ * 好友共创：通过 planId 查询方案详情（无需登录）
+ */
+export async function getSharePlan(planId) {
+  const data = await request({
+    url: `/history/share/${planId}`,
+    method: 'GET'
+  })
+  if (data && data.code === 0 && data.data) {
+    return data.data
+  }
+  return null
 }

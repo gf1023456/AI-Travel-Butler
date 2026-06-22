@@ -52,7 +52,7 @@ class ProviderSettings(BaseModel):
 
 
 class ExternalApiSettings(BaseModel):
-    amap_api_key: str = ""
+    amap_api_key: str = "1ac4e414cee2b2d77e6753265c8ba6f0"
     weather_api_key: str = ""
     tdt_api_key: str = "97f9870fb795ba80ef201d6edae71d73"
     pixabay_api_key: str = "55871092-ce4b6588eec534eb37300c1f9"
@@ -65,8 +65,7 @@ class WeChatSettings(BaseModel):
 
 
 class XhsSettings(BaseModel):
-    cookie: str = "abRequestId=0f92185b-1213-5ce1-92b7-26cc493997ba; a1=19cadaf304dzgdwcgew4uwfrgqlk9m0ehmx6036dx50000208982; webId=3554cd13845969a25bf33dc7661ef98a; gid=yjS0f0iqfdxyyjS0f0iq86qK4fukfESkdE47CfCEiFkA1K28Tj68d8888J8YjYJ8qJDd8Siy; ets=1781748835555; webBuild=6.20.2; unread={%22ub%22:%226a0d32d1000000000803f2fe%22%2C%22ue%22:%226a0923900000000036018ed5%22%2C%22uc%22:30}; web_session=040069b864fb418e6578cd2906384bb1683585; id_token=VjEAAKGfOdJuo3coJyoQso72UJ/G0A/mNl4mQQIIwtq0V0ATG9MnWhlxDR7JAcFxzFcAD7PPyapnPNCa0EFE/tUBZt5qFFkseLNi7Jg9JmJIETqfP97VcjJWRoAjZv1eYLAHbzEt; x-rednote-datactry=CN; x-rednote-holderctry=CN; acw_tc=0a0b121217817529575244794e0a2f32984ecc73837a4620d92be11ba2f7b2; customer-sso-sid=68c517652572050125766657rdu6xuklwgndqj5m; x-user-id-ad-market.xiaohongshu.com=6910b809000000003700352e; customerClientId=329193766973764; access-token-ad-market.xiaohongshu.com=customer.ad_market.AT-68c517652572050125783042aanffzhxztdkaur6; websectiga=984412fef754c018e472127b8effd174be8a5d51061c991aadd200c69a2801d6; sec_poison_id=888607b7-6321-4bba-8728-c0026279013b; xsecappid=xhs-pc-web; loadts=1781753370176"
-
+    cookie: str = "abRequestId=aff51df3-3fc7-597b-b16e-f8a7236d5dad; xsecappid=xhs-pc-web; a1=19d0ee53f422iu5bxapq6xa2rsgynmu2iucrm9e4q50000127652; webId=49a43481ab7eed7433e85955ec3ae54a; gid=yjf8dd24D832yjf8dd2qi7jd4JJ372DC0UAKS4AC0JFMkF28vI67J6888yJWK2J8YWd8fqjD; ets=1781780269264; x-rednote-datactry=CN; x-rednote-holderctry=CN; webBuild=6.21.0; loadts=1782024758425; acw_tc=0ad6fb0717820247602948727e5d8c0b89a71d3e745e0e6de4a82f8db93984; websectiga=f47eda31ec99545da40c2f731f0630efd2b0959e1dd10d5fedac3dce0bd1e04d; sec_poison_id=95d88ea7-341b-4f9c-8946-c0a2f78816fa; web_session=040069b864fb418e657803c202384b65fcfab3; id_token=VjEAAL9gz5bRXB/Qj7HNCir5ZmLVFRzklkCMq6Ez4II4s5yxC1ojcGACYRjrUfVdXrWNKHyGCD3UGGHjBsO9B1GXXRTb8H1zCVPt9H47d+Q0KVWd+66QrkRXqgyfs8hvuTqrf5bl"
 
 class DatabaseSettings(BaseModel):
    # host: str = "localhost"

@@ -14,7 +14,7 @@ import { getQuota } from './api/quota.js'
 const whiteList = [
   '/pages/login/index',
   '/pages/inspiration/index',  // 灵感页（首页）无需登录
-  '/pages/explore/index',       // 探索页无需登录
+  '/pages/inspiration/index',       // 灵感页无需登录
 ]
 
 onLaunch(() => {

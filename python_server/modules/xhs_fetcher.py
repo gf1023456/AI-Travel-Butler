@@ -8,6 +8,11 @@ from typing import Optional, Dict
 from urllib.parse import urlparse, parse_qs
 
 from config import settings
+
+
+class CookieExpiredError(Exception):
+    """小红书 Cookie 过期异常"""
+    pass
 from modules.xhs_sign import XhsSign
 
 
@@ -32,8 +37,41 @@ def extract_xsec_token(url: str) -> str:
     return parse_qs(query).get("xsec_token", [""])[0] or ""
 
 
+# Cookie 自动刷新：过期时用 Playwright 无头浏览器从源头获取新 cookie
+_runtime_cookie: str = ""
+
+
 def _get_cookie() -> str:
-    return settings.xhs.cookie
+    return _runtime_cookie or settings.xhs.cookie
+
+
+def set_cookie(new_cookie: str):
+    """管理接口：手动设置 cookie"""
+    global _runtime_cookie
+    _runtime_cookie = new_cookie
+    print(f"[XHS] Cookie 已手动更新，长度={len(new_cookie)}")
+
+
+async def _refresh_cookie() -> str:
+    """Cookie 过期时自动刷新：用 Playwright 从 XHS 网站获取新 cookie"""
+    global _runtime_cookie
+    try:
+        from modules.get_xhs_cookie import get_xiaohongshu_cookie, is_cookie_valid, _STATE_PATH
+        import os
+        print("[XHS] Cookie 过期，正在自动刷新...")
+        if not os.path.exists(_STATE_PATH):
+            print(f"[XHS] 自动刷新失败：未找到登录状态文件 {_STATE_PATH}")
+            print("[XHS] 请先在有界面的环境运行: python -m modules.get_xhs_cookie")
+            return ""
+        new_cookie = await get_xiaohongshu_cookie()
+        if new_cookie and is_cookie_valid(new_cookie):
+            _runtime_cookie = new_cookie
+            print(f"[XHS] Cookie 自动刷新成功，长度={len(new_cookie)}")
+            return new_cookie
+        print("[XHS] Cookie 自动刷新失败：获取到的 cookie 无效")
+    except Exception as e:
+        print(f"[XHS] Cookie 自动刷新异常: {e}")
+    return ""
 
 
 def _extract_url_from_text(text: str) -> str:
@@ -65,32 +103,36 @@ async def fetch_note_by_url(url: str) -> Optional[Dict]:
         print("[XHS] note_id 提取失败")
         return None
 
-    cookie = _get_cookie()
-    if not cookie:
-        print("[XHS] cookie 为空")
-        return None
+    for attempt in range(2):
+        cookie = _get_cookie()
+        if not cookie:
+            print("[XHS] cookie 为空")
+            return None
 
-    xsec_token = extract_xsec_token(url)
-    print(f"[XHS] note_id={note_id}, xsec_token={'有' if xsec_token else '无'}, cookie_len={len(cookie)}")
+        xsec_token = extract_xsec_token(url) if attempt == 0 else None
+        if not xsec_token:
+            xsec_token = await _get_xsec_token_from_html(note_id, url, cookie)
+            if xsec_token:
+                print(f"[XHS] 从 HTML 获取 xsec_token: {xsec_token[:20]}...")
 
-    # 如果 URL 没有 xsec_token，先请求页面获取
-    if not xsec_token:
-        xsec_token = await _get_xsec_token_from_html(note_id, url, cookie)
-        if xsec_token:
-            print(f"[XHS] 从 HTML 获取 xsec_token: {xsec_token[:20]}...")
+        if not xsec_token:
+            print("[XHS] 无法获取 xsec_token")
+            return None
 
-    if not xsec_token:
-        print("[XHS] 无法获取 xsec_token")
-        return None
+        print(f"[XHS] note_id={note_id}, xsec_token={'有' if xsec_token else '无'}, cookie_len={len(cookie)}, attempt={attempt + 1}")
 
-    # 调用 feed API（与 xhs_collector.fetch_note_detail 完全一致）
-    return await _fetch_note_detail(note_id, xsec_token, cookie)
+        result = await _fetch_note_detail(note_id, xsec_token, cookie)
+        if result:
+            return result
+
+        # cookie 刷新了，重试时用新 cookie + 新 xsec_token
+        if attempt == 0:
+            print("[XHS] 首次尝试失败，用刷新后的 cookie 重试...")
+
+    return None
 
 
 async def _fetch_note_detail(note_id: str, xsec_token: str, cookie: str) -> Optional[Dict]:
-    """
-    与 xhs_collector.py 的 fetch_note_detail 完全一致
-    """
     api_url = "https://edith.xiaohongshu.com/api/sns/web/v1/feed"
 
     payload = {
@@ -101,8 +143,15 @@ async def _fetch_note_detail(note_id: str, xsec_token: str, cookie: str) -> Opti
         "xsec_token": xsec_token,
     }
 
-    signer = XhsSign()
-    sign_headers = signer.sign_headers_post(api_url, cookie, payload=payload)
+    # 用 xhshow 纯算法签名
+    try:
+        from xhshow import Xhshow
+        xhshow_client = Xhshow()
+        sign_headers = xhshow_client.sign_headers_post(api_url, cookies=cookie, payload=payload)
+    except Exception as e:
+        print(f"[XHS] xhshow 签名失败，回退 Python 签名: {e}")
+        signer = XhsSign()
+        sign_headers = signer.sign_headers_post(api_url, cookie, payload=payload)
 
     headers = {
         "Content-Type": "application/json;charset=UTF-8",
@@ -140,7 +189,9 @@ async def _fetch_note_detail(note_id: str, xsec_token: str, cookie: str) -> Opti
         print(f"[XHS] feed code={code}, msg={data.get('msg', '')}")
 
         if code == -100:
-            print("[XHS] Cookie 已失效")
+            # Cookie 过期，刷新后由上层重试
+            print("[XHS] Cookie 过期，自动刷新中...")
+            await _refresh_cookie()
             return None
 
         if code != 0:
@@ -170,6 +221,8 @@ def _parse_note_card(note_card: Dict, note_id: str) -> Optional[Dict]:
     for img in note_card.get("image_list", []):
         url_default = img.get("url_default", "") or img.get("url_pre", "") or img.get("url", "")
         if url_default:
+            if url_default.startswith("http://"):
+                url_default = "https://" + url_default[7:]
             images.append(url_default)
 
     tags = []

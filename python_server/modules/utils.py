@@ -61,42 +61,41 @@ _geocoding_cache: Dict[str, Dict[str, float]] = {}
 
 
 async def geocode_location(name: str, city: str = "") -> Optional[Dict[str, float]]:
-    """通过高德地图 API 获取地点的真实经纬度（带缓存）"""
+    """通过高德地图 API 获取地点的真实经纬度（带缓存，失败自动重试）"""
     cache_key = f"{city}:{name}"
     if cache_key in _geocoding_cache:
         return _geocoding_cache[cache_key]
-    
+
     from config import settings
     api_key = settings.external_apis.amap_api_key
     if not api_key:
         print(f"[Geocoding] 高德 API key 未配置，无法获取真实坐标: {name}")
         return None
-    
+
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            # 关键词 = 地点名 + 城市（提高匹配精度）
-            keywords = f"{name}" + (f" {city}" if city else "")
-            resp = await client.get(
-                "https://restapi.amap.com/v3/place/text",
-                params={
-                    "key": api_key,
-                    "keywords": keywords,
-                    "city": city or "全国",
-                    "output": "json",
-                    "batch": "false",
-                }
-            )
-            if resp.status_code == 200:
-                data = resp.json()
-                pois = data.get("pois", [])
-                if pois and len(pois) > 0:
-                    location = pois[0].get("location", "")
-                    if location:
-                        lng_str, lat_str = location.split(",")
-                        result = {"lat": float(lat_str), "lng": float(lng_str)}
-                        _geocoding_cache[cache_key] = result
-                        print(f"[Geocoding] {name} → lat={result['lat']}, lng={result['lng']}")
-                        return result
+            # 有城市：先带城市精确搜，搜不到再放宽
+            # 无城市：纯名称搜
+            attempts = []
+            if city:
+                attempts.append({"keywords": name, "city": city})
+            attempts.append({"keywords": name})
+
+            for params in attempts:
+                params.update({"key": api_key, "output": "json"})
+                resp = await client.get("https://restapi.amap.com/v3/place/text", params=params)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    pois = data.get("pois", [])
+                    if pois and len(pois) > 0:
+                        location = pois[0].get("location", "")
+                        if location:
+                            lng_str, lat_str = location.split(",")
+                            result = {"lat": float(lat_str), "lng": float(lng_str)}
+                            _geocoding_cache[cache_key] = result
+                            print(f"[Geocoding] {name} → lat={result['lat']}, lng={result['lng']}")
+                            return result
+
         print(f"[Geocoding] 未找到地点: {name}")
         return None
     except Exception as e:
@@ -105,8 +104,22 @@ async def geocode_location(name: str, city: str = "") -> Optional[Dict[str, floa
 
 
 def get_city_center(city: str) -> Dict[str, float]:
-    """Get city center coordinates."""
-    return CITY_CENTERS.get(city, DEFAULT_CENTER)
+    """Get city center coordinates（支持模糊匹配：西安市→西安）"""
+    if not city:
+        return DEFAULT_CENTER
+    # 精确匹配
+    if city in CITY_CENTERS:
+        return CITY_CENTERS[city]
+    # 去掉常见后缀再匹配
+    for suffix in ("市", "省", "自治区", "特别行政区"):
+        stripped = city[:-len(suffix)] if city.endswith(suffix) else ""
+        if stripped and stripped in CITY_CENTERS:
+            return CITY_CENTERS[stripped]
+    # key 包含在 city 里（如 city="西安市雁塔区" 匹配 key="西安"）
+    for key, val in CITY_CENTERS.items():
+        if key in city:
+            return val
+    return DEFAULT_CENTER
 
 
 def infer_city_from_request(user_input: str, recommendations: List[Dict]) -> str:

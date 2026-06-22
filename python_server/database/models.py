@@ -8,6 +8,12 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy.sql import func
 from contextlib import contextmanager
+from datetime import datetime, timezone, timedelta
+
+_BJT = timezone(timedelta(hours=8))
+
+def _bjt_now():
+    return datetime.now(_BJT)
 from typing import Generator, Optional
 import os
 
@@ -35,8 +41,8 @@ class User(Base):
     total_plans = Column(Integer, default=0)
     invite_code = Column(String(32), unique=True, index=True)
     invited_by = Column(Integer, ForeignKey('users.id'), nullable=True)
-    created_at = Column(TIMESTAMP, server_default=func.now())
-    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+    created_at = Column(TIMESTAMP, default=_bjt_now)
+    updated_at = Column(TIMESTAMP, default=_bjt_now, onupdate=_bjt_now)
 
     sessions = relationship("UserSession", back_populates="user", cascade="all, delete-orphan")
     plans = relationship("TravelPlan", back_populates="user", cascade="all, delete-orphan")
@@ -55,8 +61,8 @@ class UserSession(Base):
     refresh_expires_at = Column(TIMESTAMP)
     ip_address = Column(String(50))
     user_agent = Column(String(256))
-    created_at = Column(TIMESTAMP, server_default=func.now())
-    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+    created_at = Column(TIMESTAMP, default=_bjt_now)
+    updated_at = Column(TIMESTAMP, default=_bjt_now, onupdate=_bjt_now)
 
     user = relationship("User", back_populates="sessions")
 
@@ -95,12 +101,12 @@ class TravelPlan(Base):
     is_deleted = Column(Boolean, default=False)
 
     # 广场/分类（v1.1+）
-    category = Column(String(32), index=True, nullable=True)        # light/deep/food/outdoor
+    category = Column(String(32), index=True, nullable=True)        # city/photo/food/couple/family/rusher/road
     is_public = Column(Boolean, default=False, nullable=False, index=True)
     cover_url = Column(String(500), nullable=True)                  # 显式封面，优先于 day_plan[].image
 
-    created_at = Column(TIMESTAMP, server_default=func.now())
-    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+    created_at = Column(TIMESTAMP, default=_bjt_now)
+    updated_at = Column(TIMESTAMP, default=_bjt_now, onupdate=_bjt_now)
 
     user = relationship("User", back_populates="plans")
     feedbacks = relationship("UserFeedback", back_populates="plan")
@@ -118,7 +124,7 @@ class UserFeedback(Base):
     content = Column(Text)
     contact = Column(String(100))
     status = Column(SmallInteger, default=0)  # 0待处理 1已处理 2忽略
-    created_at = Column(TIMESTAMP, server_default=func.now())
+    created_at = Column(TIMESTAMP, default=_bjt_now)
 
     plan = relationship("TravelPlan", back_populates="feedbacks")
 
@@ -130,7 +136,7 @@ class PlanLike(Base):
     id = Column(Integer, primary_key=True)
     plan_id = Column(Integer, ForeignKey('travel_plans.id', ondelete='CASCADE'), nullable=False, index=True)
     user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
-    created_at = Column(TIMESTAMP, server_default=func.now())
+    created_at = Column(TIMESTAMP, default=_bjt_now)
 
     plan = relationship("TravelPlan", backref="likes")
     user = relationship("User", backref="liked_plans")
@@ -147,7 +153,7 @@ class PlanFavorite(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
     plan_id = Column(Integer, ForeignKey('travel_plans.id', ondelete='CASCADE'), nullable=False, index=True)
-    created_at = Column(TIMESTAMP, server_default=func.now())
+    created_at = Column(TIMESTAMP, default=_bjt_now)
 
     plan = relationship("TravelPlan", backref="favorited_by")
     user = relationship("User", backref="favorite_plans")
@@ -165,8 +171,8 @@ class SystemConfig(Base):
     config_key = Column(String(100), unique=True, nullable=False, index=True)
     config_value = Column(Text)
     description = Column(String(255))
-    created_at = Column(TIMESTAMP, server_default=func.now())
-    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+    created_at = Column(TIMESTAMP, default=_bjt_now)
+    updated_at = Column(TIMESTAMP, default=_bjt_now, onupdate=_bjt_now)
 
 
 class UserDailyUsage(Base):
@@ -178,8 +184,8 @@ class UserDailyUsage(Base):
     usage_date = Column(Date, nullable=False)
     plan_count = Column(Integer, default=0)
     bonus_count = Column(Integer, default=0)
-    created_at = Column(TIMESTAMP, server_default=func.now())
-    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+    created_at = Column(TIMESTAMP, default=_bjt_now)
+    updated_at = Column(TIMESTAMP, default=_bjt_now, onupdate=_bjt_now)
 
     user = relationship("User", backref="daily_usage")
 

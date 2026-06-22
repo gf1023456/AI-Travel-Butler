@@ -88,7 +88,7 @@ onLoad((options = {}) => {
 })
 
 const handleClose = () => {
-  uni.navigateBack({ fallback: () => uni.switchTab({ url: '/pages/index/index' }) })
+  uni.reLaunch({ url: '/pages/inspiration/index' })
 }
 
 const triggerAvatar = () => {
@@ -185,7 +185,7 @@ const handleWechatLogin = async () => {
     uni.hideLoading()
     uni.showToast({ title: '登录成功', icon: 'success' })
     setTimeout(() => {
-      uni.reLaunch({ url: '/pages/index/index' })
+      uni.reLaunch({ url: '/pages/inspiration/index' })
     }, 1000)
   } catch (error) {
     uni.hideLoading()
