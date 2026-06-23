@@ -73,6 +73,14 @@
         </view>
       </view>
 
+      <!-- ===== 笔记原文（LLM 兜底时展示） ===== -->
+      <view class="note-content-section" v-if="plan.noteContent">
+        <view class="note-content-header">
+          <text class="note-content-title">📝 笔记原文</text>
+        </view>
+        <text class="note-content-text">{{ plan.noteContent }}</text>
+      </view>
+
       <!-- ===== 每日行程 ===== -->
       <view v-for="(day, di) in days" :key="di" class="day-section">
         <!-- Day Header -->
@@ -180,6 +188,10 @@
           <text class="btn-icon">🗺️</text>
           <text class="btn-label">地图</text>
         </button>
+        <button class="footer-btn" @click="copyPlan">
+          <text class="btn-icon">📋</text>
+          <text class="btn-label">复制方案</text>
+        </button>
       </view>
     </view>
 
@@ -220,7 +232,7 @@ const days = computed(() => {
     }))
   }
   // 格式2: plan.dayPlanItinerary = [{day, name, ...}] 扁平景点列表
-  const items = plan.value?.dayPlanItinerary || []
+  const items = plan.value?.dayPlanItinerary || plan.value?.day_plan || []
   if (items.length) {
     const map = {}
     for (const p of items) {
@@ -501,7 +513,10 @@ async function saveToHistory() {
       warnings: [],
       category: travelStyle.value || 'city',
       is_public: isPublic.value,
-      cover_url: coverUrl
+      cover_url: coverUrl,
+      noteMeta: (plan.value?.noteAuthor || plan.value?.noteLikes)
+        ? { author: plan.value?.noteAuthor || '', likes: plan.value?.noteLikes || 0, cover_url: plan.value?.noteCoverUrl || '', images: plan.value?.noteImages || [], content: plan.value?.noteContent || '' }
+        : null
     })
     uni.hideLoading()
     if (result?.id) {
@@ -716,6 +731,15 @@ function fallbackCopyText() {
   })
 }
 
+// ===== 复制方案 =====
+function copyPlan() {
+  if (!days.value.length) {
+    uni.showToast({ title: '无行程可复制', icon: 'none' })
+    return
+  }
+  fallbackCopyText()
+}
+
 // ===== 地图 =====
 function goMap() {
   // 把当前方案数据同步给地图页（地图页读 currentPlan）
@@ -787,7 +811,12 @@ onLoad(async (options) => {
               dayPlan,
               itinerarySummary: detail.itinerary_summary || detail.summary || '',
               category: detail.category || 'city',
-              isFromPlaza: true
+              isFromPlaza: true,
+              noteAuthor: detail.note_meta?.author || '',
+              noteLikes: detail.note_meta?.likes || 0,
+              noteCoverUrl: detail.note_meta?.cover_url || '',
+              noteImages: detail.note_meta?.images || [],
+              noteContent: detail.note_meta?.content || ''
             }
           }
         } catch (e) {
@@ -957,6 +986,25 @@ onShow(() => {
 }
 .note-likes {
   font-size: 22rpx; color: #FF6B6B;
+}
+
+/* ===== 笔记原文（LLM 兜底时展示） ===== */
+.note-content-section {
+  margin: 16rpx 32rpx 0;
+  padding: 24rpx;
+  background: #FFFDF8;
+  border: 1rpx solid #E5DED1;
+  border-radius: 16rpx;
+}
+.note-content-header {
+  margin-bottom: 12rpx;
+}
+.note-content-title {
+  font-size: 26rpx; font-weight: 600; color: #C9A96E;
+}
+.note-content-text {
+  display: block; font-size: 26rpx; line-height: 1.8;
+  color: #5A5A5A; white-space: pre-wrap;
 }
 
 /* ===== 信息胶囊 ===== */

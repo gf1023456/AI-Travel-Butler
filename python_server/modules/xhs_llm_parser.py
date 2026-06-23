@@ -30,8 +30,8 @@ _XHS_PARSE_PROMPT = """你是一位旅行笔记解析专家。请将以下小红
       "sequence": 1,
       "name": "景点名（去掉emoji编号和装饰符号）",
       "city": "城市",
-      "description": "笔记原文中关于该景点的描述，保留口语化表达、emoji、感叹词，200字以内",
-      "tips": "笔记中提到的实用小提醒，如营业时间、避坑、交通、穿搭建议等，没有则留空",
+      "description": "景点描述。优先使用笔记原文中的描述，如笔记中该景点无详细描述，则结合景点名称和你的知识库自主生成一段200字以内的有价值的描述（包含景点特色、亮点、推荐理由等），禁止留空或生成'未提供详细描述'等敷衍文案",
+      "tips": "实用小提醒，如笔记中有则提取（营业时间、避坑、交通、穿搭建议等），没有则留空",
       "time": "建议时间（如上午、下午、晚上，根据笔记推断）",
       "category": "city/photo/food/couple/family/rusher/road"
     }}
@@ -42,7 +42,7 @@ _XHS_PARSE_PROMPT = """你是一位旅行笔记解析专家。请将以下小红
 0. 如果正文结构简单（1天或1-2个景点），直接返回。
 1. day_plan 按笔记原文的 Day/天 分组，保持原始顺序（景点出现的先后顺序必须和笔记正文一致）
 2. name 提取景点的完整官方名称（如"赛格国际购物中心"而不是"赛格"，"陕西历史博物馆"保持完整）。去掉 1⃣️ 2⃣️ ① ② 等 emoji 编号和装饰符号
-3. description 必须保留笔记原文的口语风格！不要改写成书面语。保留原文中的 emoji（如 🔥 ）、感叹（如 "绝绝子！"）、口语（如 "yyds" "避雷" "冲"）。字数限制200字以内，但尽量多保留原文内容
+3. description 优先使用笔记原文中的描述。如果笔记中该景点只是简单提及（如"📍解放碑"）而没有详细描述，则结合景点名称和你的知识库自主生成有价值的描述，包含景点特色、亮点、推荐理由等。禁止留空字符串，禁止生成"笔记中列出该景点，但未提供详细描述"、"未提供详细描述"等敷衍文案
 4. tips 提取笔记中零散的实用信息：门票价格、开放时间、交通方式、穿搭建议、避坑提醒、最佳拍照时间等。如果没有明显的小提醒则留空字符串
 5. 如果笔记没有明确 Day 分组，全部归为 day=1
 6. category 根据内容判断，只能是以下之一：city/photo/food/couple/family/rusher/road
@@ -57,7 +57,7 @@ async def _call_llm(messages: List[Dict], timeout: float = 60) -> Optional[str]:
 
     if provider == "deepseek":
         api_key = settings.providers.deepseek_api_key
-        model = settings.providers.default_deepseek_model
+        model = "deepseek-v4-flash"  # XHS 解析用闪版，更快更稳
     elif provider == "dashscope":
         api_key = settings.providers.dashscope_api_key
         model = settings.providers.default_dashscope_model
@@ -66,7 +66,7 @@ async def _call_llm(messages: List[Dict], timeout: float = 60) -> Optional[str]:
         model = settings.providers.default_mimo_model
     else:
         api_key = settings.providers.deepseek_api_key
-        model = settings.providers.default_deepseek_model
+        model = "deepseek-v4-flash"  # XHS 解析用闪版
 
     print(f"[XHS-LLM] provider={provider}, endpoint={endpoint}, model={model}")
     print(f"[XHS-LLM] api_key length={len(api_key) if api_key else 0}")
@@ -87,11 +87,11 @@ async def _call_llm(messages: List[Dict], timeout: float = 60) -> Optional[str]:
         body["frequency_penalty"] = 0.1
         body["presence_penalty"] = 0.1
 
-    max_retries = settings.server.max_retries
+    max_retries = 0  # XHS 解析不重试，超时直接降级正则
     for attempt in range(max_retries + 1):
         try:
             print(f"[XHS-LLM] attempt {attempt + 1}/{max_retries + 1}")
-            async with httpx.AsyncClient(timeout=timeout) as client:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=10.0, read=120.0, write=15.0)) as client:
                 response = await client.post(endpoint, headers=headers, json=body)
                 print(f"[XHS-LLM] response status={response.status_code}")
                 if response.status_code != 200:
@@ -202,7 +202,7 @@ async def llm_parse_note(
         {"role": "user", "content": prompt}
     ]
 
-    response_text = await _call_llm(messages, timeout=60)
+    response_text = await _call_llm(messages, timeout=120)
     if not response_text:
         print("[XHS-LLM] LLM 返回为空")
         return None

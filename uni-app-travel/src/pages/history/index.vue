@@ -215,6 +215,7 @@ const loadHistory = async (item) => {
   }
 
   uni.hideLoading()
+  travelStore.previewPlan = null  // 清掉旧方案
   travelStore.currentPlan = {
     itinerarySummary: sourceItem.itinerary_summary || sourceItem.summary || '',
     dayPlanItinerary,
@@ -271,6 +272,7 @@ const loadDetailToPlan = () => {
       dayPlanItinerary = selectedDetail.value.day_plan.map((item, i) => ({ ...item, day: item.day || 1, sequence: item.sequence || (i + 1), name: item.name || item.title, city: item.city }))
     }
   }
+  travelStore.previewPlan = null  // 清掉旧方案，避免 onLoad 取到残留
   travelStore.currentPlan = {
     itinerarySummary: selectedDetail.value.itinerary_summary || selectedDetail.value.summary || '行程详情',
     dayPlanItinerary,

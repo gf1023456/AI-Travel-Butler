@@ -72,7 +72,8 @@ export async function saveHistory(planData) {
       // v1.1 广场字段
       category: planData.category || null,
       is_public: planData.is_public === true,
-      cover_url: planData.cover_url || planData.coverUrl || ''
+      cover_url: planData.cover_url || planData.coverUrl || '',
+      note_meta: planData.note_meta || planData.noteMeta || null
     };
     
     console.log('[API] 发送到后端的请求参数:', requestBody);

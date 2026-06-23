@@ -150,7 +150,7 @@ async def import_xhs_note(req: ImportRequest):
         print(f"[XHS] LLM parse failed, fallback to regex: {e}")
 
     if not parsed or parsed.get("spot_count", 0) < 2:
-        parsed = parse_note(title, content, city)
+        parsed = parse_note(title, content, city, note.get("images", []))
 
     # 3. 并发补充经纬度
     day_plan = parsed.get("day_plan", [])
@@ -171,13 +171,11 @@ async def import_xhs_note(req: ImportRequest):
     def _collect_day_plan_images(day_plan):
         urls = []
         for entry in day_plan:
-            # 嵌套格式: {items: [{image: ...}]}
             if "items" in entry and isinstance(entry["items"], list):
                 for item in entry["items"]:
                     img = item.get("image", "")
                     if img and img.startswith("http"):
                         urls.append(img)
-            # 扁平格式: {day: 1, name: "...", image: "..."}
             else:
                 img = entry.get("image", "")
                 if img and img.startswith("http"):
@@ -186,28 +184,10 @@ async def import_xhs_note(req: ImportRequest):
 
     all_urls.extend(_collect_day_plan_images(day_plan))
 
-    # 并发下载，替换 URL
+    # 后台异步下载（不阻塞响应，XHS CDN 链接几小时内有效）
     if all_urls:
         unique_urls = list(dict.fromkeys(all_urls))
-        downloaded = await _download_images(unique_urls)
-        url_map = dict(zip(unique_urls, downloaded))
-        if cover_url:
-            cover_url = url_map.get(cover_url, cover_url)
-        note_images = [url_map.get(u, u) for u in note_images]
-
-        def _replace_day_plan_images(day_plan):
-            for entry in day_plan:
-                if "items" in entry and isinstance(entry["items"], list):
-                    for item in entry["items"]:
-                        img = item.get("image", "")
-                        if img in url_map:
-                            item["image"] = url_map[img]
-                else:
-                    img = entry.get("image", "")
-                    if img in url_map:
-                        entry["image"] = url_map[img]
-
-        _replace_day_plan_images(day_plan)
+        asyncio.create_task(_download_images(unique_urls))  # fire-and-forget
 
     # 5. 返回前端期望的格式（不自动存库，用户在方案详情页手动保存）
     return {
@@ -220,6 +200,7 @@ async def import_xhs_note(req: ImportRequest):
             "note": {
                 "cover_url": cover_url,
                 "images": note_images,
+                "content": content,
                 "author": note.get("author", ""),
                 "likes": note.get("likes", 0),
                 "title": note.get("title", ""),

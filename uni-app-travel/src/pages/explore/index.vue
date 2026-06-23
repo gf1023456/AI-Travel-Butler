@@ -460,6 +460,7 @@ const onPlanCardClick = async (plan) => {
           : typeof rawDays === 'object'
             ? Object.entries(rawDays).map(([k, v]) => ({ summary: `第 ${k} 天`, items: Array.isArray(v) ? v : [] }))
             : []
+        travelStore.currentPlan = null  // 清掉旧方案
         travelStore.previewPlan = {
           id: detail.id,
           title: detail.title || plan.title,
@@ -714,6 +715,7 @@ async function importFromXhs() {
     const res = await importXhsNote({ url: importUrl.value })
     if (res.code === 0) {
       const data = res.data
+      travelStore.previewPlan = null  // 清掉旧方案
       travelStore.currentPlan = {
         itinerarySummary: data.itinerary_summary,
         dayPlan: data.day_plan,
@@ -723,6 +725,7 @@ async function importFromXhs() {
         category: data.category,
         noteCoverUrl: data.note?.cover_url || '',
         noteImages: data.note?.images || [],
+        noteContent: data.note?.content || '',
         noteAuthor: data.note?.author || '',
         noteLikes: data.note?.likes || 0,
         isFromHistory: true,

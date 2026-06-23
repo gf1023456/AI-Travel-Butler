@@ -68,7 +68,7 @@
     </view>
 
     <!-- Itinerary Quick Card -->
-    <view class="quick-card-wrapper" v-if="hasPlan && !quickCardHidden" :style="{ bottom: (180 + safeAreaBottom) + 'px' }">
+    <view class="quick-card-wrapper" v-if="hasPlan && !quickCardHidden" :style="{ bottom: quickCardBottom + 'px', transition: quickCardDragging ? 'none' : 'bottom 0.35s cubic-bezier(0.22, 1, 0.36, 1)' }">
       <view class="quick-card" @touchstart="onQuickCardTouchStart" @touchmove="onQuickCardTouchMove" @touchend="onQuickCardTouchEnd">
         <view class="quick-card-inner">
           <image class="quick-img" :src="currentQuickItem.image || planImage" mode="aspectFill" />
@@ -100,7 +100,7 @@
     </button>
 
     <!-- Floating 行程一下 Butler -->
-    <button class="ai-butler" @click="goInspiration" :style="{ bottom: (136 + safeAreaBottom) + 'px' }">
+    <button v-if="false" class="ai-butler" @click="goInspiration" :style="{ bottom: (136 + safeAreaBottom) + 'px' }">
       <text class="ai-icon">✨</text>
       <text class="ai-text">快来生成你得专属攻略吧</text>
     </button>
@@ -198,6 +198,10 @@ export default {
       currentMarkerIndex: 0,
       quickCardHidden: false,
       quickCardIndex: 0,
+      quickCardBottom: 180,
+      quickCardDragY: 0,
+      quickCardBottomStart: 180,
+      quickCardDragging: false,
       quickCardTouchStartX: 0,
       quickCardTouchStartY: 0,
       userLocation: null,
@@ -416,12 +420,25 @@ export default {
       const touch = e.touches[0]
       this.quickCardTouchStartX = touch.clientX
       this.quickCardTouchStartY = touch.clientY
+      this.quickCardDragging = false
+      this.quickCardDragY = touch.clientY
+      this.quickCardBottomStart = this.quickCardBottom
     },
     onQuickCardTouchMove(e) {
       if (e.touches.length > 1) return
       const touch = e.touches[0]
       const deltaX = touch.clientX - this.quickCardTouchStartX
       const deltaY = touch.clientY - this.quickCardTouchStartY
+      
+      // 垂直拖动 → 移动卡片
+      if (Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaY) > 4) {
+        this.quickCardDragging = true
+        const newBottom = this.quickCardBottomStart - deltaY
+        // 限制范围：top 20px ~ bottom -40px
+        const viewH = uni.getSystemInfoSync().safeArea.bottom
+        this.quickCardBottom = Math.max(-20, Math.min(viewH - 40, newBottom))
+      }
+      
       if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 10) {
         e.preventDefault()
       }
@@ -430,12 +447,23 @@ export default {
       const touch = e.changedTouches[0]
       const deltaX = touch.clientX - this.quickCardTouchStartX
       const deltaY = touch.clientY - this.quickCardTouchStartY
+      
+      this.quickCardDragging = false
+      
+      // 垂直拖动松手 → 超出屏幕底部就隐藏
+      if (Math.abs(deltaY) > 5 && Math.abs(deltaY) > Math.abs(deltaX)) {
+        const viewH = uni.getSystemInfoSync().safeArea.bottom
+        if (this.quickCardBottom > viewH * 0.7) {
+          this.hideQuickCard()
+          this.quickCardBottom = 180 + this.safeAreaBottom
+        }
+        return
+      }
+      
       if (Math.abs(deltaX) > 30 && Math.abs(deltaY) < 50) {
         if (deltaX > 50) {
-          // 向右滑动，切换到上一个
           this.switchQuickCard(this.quickCardIndex - 1)
         } else if (deltaX < -50) {
-          // 向左滑动，切换到下一个
           this.switchQuickCard(this.quickCardIndex + 1)
         }
       }
@@ -456,6 +484,7 @@ export default {
       this.quickCardHidden = true
     },
     showQuickCard() {
+      this.quickCardBottom = 180 + this.safeAreaBottom
       this.quickCardHidden = false
     },
     onMarkerTap(e) {
@@ -561,6 +590,7 @@ export default {
     const { statusBarHeight, safeAreaBottom } = useSafeArea()
     this.statusBarHeight = statusBarHeight
     this.safeAreaBottom = safeAreaBottom
+    this.quickCardBottom = 180 + safeAreaBottom
     this.userStore.restoreFromStorage()
     this.getUserLocation().then(() => this.loadFromStore())
     wx.showShareMenu({

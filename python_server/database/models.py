@@ -104,6 +104,7 @@ class TravelPlan(Base):
     category = Column(String(32), index=True, nullable=True)        # city/photo/food/couple/family/rusher/road
     is_public = Column(Boolean, default=False, nullable=False, index=True)
     cover_url = Column(String(500), nullable=True)                  # 显式封面，优先于 day_plan[].image
+    note_meta = Column(JSON, nullable=True)                        # 小红书笔记元信息 {author, likes, cover_url, images}
 
     created_at = Column(TIMESTAMP, default=_bjt_now)
     updated_at = Column(TIMESTAMP, default=_bjt_now, onupdate=_bjt_now)
@@ -214,7 +215,7 @@ class Database:
             db_url = f"postgresql://{db_config.username}:{db_config.password}@{db_config.host}:{db_config.port}/{db_config.name}"
 
         # 连接池配置
-        pool_size = 5
+        pool_size = 10
         max_overflow = 10
         pool_timeout = 30
 

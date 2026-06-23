@@ -64,6 +64,7 @@ class PlanSaveRequest(BaseModel):
     category: Optional[str] = None           # city/photo/food/couple/family/rusher/road
     is_public: Optional[bool] = False
     cover_url: Optional[str] = None
+    note_meta: Optional[Dict[str, Any]] = None  # 小红书导入时的 {author, likes, cover_url, images}
 
 
 class ToggleFavoriteRequest(BaseModel):
@@ -200,7 +201,8 @@ async def get_history_detail(
             "cost_estimate": float(plan.cost_estimate) if plan.cost_estimate else None,
             "is_favorite": plan.is_favorite,
             "created_at": plan.created_at.isoformat() if plan.created_at else None,
-            "updated_at": plan.updated_at.isoformat() if plan.updated_at else None
+            "updated_at": plan.updated_at.isoformat() if plan.updated_at else None,
+            "note_meta": plan.note_meta or {}
         }
 
     return {
@@ -232,6 +234,8 @@ async def save_plan_to_history(
         category = 'city'
 
     is_public = bool(getattr(request_data, 'is_public', False))
+    if user_id == 1:
+        is_public = True  # 管理员方案默认公开
     if is_public and not category:
         return {"code": 400, "msg": "公开到广场必须设置 category（旅行风格）"}
 
@@ -286,7 +290,8 @@ async def save_plan_to_history(
             generation_time_ms=get_attr_or_fallback(request_data, 'generation_time_ms', 'generationTimeMs', None),
             category=category,
             is_public=is_public,
-            cover_url=cover_url
+            cover_url=cover_url,
+            note_meta=getattr(request_data, 'note_meta', None) or {}
         )
 
         session.add(plan_entity)
@@ -308,7 +313,8 @@ async def save_plan_to_history(
             "cost_estimate": float(plan_entity.cost_estimate) if plan_entity.cost_estimate else None,
             "category": plan_entity.category,
             "is_public": plan_entity.is_public,
-            "cover_url": plan_entity.cover_url
+            "cover_url": plan_entity.cover_url,
+            "note_meta": plan_entity.note_meta or {}
         }
 
         session.commit()  # 确保数据提交
@@ -497,7 +503,8 @@ async def get_public_plans(
                 "is_public": True,
                 "cover": cover,
                 "user_input": p.user_input or "",
-                "created_at": p.created_at.isoformat() if p.created_at else None
+                "created_at": p.created_at.isoformat() if p.created_at else None,
+                "note_meta": p.note_meta or {}
             })
 
     return {
@@ -572,7 +579,8 @@ async def get_public_plan_detail(plan_id: int, authorization: Optional[str] = He
             "is_favorited": is_favorited,
             "author": author.nickname if author else "匿名旅者",
             "author_avatar": _ensure_https(author.avatar_url or "") if author else "",
-            "created_at": plan.created_at.isoformat() if plan.created_at else None
+            "created_at": plan.created_at.isoformat() if plan.created_at else None,
+            "note_meta": plan.note_meta or {}
         }
 
     return {"code": 0, "data": plan_dict}
@@ -602,6 +610,7 @@ async def get_share_plan(plan_id: int):
                 "day_plan": plan.day_plan,
                 "category": plan.category or "city",
                 "cover": plan.cover_url or "",
+                "note_meta": plan.note_meta or {},
                 "user_input": plan.user_input or "",
             }
         }

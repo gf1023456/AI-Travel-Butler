@@ -65,11 +65,11 @@
       </view>
 
       <!-- 底部间距 -->
-      <view style="height: 200rpx;"></view>
+      <view style="height: 100rpx;"></view>
     </scroll-view>
 
     <!-- 返回顶部 -->
-    <view v-if="showBackTop" class="back-top" :style="{ bottom: (180 + safeAreaBottom) + 'px' }" @click="scrollToTop">
+    <view v-if="showBackTop" class="back-top" :style="{ bottom: (120 + safeAreaBottom) + 'px' }" @click="scrollToTop">
       <text>↑</text>
     </view>
 
@@ -328,7 +328,7 @@ const loadPlazaPlans = async (append = false) => {
       page: plazaPage.value,
       pageSize: plazaPageSize,
       category: activeCategory.value,
-      sort: 'hot'
+      sort: 'new'
     })
     const list = data?.list || []
     if (append) {
@@ -405,6 +405,7 @@ const onPlanCardClick = async (plan) => {
           ? Object.entries(rawDays).map(([k, v]) => ({ summary: `第 ${k} 天`, items: Array.isArray(v) ? v : [] }))
           : []
       
+      travelStore.currentPlan = null  // 清掉旧方案，避免 onLoad 取到历史残留
       travelStore.previewPlan = {
         id: detail.id,
         title: detail.title || plan.title,
@@ -412,7 +413,11 @@ const onPlanCardClick = async (plan) => {
         userInput: detail.user_input || plan.user_input || '',
         dayPlan: dayPlan,
         itinerarySummary: detail.itinerary_summary || detail.summary || '',
-        category: detail.category || plan.category || 'city'
+        category: detail.category || plan.category || 'city',
+        noteAuthor: detail.note_meta?.author || '',
+        noteLikes: detail.note_meta?.likes || 0,
+        noteCoverUrl: detail.note_meta?.cover_url || '',
+        noteImages: detail.note_meta?.images || []
       }
       uni.navigateTo({ url: '/pages/ai-plan-detail/index' })
     }
@@ -662,6 +667,7 @@ async function importFromXhs() {
         category: data.category,
         noteCoverUrl: data.note?.cover_url || '',
         noteImages: data.note?.images || [],
+        noteContent: data.note?.content || '',
         noteAuthor: data.note?.author || '',
         noteLikes: data.note?.likes || 0,
         isFromHistory: true,
@@ -707,7 +713,7 @@ async function importFromXhs() {
 
 .content {
   flex: 1; min-height: 0;
-  padding: 110rpx 24rpx 120rpx;
+  padding: 260rpx 24rpx 80rpx;
   box-sizing: border-box;
 }
 
@@ -765,9 +771,9 @@ async function importFromXhs() {
 
 .back-top {
   position: fixed; right: 32rpx; z-index: 18;
-  width: 80rpx; height: 80rpx; border-radius: 50%;
+  width: 64rpx; height: 64rpx; border-radius: 50%;
   background: linear-gradient(135deg, #0F4C5C, #14B8A6);
-  color: #fff; font-size: 36rpx; font-weight: bold;
+  color: #fff; font-size: 28rpx; font-weight: bold;
   display: flex; align-items: center; justify-content: center;
   box-shadow: 0 8rpx 24rpx rgba(15,76,92,0.30);
 }
@@ -776,7 +782,7 @@ async function importFromXhs() {
 /* FAB */
 .fab-btn {
   position: fixed; right: 48rpx; z-index: 50;
-  width: 56px; height: 56px; border-radius: 50%;
+  width: 48px; height: 48px; border-radius: 50%;
   background: linear-gradient(135deg, #0F4C5C 0%, #14B8A6 50%, #2DD4BF 100%);
   box-shadow: 0 8px 24px rgba(15,76,92,0.35);
   display: flex; align-items: center; justify-content: center;
@@ -803,16 +809,16 @@ async function importFromXhs() {
   display: flex; flex-direction: column; gap: 10px;
 }
 .fab-menu-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 12px 20px; border-radius: 16px;
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 16px; border-radius: 14px;
   background: #fff;
   box-shadow: 0 4px 20px rgba(0,0,0,0.12);
   white-space: nowrap;
   animation: fabItemIn 0.2s ease-out;
 }
 .fab-menu-item:active { transform: scale(0.96); background: #f5f5f5; }
-.fab-menu-icon { font-size: 20px; }
-.fab-menu-text { font-size: 15px; color: #2C2C2C; font-weight: 600; }
+.fab-menu-icon { font-size: 16px; }
+.fab-menu-text { font-size: 13px; color: #2C2C2C; font-weight: 600; }
 @keyframes fabItemIn { from { opacity: 0; transform: translateY(8px) scale(0.9); } to { opacity: 1; transform: translateY(0) scale(1); } }
 
 /* Import Sheet */
@@ -859,8 +865,8 @@ async function importFromXhs() {
 .sheet-panel {
   width: 100%; background: #ffffff;
   border-radius: 32px 32px 0 0;
-  padding: 24rpx 40rpx;
-  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
+  padding: 20rpx 32rpx;
+  padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
   box-shadow: 0 -8px 40px rgba(0,0,0,0.15);
   animation: sheetUp 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }

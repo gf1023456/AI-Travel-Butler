@@ -102,15 +102,34 @@ def _try_extract_brackets(content: str) -> List[str]:
     return [m.group(1).strip() for m in pattern.finditer(content) if m.group(1).strip()]
 
 
-def regex_parse(title: str, content: str, city: Optional[str] = None) -> Tuple[List[Dict], str, bool]:
+def regex_parse(title: str, content: str, city: Optional[str] = None, images: Optional[List[str]] = None) -> Tuple[List[Dict], str, bool]:
     """
     正则解析笔记内容
 
+    Args:
+        images: 原始笔记图片列表，用于关联到解析出的 spots
     Returns:
         (spots, city, success) — success 表示是否解析到足够景点
     """
     full_text = f"{title}\n{content}"
     inferred_city = _infer_city(full_text, city)
+    img_list = images or []
+    img_count = len(img_list)
+
+    def _make_spot(name: str, day: int, seq: int) -> Dict:
+        img_idx = (day - 1) * 3 + (seq - 1)
+        spot_image = img_list[img_idx % img_count] if img_count > 0 else ''
+        return {
+            'name': name,
+            'city': inferred_city,
+            'day': day,
+            'sequence': seq,
+            'description': '',
+            'reason': '',
+            'time': '',
+            'category': 'SIGHT',
+            'image': spot_image,
+        }
 
     # 策略 1：Day 分段
     day_blocks = _try_extract_day_blocks(full_text)
@@ -118,46 +137,19 @@ def regex_parse(title: str, content: str, city: Optional[str] = None) -> Tuple[L
         spots = []
         for day_num in sorted(day_blocks.keys()):
             for seq, name in enumerate(day_blocks[day_num], 1):
-                spots.append({
-                    'name': name,
-                    'city': inferred_city,
-                    'day': day_num,
-                    'sequence': seq,
-                    'description': '',
-                    'reason': '',
-                    'time': '',
-                    'category': 'SIGHT',
-                })
+                spots.append(_make_spot(name, day_num, seq))
         return spots, inferred_city, len(spots) >= 2
 
     # 策略 2：emoji 📍
     emoji_spots = _try_extract_emoji(full_text)
     if emoji_spots:
-        spots = [{
-            'name': name,
-            'city': inferred_city,
-            'day': 1,
-            'sequence': i,
-            'description': '',
-            'reason': '',
-            'time': '',
-            'category': 'SIGHT',
-        } for i, name in enumerate(emoji_spots, 1)]
+        spots = [_make_spot(name, 1, i) for i, name in enumerate(emoji_spots, 1)]
         return spots, inferred_city, len(spots) >= 2
 
     # 策略 3：方括号 【】
     bracket_spots = _try_extract_brackets(full_text)
     if bracket_spots:
-        spots = [{
-            'name': name,
-            'city': inferred_city,
-            'day': 1,
-            'sequence': i,
-            'description': '',
-            'reason': '',
-            'time': '',
-            'category': 'SIGHT',
-        } for i, name in enumerate(bracket_spots, 1)]
+        spots = [_make_spot(name, 1, i) for i, name in enumerate(bracket_spots, 1)]
         return spots, inferred_city, len(spots) >= 2
 
     # 策略 4：通用分隔符
@@ -170,16 +162,7 @@ def regex_parse(title: str, content: str, city: Optional[str] = None) -> Tuple[L
         for item in items:
             name = _clean_spot_name(item)
             if name and 2 <= len(name) <= 15:
-                spots.append({
-                    'name': name,
-                    'city': inferred_city,
-                    'day': 1,
-                    'sequence': len(spots) + 1,
-                    'description': '',
-                    'reason': '',
-                    'time': '',
-                    'category': 'SIGHT',
-                })
+                spots.append(_make_spot(name, 1, len(spots) + 1))
 
     return spots, inferred_city, len(spots) >= 2
 
@@ -200,10 +183,12 @@ def _infer_category(text: str) -> str:
     return 'city'
 
 
-def parse_note(title: str, content: str, city: Optional[str] = None) -> Dict:
+def parse_note(title: str, content: str, city: Optional[str] = None, images: Optional[List[str]] = None) -> Dict:
     """
     解析笔记（正则优先）
 
+    Args:
+        images: 原始笔记图片列表，用于关联到解析出的 spots
     Returns:
         {
             "itinerary_summary": str,
@@ -214,7 +199,7 @@ def parse_note(title: str, content: str, city: Optional[str] = None) -> Dict:
             "parse_method": "regex" | "fallback"
         }
     """
-    spots, inferred_city, success = regex_parse(title, content, city)
+    spots, inferred_city, success = regex_parse(title, content, city, images)
     category = _infer_category(f"{title}\n{content}")
 
     if title and len(title) <= 50:

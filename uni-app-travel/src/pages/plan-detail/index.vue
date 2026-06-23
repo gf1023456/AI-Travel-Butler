@@ -184,6 +184,7 @@ const copyPlanToMine = () => {
     dayPlanItinerary = p.items.map((item, i) => ({ ...item, day: 1, sequence: i + 1, name: item.name || item.title }))
   }
 
+  travelStore.previewPlan = null  // 清掉旧方案
   travelStore.currentPlan = {
     itinerarySummary: p.itinerarySummary || p.title || '精选旅行方案',
     dayPlanItinerary,
