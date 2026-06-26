@@ -79,8 +79,8 @@ async def _call_llm(messages: List[Dict], timeout: float = 60) -> Optional[str]:
     body = {
         "model": model,
         "messages": messages,
-        "max_tokens": 4096,
-        "temperature": 0.1,
+        "max_tokens": 6000,
+        "temperature": 0.4,
     }
 
     if provider == "deepseek":

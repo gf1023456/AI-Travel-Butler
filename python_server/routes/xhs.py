@@ -184,12 +184,30 @@ async def import_xhs_note(req: ImportRequest):
 
     all_urls.extend(_collect_day_plan_images(day_plan))
 
-    # 后台异步下载（不阻塞响应，XHS CDN 链接几小时内有效）
+    # 同步下载图片并替换 URL 为本地地址
     if all_urls:
         unique_urls = list(dict.fromkeys(all_urls))
-        asyncio.create_task(_download_images(unique_urls))  # fire-and-forget
+        local_urls = await _download_images(unique_urls)
+        url_map = dict(zip(unique_urls, local_urls))
 
-    # 5. 返回前端期望的格式（不自动存库，用户在方案详情页手动保存）
+        # 替换 day_plan 中的 image URL（兼容扁平和嵌套格式）
+        for entry in day_plan:
+            if "items" in entry and isinstance(entry["items"], list):
+                for item in entry["items"]:
+                    img = item.get("image", "")
+                    if img in url_map:
+                        item["image"] = url_map[img]
+            else:
+                img = entry.get("image", "")
+                if img in url_map:
+                    entry["image"] = url_map[img]
+
+        # 替换 cover_url 和 note_images
+        if cover_url in url_map:
+            cover_url = url_map[cover_url]
+        note_images = [url_map.get(u, u) for u in note_images]
+
+    # 返回前端期望的格式（不自动存库，用户在方案详情页手动保存）
     return {
         "code": 0,
         "data": {
