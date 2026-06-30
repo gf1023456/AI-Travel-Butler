@@ -231,7 +231,7 @@ def _parse_note_card(note_card: Dict, note_id: str) -> Optional[Dict]:
         if name:
             tags.append(name)
 
-    user = note_card.get("user", {})
+    user = note_card.get("user") or note_card.get("user_info") or note_card.get("userInfo") or {}
     interact = note_card.get("interact_info", {})
 
     # 提取作者名（兼容多种字段名）
