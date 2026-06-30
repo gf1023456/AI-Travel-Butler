@@ -469,7 +469,12 @@ const onPlanCardClick = async (plan) => {
           likes: detail.likes || plan.likes,
           userInput: detail.user_input || plan.user_input || '',
           dayPlan: dayPlan,
-          itinerarySummary: detail.itinerary_summary || detail.summary || ''
+          itinerarySummary: detail.itinerary_summary || detail.summary || '',
+          noteAuthor: detail.note_meta?.author || '',
+          noteLikes: detail.note_meta?.likes || 0,
+          noteCoverUrl: detail.note_meta?.cover_url || '',
+          noteImages: detail.note_meta?.images || [],
+          noteContent: detail.note_meta?.content || ''
         }
         uni.navigateTo({ url: '/pages/ai-plan-detail/index' })
         return

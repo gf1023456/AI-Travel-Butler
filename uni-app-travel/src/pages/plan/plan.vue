@@ -504,7 +504,10 @@ const saveToHistory = async () => {
       // v1.1+
       category: finalCategory,
       is_public: isPublic.value,
-      cover_url: coverUrl
+      cover_url: coverUrl,
+      noteMeta: (travelStore.currentPlan?.noteAuthor || travelStore.currentPlan?.noteLikes)
+        ? { author: travelStore.currentPlan?.noteAuthor || '', likes: travelStore.currentPlan?.noteLikes || 0, cover_url: travelStore.currentPlan?.noteCoverUrl || '', images: travelStore.currentPlan?.noteImages || [], content: travelStore.currentPlan?.noteContent || '' }
+        : null
     })
     uni.hideLoading()
       if (result?.id) {

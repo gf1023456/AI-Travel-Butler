@@ -222,6 +222,11 @@ const loadHistory = async (item) => {
     socialRecommendations: sourceItem.social_recommendations || [],
     evidence: sourceItem.evidence || [],
     warnings: sourceItem.warnings || [],
+    noteAuthor: sourceItem.note_meta?.author || '',
+    noteLikes: sourceItem.note_meta?.likes || 0,
+    noteCoverUrl: sourceItem.note_meta?.cover_url || '',
+    noteImages: sourceItem.note_meta?.images || [],
+    noteContent: sourceItem.note_meta?.content || '',
     isFromHistory: true,
     historyId: sourceItem.id
   }
@@ -279,6 +284,11 @@ const loadDetailToPlan = () => {
     socialRecommendations: selectedDetail.value.social_recommendations || [],
     evidence: selectedDetail.value.evidence || [],
     warnings: selectedDetail.value.warnings || [],
+    noteAuthor: selectedDetail.value.note_meta?.author || '',
+    noteLikes: selectedDetail.value.note_meta?.likes || 0,
+    noteCoverUrl: selectedDetail.value.note_meta?.cover_url || '',
+    noteImages: selectedDetail.value.note_meta?.images || [],
+    noteContent: selectedDetail.value.note_meta?.content || '',
     isFromHistory: true,
     historyId: selectedDetail.value.id
   }
