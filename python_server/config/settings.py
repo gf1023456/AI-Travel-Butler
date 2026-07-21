@@ -15,7 +15,7 @@ class ServerSettings(BaseModel):
     port: int = 8787
     request_timeout_ms: int = 240000
     max_retries: int = 3
-    public_base_url: str = "https://tonystark-ai.ccwu.cc"
+    public_base_url: str = "https://aixian.online"
     refine_timeout_ms: int = 300000  # 优化接口专用超时：5分钟
 
 
@@ -45,7 +45,7 @@ class ProviderSettings(BaseModel):
     dashscope_api_key: str = "sk-1501fc47ce7d466e949bff1a1dba9481"
     mimo_api_key: str = "sk-cyfkjsjqshqxavbo6s1l7yefh1b3f588zcv1oicfufyrykfu"
     default_gemini_model: str = "gemini-2.5-flash"
-    default_deepseek_model: str = "deepseek-v4-pro"
+    default_deepseek_model: str = "deepseek-v4-flash"
     default_zhipu_model: str = "glm-4-flash"
     default_dashscope_model: str = "qwen3.5-397b-a17b"
     default_mimo_model: str = "MiMo-V2.5-Pro"

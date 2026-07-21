@@ -72,7 +72,7 @@
 
       <!-- Decorative Image -->
       <view class="deco-image">
-        <image class="deco-img" src="https://tonystark-ai.ccwu.cc/png/4d94c032-2cd5-4e00-8771-b1cd89cb0850.png" mode="aspectFill" />
+        <image class="deco-img" src="https://aixian.online/png/4d94c032-2cd5-4e00-8771-b1cd89cb0850.png" mode="aspectFill" />
         <view class="deco-overlay"></view>
         <view class="deco-content">
           <text class="deco-title">每次优化，让旅行更完美</text>

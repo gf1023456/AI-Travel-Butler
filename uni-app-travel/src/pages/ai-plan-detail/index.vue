@@ -53,6 +53,20 @@
         </view>
       </view>
 
+      <!-- ===== 天气卡片 ===== -->
+      <view class="weather-card" v-if="weatherSummary">
+        <view class="weather-main">
+          <text class="weather-icon-large">{{ weatherSummary.icon }}</text>
+          <view class="weather-info">
+            <text class="weather-temp">{{ weatherSummary.tempRange }}</text>
+            <text class="weather-advice">{{ weatherSummary.advice }}</text>
+          </view>
+        </view>
+        <view class="weather-packing" v-if="weatherPacking">
+          <text class="weather-packing-text">{{ weatherPacking }}</text>
+        </view>
+      </view>
+
       <!-- ===== 信息胶囊 ===== -->
       <view class="info-chips">
         <view class="chip" v-if="physicalLevel">
@@ -63,11 +77,7 @@
           <text class="chip-icon">🍃</text>
           <text class="chip-text">{{ paceLabel }}</text>
         </view>
-        <view class="chip" v-if="weatherSummary">
-          <text class="chip-icon">{{ weatherSummary.icon }}</text>
-          <text class="chip-text">{{ weatherSummary.tempRange }} {{ weatherSummary.advice }}</text>
-        </view>
-        <view class="chip" v-else-if="bestSeason">
+        <view class="chip" v-if="bestSeason">
           <text class="chip-icon">🌸</text>
           <text class="chip-text">{{ bestSeason }}</text>
         </view>
@@ -100,6 +110,10 @@
           <!-- 景点照片 -->
           <view class="spot-photo" v-if="loc.image">
             <image class="spot-img" :src="loc.image" mode="aspectFill" />
+            <view class="spot-weather-badge" v-if="loc.weather_icon">
+              <text class="spot-weather-icon">{{ loc.weather_icon }}</text>
+              <text class="spot-weather-temp">{{ loc.temperature }}</text>
+            </view>
           </view>
 
           <!-- 景点信息 -->
@@ -356,7 +370,27 @@ const weatherSummary = computed(() => {
   return { icon: mainIcon, tempRange, advice }
 })
 
-// ===== 旅行信（根据风格动态生成） =====
+// ===== 天气穿搭建议 =====
+const weatherPacking = computed(() => {
+  if (!weatherSummary.value) return ''
+  const { icon, tempRange, advice } = weatherSummary.value
+  const temps = tempRange.match(/\d+/g)
+  const maxTemp = temps ? Math.max(...temps.map(Number)) : null
+  const minTemp = temps ? Math.min(...temps.map(Number)) : null
+
+  if (advice === '记得带伞') return '推荐穿搭：轻便雨衣 + 防水鞋'
+  if (advice === '注意防暑') return '推荐穿搭：防晒衣 + 遮阳帽 + 墨镜 + 水杯'
+  if (advice === '注意保暖') return '推荐穿搭：羽绒服 + 围巾 + 手套'
+  if (advice === '注意防滑') return '推荐穿搭：防滑登山鞋 + 登山杖'
+  if (minTemp !== null && maxTemp !== null) {
+    if (maxTemp - minTemp > 10) return '推荐穿搭：洋葱式穿搭，方便增减衣物'
+    if (maxTemp >= 25) return '推荐穿搭：轻薄透气衣物 + 防晒'
+    if (minTemp <= 10) return '推荐穿搭：外套 + 长裤，早晚温差注意保暖'
+  }
+  return ''
+})
+
+// ===== 旅行信（动态生成） =====
 const travelLetter = computed(() => {
   const summary = plan.value?.itinerarySummary || ''
   const city = destination.value
@@ -365,44 +399,85 @@ const travelLetter = computed(() => {
   const spots = allSpots.value
   const weather = weatherSummary.value
 
-  // 风格化的开场（7大玩法）
+  // 风格化的开场（动态引入景点）
+  const first3Spots = spots.slice(0, 3).map(s => s.name).join('、')
   const openers = {
-    city: `这次带你探索${city}的街头巷尾。`,
-    photo: `这次帮你规划了${city}的摄影路线。`,
-    food: `这次为你安排了${city}的美食打卡。`,
-    couple: `这次为你们安排了${city}的浪漫之旅。`,
+    city: spots.length >= 3
+      ? `这次带你去${city}，从${first3Spots}，感受这座城市的独特魅力。`
+      : `这次带你探索${city}的街头巷尾。`,
+    photo: spots.length >= 3
+      ? `这次帮你规划了${city}的摄影路线，${first3Spots}，每一处都值得按下快门。`
+      : `这次帮你规划了${city}的摄影路线。`,
+    food: spots.length >= 3
+      ? `这次为你安排了${city}的美食之旅，${first3Spots}，准备好胃口。`
+      : `这次为你安排了${city}的美食打卡。`,
+    couple: spots.length >= 3
+      ? `这次为你们安排了${city}的浪漫之旅，${first3Spots}，适合两个人慢慢逛。`
+      : `这次为你们安排了${city}的浪漫之旅。`,
     family: `这次帮你规划了${city}的亲子路线。`,
-    rusher: `这次给你规划了${city}的特种兵路线。`,
+    rusher: spots.length >= 5
+      ? `这次给你规划了${city}的特种兵路线，${d}天打卡${spots.length}个景点。`
+      : `这次给你规划了${city}的路线。`,
     road: `这次为你规划了${city}的自驾路线。`,
   }
 
-  // 风格化的中段
+  // 风格化的中段（每日亮点）
+  const dayHighlights = days.value.map(day => {
+    const names = day.pois.map(p => p.name).slice(0, 2).join('和')
+    return names ? `第${day.day}天去${names}` : ''
+  }).filter(Boolean)
+
   const mids = {
-    city: `不赶路，随心走，看到喜欢的就停下来，感受这座城市的呼吸。`,
-    photo: `我特意选了光线最好的时段和角度，希望能帮你拍到满意的照片。`,
-    food: `从老字号到巷子深处的小店，每一家都是我精挑细选的，准备好胃口。`,
+    city: dayHighlights.length > 0
+      ? `行程共${d}天，${dayHighlights.join('，')}，节奏刚好。不赶路，随心走，看到喜欢的就停下来。`
+      : `不赶路，随心走，看到喜欢的就停下来，感受这座城市的呼吸。`,
+    photo: dayHighlights.length > 0
+      ? `行程共${d}天，${dayHighlights.join('，')}。我特意选了光线最好的时段，希望能帮你拍到满意的照片。`
+      : `我特意选了光线最好的时段和角度，希望能帮你拍到满意的照片。`,
+    food: dayHighlights.length > 0
+      ? `行程共${d}天，${dayHighlights.join('，')}。从老字号到巷子深处的小店，每一家都是精挑细选的。`
+      : `从老字号到巷子深处的小店，每一家都是我精挑细选的，准备好胃口。`,
     couple: `选了几个适合两个人慢慢逛的地方，不赶时间，享受二人世界。`,
     family: `节奏安排得比较宽松，带小朋友也不会太赶，重要的是全家开心。`,
-    rusher: `行程安排得比较紧凑，一天能打很多卡，量力而行。`,
+    rusher: dayHighlights.length > 0
+      ? `${d}天行程，${dayHighlights.join('，')}，行程紧凑但充实，量力而行。`
+      : `行程安排得比较紧凑，一天能打很多卡，量力而行。`,
     road: `路线已经规划好了，跟着导航走就行，沿途风景不要错过。`,
   }
 
-  // 天气融入
+  // 天气融入（更自然的描述）
   let weatherNote = ''
   if (weather) {
-    if (weather.advice === '记得带伞') weatherNote = `出发前看了一下，${city}这几天有雨，${weather.advice}。`
-    else if (weather.advice === '注意防暑') weatherNote = `${city}这几天比较热，${weather.advice}，尽量避开正午户外。`
-    else if (weather.advice === '注意保暖') weatherNote = `${city}这几天偏冷，${weather.advice}。`
-    else weatherNote = `${city}这几天${weather.icon}，${weather.advice}。`
+    const tempDesc = weather.tempRange ? `气温${weather.tempRange}` : ''
+    if (weather.advice === '记得带伞') {
+      weatherNote = `出发前看了一下天气，${city}这几天${weather.icon}，${tempDesc}，建议随身带把伞，雨中的${city}也别有一番风味。`
+    } else if (weather.advice === '注意防暑') {
+      weatherNote = `${city}这几天${weather.icon}，${tempDesc}，建议避开正午户外，多补充水分，早晚出行更舒适。`
+    } else if (weather.advice === '注意保暖') {
+      weatherNote = `${city}这几天${weather.icon}，${tempDesc}，建议穿厚一些，注意保暖。`
+    } else if (weather.advice === '注意防滑') {
+      weatherNote = `${city}这几天${weather.icon}，${tempDesc}，路面可能湿滑，注意脚下安全。`
+    } else {
+      weatherNote = `${city}这几天${weather.icon}，${tempDesc}，${weather.advice}，适合出行。`
+    }
   }
 
-  const opener = openers[style] || openers.family
-  const mid = mids[style] || mids.family
+  // 多样化结尾
+  const endings = [
+    `希望这份路线，能让你感受到${city}独特的魅力。`,
+    `${city}在等你，出发吧。`,
+    `愿你在${city}的每一天，都有好风景。`,
+    `收拾行李，${city}见。`,
+    `这一路，${city}会给你惊喜。`,
+  ]
+
+  const opener = openers[style] || openers.city
+  const mid = mids[style] || mids.city
 
   let letter = `${opener}${mid}`
   if (weatherNote) letter += weatherNote
   if (summary) letter += `${summary}`
-  letter += `希望这份路线，能让你感受到${city}独特的魅力。`
+  letter += endings[d % endings.length]
 
   return letter
 })
@@ -766,7 +841,7 @@ onShareAppMessage(() => {
   return {
     title,
     path,
-    imageUrl: shareThumbnailPath.value || 'https://tonystark-ai.ccwu.cc/png/kfeng.png'
+    imageUrl: shareThumbnailPath.value || 'https://aixian.online/png/kfeng.png'
   }
 })
 
@@ -966,6 +1041,37 @@ onShow(() => {
   text-align: right; font-weight: 500;
 }
 
+/* ===== 天气卡片 ===== */
+.weather-card {
+  margin: 16rpx 32rpx 0;
+  padding: 24rpx 28rpx;
+  background: linear-gradient(135deg, #E8F4FD 0%, #F0F9FF 100%);
+  border-radius: 20rpx;
+  border: 1rpx solid #D4EAF7;
+}
+.weather-main {
+  display: flex; align-items: center; gap: 20rpx;
+}
+.weather-icon-large {
+  font-size: 56rpx; line-height: 1;
+}
+.weather-info {
+  display: flex; flex-direction: column; gap: 4rpx;
+}
+.weather-temp {
+  font-size: 32rpx; font-weight: 700; color: #1A73B5;
+}
+.weather-advice {
+  font-size: 24rpx; color: #4A90A4; font-weight: 500;
+}
+.weather-packing {
+  margin-top: 16rpx; padding-top: 16rpx;
+  border-top: 1rpx solid rgba(26,115,181,0.15);
+}
+.weather-packing-text {
+  font-size: 22rpx; color: #5A8FA8; line-height: 1.5;
+}
+
 /* ===== 小红书来源 ===== */
 .note-source {
   margin: 16rpx 32rpx 0;
@@ -1058,11 +1164,22 @@ onShow(() => {
   animation: fadeUp 0.5s ease both;
 }
 .spot-photo {
+  position: relative;
   border-radius: 20rpx; overflow: hidden;
   margin-bottom: 16rpx;
   box-shadow: 0 4px 16px rgba(44,44,44,0.06);
 }
 .spot-img { width: 100%; height: 380rpx; }
+.spot-weather-badge {
+  position: absolute; top: 16rpx; right: 16rpx;
+  display: flex; align-items: center; gap: 6rpx;
+  padding: 6rpx 14rpx;
+  background: rgba(255,255,255,0.92);
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+.spot-weather-icon { font-size: 24rpx; }
+.spot-weather-temp { font-size: 22rpx; color: #1A73B5; font-weight: 600; }
 
 .spot-info { padding: 0 4rpx; }
 .spot-name-row {

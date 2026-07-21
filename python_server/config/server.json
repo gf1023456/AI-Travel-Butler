@@ -4,7 +4,7 @@
     "port": 8787,
     "request_timeout_ms": 120000,
     "max_retries": 3,
-    "public_base_url": "https://tonystark-ai.ccwu.cc"
+    "public_base_url": "https://aixian.online"
   },
   "ai_providers": {
     "gemini": {

@@ -471,9 +471,9 @@ async def get_public_plans(
         fav_map = db.get_favorites_for_user(current_user_id, plan_ids) if current_user_id else {}
 
         fallback_covers = [
-            "https://tonystark-ai.ccwu.cc/png/fed79683-fbb6-44ac-9327-44c2f269cc47.png",
-            "https://tonystark-ai.ccwu.cc/png/600dc4e1-70ed-491a-85d4-a0edea269eb8.png",
-            "https://tonystark-ai.ccwu.cc/png/79b1c1f7-445f-49bc-a075-e44c66b289d8.png"
+            "https://aixian.online/png/fed79683-fbb6-44ac-9327-44c2f269cc47.png",
+            "https://aixian.online/png/600dc4e1-70ed-491a-85d4-a0edea269eb8.png",
+            "https://aixian.online/png/79b1c1f7-445f-49bc-a075-e44c66b289d8.png"
         ]
 
         plan_list = []

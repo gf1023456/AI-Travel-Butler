@@ -28,7 +28,7 @@
       </view>
 
       <section class="hero-card" v-if="travelStore.currentPlan">
-        <image class="hero-img" src="https://tonystark-ai.ccwu.cc/png/fed79683-fbb6-44ac-9327-44c2f269cc47.png" mode="aspectFill" />
+        <image class="hero-img" src="https://aixian.online/png/fed79683-fbb6-44ac-9327-44c2f269cc47.png" mode="aspectFill" />
         <view class="hero-overlay"></view>
         <view class="hero-content">
           <text class="hero-title">{{ itinerarySummary || '行程方案' }}</text>
@@ -391,9 +391,9 @@ const getDayTitle = (day) => {
 
 const getPlaceholderImg = (idx) => {
   const imgs = [
-    'https://tonystark-ai.ccwu.cc/png/600dc4e1-70ed-491a-85d4-a0edea269eb8.png',
-    'https://tonystark-ai.ccwu.cc/png/62d9b74c-a24c-4474-b119-59f01af3902b.png',
-    'https://tonystark-ai.ccwu.cc/png/79b1c1f7-445f-49bc-a075-e44c66b289d8.png'
+    'https://aixian.online/png/600dc4e1-70ed-491a-85d4-a0edea269eb8.png',
+    'https://aixian.online/png/62d9b74c-a24c-4474-b119-59f01af3902b.png',
+    'https://aixian.online/png/79b1c1f7-445f-49bc-a075-e44c66b289d8.png'
   ]
   return imgs[idx % imgs.length]
 }

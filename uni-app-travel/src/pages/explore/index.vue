@@ -278,7 +278,7 @@ const myInviteCode = ref('')
 onShareAppMessage(() => ({
   title: '行程一下 - 输入旅行想法，自动生成专属行程',
   path: `/pages/login/index?invite=${myInviteCode.value || ''}`,
-  imageUrl: 'https://tonystark-ai.ccwu.cc/png/kfeng.png'
+  imageUrl: 'https://aixian.online/png/kfeng.png'
 }))
 
 onMounted(async () => {
@@ -421,25 +421,25 @@ const onToggleLike = async (plan) => {
 }
 
 const getFallbackPlans = () => [
-  { id: 1, title: '上海3日深度游：外滩法租界美食探索', author: '旅行达人小王', likes: 234, cover: 'https://tonystark-ai.ccwu.cc/png/fed79683-fbb6-44ac-9327-44c2f269cc47.png', user_input: '上海 3天 深度游，住外滩附近' },
-  { id: 2, title: '东京樱花季4天行程攻略', author: '樱花猎人', likes: 567, cover: 'https://tonystark-ai.ccwu.cc/png/600dc4e1-70ed-491a-85d4-a0edea269eb8.png', user_input: '东京 樱花季 4天' },
-  { id: 3, title: '成都美食之旅3天', author: '吃货联盟', likes: 189, cover: 'https://tonystark-ai.ccwu.cc/png/79b1c1f7-445f-49bc-a075-e44c66b289d8.png', user_input: '成都 美食之旅 3天' },
-  { id: 4, title: '三亚5天海滨度假', author: '海岛控', likes: 423, cover: 'https://tonystark-ai.ccwu.cc/png/fed79683-fbb6-44ac-9327-44c2f269cc47.png', user_input: '三亚 5天 度假' },
-  { id: 5, title: '西安古都文化深度游', author: '历史爱好者', likes: 312, cover: 'https://tonystark-ai.ccwu.cc/png/600dc4e1-70ed-491a-85d4-a0edea269eb8.png', user_input: '西安 3天 文化游' },
-  { id: 6, title: '丽江大理7天慢旅行', author: '慢旅行者', likes: 678, cover: 'https://tonystark-ai.ccwu.cc/png/79b1c1f7-445f-49bc-a075-e44c66b289d8.png', user_input: '丽江大理 7天' },
-  { id: 7, title: '新疆伊犁5天花海之旅', author: '西域行者', likes: 432, cover: 'https://tonystark-ai.ccwu.cc/png/fed79683-fbb6-44ac-9327-44c2f269cc47.png', user_input: '新疆 伊犁 5天 花海' },
-  { id: 8, title: '杭州西湖3天诗意漫游', author: '江南旅人', likes: 345, cover: 'https://tonystark-ai.ccwu.cc/png/600dc4e1-70ed-491a-85d4-a0edea269eb8.png', user_input: '杭州 西湖 3天 漫游' },
-  { id: 9, title: '桂林阳朔4天山水画卷', author: '山水之间', likes: 287, cover: 'https://tonystark-ai.ccwu.cc/png/79b1c1f7-445f-49bc-a075-e44c66b289d8.png', user_input: '桂林 阳朔 4天 山水' },
-  { id: 10, title: '重庆3天火锅江湖之旅', author: '辣味人生', likes: 521, cover: 'https://tonystark-ai.ccwu.cc/png/fed79683-fbb6-44ac-9327-44c2f269cc47.png', user_input: '重庆 3天 火锅' },
-  { id: 11, title: '大理洱海5天环湖慢生活', author: '风花雪月', likes: 398, cover: 'https://tonystark-ai.ccwu.cc/png/600dc4e1-70ed-491a-85d4-a0edea269eb8.png', user_input: '大理 洱海 5天 环湖' },
-  { id: 12, title: '哈尔滨冰雪7天奇幻之旅', author: '冰雪奇缘', likes: 456, cover: 'https://tonystark-ai.ccwu.cc/png/79b1c1f7-445f-49bc-a075-e44c66b289d8.png', user_input: '哈尔滨 冰雪 7天' },
+  { id: 1, title: '上海3日深度游：外滩法租界美食探索', author: '旅行达人小王', likes: 234, cover: 'https://aixian.online/png/fed79683-fbb6-44ac-9327-44c2f269cc47.png', user_input: '上海 3天 深度游，住外滩附近' },
+  { id: 2, title: '东京樱花季4天行程攻略', author: '樱花猎人', likes: 567, cover: 'https://aixian.online/png/600dc4e1-70ed-491a-85d4-a0edea269eb8.png', user_input: '东京 樱花季 4天' },
+  { id: 3, title: '成都美食之旅3天', author: '吃货联盟', likes: 189, cover: 'https://aixian.online/png/79b1c1f7-445f-49bc-a075-e44c66b289d8.png', user_input: '成都 美食之旅 3天' },
+  { id: 4, title: '三亚5天海滨度假', author: '海岛控', likes: 423, cover: 'https://aixian.online/png/fed79683-fbb6-44ac-9327-44c2f269cc47.png', user_input: '三亚 5天 度假' },
+  { id: 5, title: '西安古都文化深度游', author: '历史爱好者', likes: 312, cover: 'https://aixian.online/png/600dc4e1-70ed-491a-85d4-a0edea269eb8.png', user_input: '西安 3天 文化游' },
+  { id: 6, title: '丽江大理7天慢旅行', author: '慢旅行者', likes: 678, cover: 'https://aixian.online/png/79b1c1f7-445f-49bc-a075-e44c66b289d8.png', user_input: '丽江大理 7天' },
+  { id: 7, title: '新疆伊犁5天花海之旅', author: '西域行者', likes: 432, cover: 'https://aixian.online/png/fed79683-fbb6-44ac-9327-44c2f269cc47.png', user_input: '新疆 伊犁 5天 花海' },
+  { id: 8, title: '杭州西湖3天诗意漫游', author: '江南旅人', likes: 345, cover: 'https://aixian.online/png/600dc4e1-70ed-491a-85d4-a0edea269eb8.png', user_input: '杭州 西湖 3天 漫游' },
+  { id: 9, title: '桂林阳朔4天山水画卷', author: '山水之间', likes: 287, cover: 'https://aixian.online/png/79b1c1f7-445f-49bc-a075-e44c66b289d8.png', user_input: '桂林 阳朔 4天 山水' },
+  { id: 10, title: '重庆3天火锅江湖之旅', author: '辣味人生', likes: 521, cover: 'https://aixian.online/png/fed79683-fbb6-44ac-9327-44c2f269cc47.png', user_input: '重庆 3天 火锅' },
+  { id: 11, title: '大理洱海5天环湖慢生活', author: '风花雪月', likes: 398, cover: 'https://aixian.online/png/600dc4e1-70ed-491a-85d4-a0edea269eb8.png', user_input: '大理 洱海 5天 环湖' },
+  { id: 12, title: '哈尔滨冰雪7天奇幻之旅', author: '冰雪奇缘', likes: 456, cover: 'https://aixian.online/png/79b1c1f7-445f-49bc-a075-e44c66b289d8.png', user_input: '哈尔滨 冰雪 7天' },
 ]
 
 const getPlaceholderImg = (idx) => {
   const imgs = [
-    'https://tonystark-ai.ccwu.cc/png/fed79683-fbb6-44ac-9327-44c2f269cc47.png',
-    'https://tonystark-ai.ccwu.cc/png/600dc4e1-70ed-491a-85d4-a0edea269eb8.png',
-    'https://tonystark-ai.ccwu.cc/png/79b1c1f7-445f-49bc-a075-e44c66b289d8.png'
+    'https://aixian.online/png/fed79683-fbb6-44ac-9327-44c2f269cc47.png',
+    'https://aixian.online/png/600dc4e1-70ed-491a-85d4-a0edea269eb8.png',
+    'https://aixian.online/png/79b1c1f7-445f-49bc-a075-e44c66b289d8.png'
   ]
   return imgs[idx % imgs.length]
 }

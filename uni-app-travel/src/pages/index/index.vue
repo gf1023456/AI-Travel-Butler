@@ -244,7 +244,7 @@ export default {
     },
     nextDist() { return '1.2km' },
     planImage() {
-      return 'https://tonystark-ai.ccwu.cc/png/8c8c5e70-c661-4658-a1cf-a732fec20c4f.png'
+      return 'https://aixian.online/png/8c8c5e70-c661-4658-a1cf-a732fec20c4f.png'
     },
     quickCardItems() {
       const plan = this.travelStore.currentPlan
